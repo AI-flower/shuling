@@ -43,7 +43,8 @@ def init_db():
         likes INTEGER DEFAULT 0,
         saves INTEGER DEFAULT 0,
         comments INTEGER DEFAULT 0,
-        shares INTEGER DEFAULT 0
+        shares INTEGER DEFAULT 0,
+        checkpoint TEXT DEFAULT 'review'
     );
 
     CREATE TABLE IF NOT EXISTS topics (
@@ -200,11 +201,11 @@ def get_draft_posts(date_str, slot):
 
 # ---- Metrics ----
 
-def add_metrics(post_id, likes=0, saves=0, comments=0, shares=0):
+def add_metrics(post_id, likes=0, saves=0, comments=0, shares=0, checkpoint="review"):
     conn = get_conn()
     conn.execute(
-        "INSERT INTO post_metrics (post_id, checked_at, likes, saves, comments, shares) VALUES (?, ?, ?, ?, ?, ?)",
-        (post_id, datetime.now().isoformat(), likes, saves, comments, shares)
+        "INSERT INTO post_metrics (post_id, checked_at, likes, saves, comments, shares, checkpoint) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (post_id, datetime.now().isoformat(), likes, saves, comments, shares, checkpoint)
     )
     conn.commit()
     conn.close()
@@ -283,6 +284,11 @@ def migrate_db():
         conn.execute("ALTER TABLE posts ADD COLUMN angle TEXT")
     if "style" not in columns:
         conn.execute("ALTER TABLE posts ADD COLUMN style TEXT")
+    # post_metrics: checkpoint 字段
+    cursor = conn.execute("PRAGMA table_info(post_metrics)")
+    pm_columns = {row["name"] for row in cursor.fetchall()}
+    if "checkpoint" not in pm_columns:
+        conn.execute("ALTER TABLE post_metrics ADD COLUMN checkpoint TEXT DEFAULT 'review'")
     conn.commit()
     conn.close()
 
@@ -520,6 +526,66 @@ def get_post_images(post_id):
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def has_metric_at_checkpoint(post_id, checkpoint):
+    """检查是否已采集该时间点的数据"""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT COUNT(*) as cnt FROM post_metrics WHERE post_id=? AND checkpoint=?",
+        (post_id, checkpoint)
+    ).fetchone()
+    conn.close()
+    return row["cnt"] > 0
+
+
+def get_published_posts_with_notes():
+    """获取所有已发布且有 note_id 的帖子"""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT id, xhs_note_id, published_at FROM posts WHERE status='published' AND xhs_note_id IS NOT NULL"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_posts_between_dates(start_date, end_date):
+    """获取日期范围内的帖子，用于周复盘导出"""
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT p.id, p.date, p.slot, p.title, p.angle, p.style, p.github_repo,
+               p.github_stars, p.status, p.xhs_note_id
+        FROM posts p
+        WHERE p.date >= ? AND p.date <= ? AND p.status = 'published'
+        ORDER BY p.date, p.slot
+    """, (start_date, end_date)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_all_metrics_for_post(post_id):
+    """获取帖子的所有 checkpoint 指标，用于增长曲线"""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT checkpoint, likes, saves, comments, shares, checked_at FROM post_metrics WHERE post_id=? ORDER BY checked_at",
+        (post_id,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_draft_score_for_post(post_id):
+    """获取帖子对应的草稿预测分"""
+    conn = get_conn()
+    row = conn.execute("""
+        SELECT ds.total_score FROM draft_scores ds
+        JOIN drafts d ON d.id = ds.draft_row_id
+        JOIN posts p ON p.date = d.date AND p.slot = d.slot
+        WHERE p.id = ? AND d.selected = 1
+        ORDER BY ds.total_score DESC LIMIT 1
+    """, (post_id,)).fetchone()
+    conn.close()
+    return row["total_score"] if row else None
 
 
 # 初始化
