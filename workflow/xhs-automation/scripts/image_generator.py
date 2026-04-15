@@ -1,9 +1,10 @@
 """XHS 自动化系统 - AI 图片生成模块（零依赖）
 
-支持三种策略：
-  - ai: OpenAI 兼容 API 生成
-  - html: HTML 截图降级（Playwright）
-  - auto: AI 优先，失败自动降级为截图
+支持四种策略：
+  - cover_ai: 封面 AI 生成 + 内容页 HTML 截图（推荐默认）
+  - ai: 全部 OpenAI 兼容 API 生成
+  - html: 全部 HTML 截图（Playwright）
+  - auto: 等同 cover_ai（向后兼容）
 """
 import base64
 import glob
@@ -77,22 +78,56 @@ NODE_BIN = _find_executable("node", [
 # Prompt 增强
 # ---------------------------------------------------------------------------
 
-def enhance_image_prompt(raw_prompt, brand_style="", page_index=0):
-    """增强 prompt：追加品牌风格 + 小红书适配 + 页码上下文"""
+def _parse_image_prompts(raw):
+    """解析 image_prompts，兼容新格式（dict）和旧格式（list/str）。
+
+    Returns:
+        (visual_style: str, prompts: list[str])
+    """
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw) if raw else []
+        except (json.JSONDecodeError, ValueError):
+            return ("", [raw] if raw else [])
+
+    if isinstance(raw, dict):
+        visual_style = raw.get("visual_style", "")
+        prompts = raw.get("prompts", [])
+        if isinstance(prompts, str):
+            prompts = [prompts] if prompts else []
+        return (visual_style, prompts)
+
+    if isinstance(raw, list):
+        return ("", raw)
+
+    return ("", [])
+
+
+def enhance_image_prompt(raw_prompt, brand_style="", visual_style="", page_index=0):
+    """增强 prompt：合并品牌风格 + 帖子视觉风格 + 小红书适配 + 页码上下文
+
+    优先级：raw_prompt（内容描述）> visual_style（本帖风格）> brand_style（品牌风格）
+    """
     parts = [raw_prompt.strip()]
 
+    # 帖子级风格（来自 Claude 针对本帖生成的视觉描述）
+    if visual_style:
+        parts.append(visual_style)
+
+    # 品牌级风格（来自 IMAGE_BRAND_STYLE 环境变量）
     if brand_style:
         parts.append(brand_style)
-    else:
+    elif not visual_style:
+        # 两者都没有时才用兜底
         parts.append("clean modern style, soft pastel colors, minimalist, no text overlay")
 
     # 页码上下文
     if page_index == 0:
-        parts.append("eye-catching cover image, vibrant and inviting")
+        parts.append("eye-catching cover image, vibrant and inviting, hero illustration")
     elif page_index >= 4:
         parts.append("summary visual, warm and encouraging tone")
 
-    parts.append("high quality, vibrant colors, 3:4 aspect ratio")
+    parts.append("high quality, vibrant colors, 3:4 aspect ratio, no text in image")
     return ", ".join(parts)
 
 
@@ -101,18 +136,30 @@ def enhance_image_prompt(raw_prompt, brand_style="", page_index=0):
 # ---------------------------------------------------------------------------
 
 def recommend_image_strategy(draft):
-    """根据内容类型推荐图片策略"""
-    fmt = draft.get("suggested_format", "image_text")
+    """根据内容类型推荐图片策略
+
+    策略说明：
+    - html: 全部走 HTML 截图（无 API Key 时强制）
+    - ai: 全部走 AI 生成
+    - cover_ai: 封面走 AI，内容页走 HTML 截图（推荐默认）
+    - auto: 等同 cover_ai（向后兼容）
+    """
     config = get_image_config()
 
     if not config["api_key"]:
-        return "html"  # 未配置 API Key，强制截图
+        return "html"
 
+    fmt = draft.get("suggested_format", "image_text")
+
+    # image_text 格式（主流）：封面 AI + 内容截图，兼顾吸引力和信息密度
     if fmt == "image_text":
+        return "cover_ai"
+
+    # 纯图片格式：全部 AI
+    if fmt == "image_only":
         return "ai"
-    if fmt == "image_only" and draft.get("angle") == "tutorial":
-        return "html"  # 教程类内容截图效果更好
-    return "ai"
+
+    return "cover_ai"
 
 
 # ---------------------------------------------------------------------------
@@ -239,13 +286,8 @@ async def generate_images(draft, post_id, output_dir):
     if strategy == "auto":
         strategy = recommend_image_strategy(draft)
 
-    # 解析 prompts
-    prompts = draft.get("image_prompts", [])
-    if isinstance(prompts, str):
-        try:
-            prompts = json.loads(prompts) if prompts else []
-        except (json.JSONDecodeError, ValueError):
-            prompts = [prompts] if prompts else []
+    # 解析 prompts（兼容新格式 dict 和旧格式 list）
+    visual_style, prompts = _parse_image_prompts(draft.get("image_prompts", []))
 
     # 如果没有 prompts，从 key_points 构造
     if not prompts:
@@ -269,16 +311,61 @@ async def generate_images(draft, post_id, output_dir):
     for i, prompt in enumerate(prompts):
         img_id = db.add_generated_image(
             post_id, i + 1, prompt,
-            gen_model=config["model"] if strategy == "ai" else "screenshot",
+            gen_model=config["model"] if strategy in ("ai", "cover_ai") else "screenshot",
             gen_strategy=strategy,
         )
         db_ids.append(img_id)
 
-    if strategy in ("ai", "auto") and config["api_key"]:
+    if strategy == "cover_ai" and config["api_key"] and len(prompts) > 0:
+        # cover_ai 策略：封面（index 0）走 AI，其余走 HTML 截图
+        results = [{"index": i + 1, "path": None, "status": "pending"} for i in range(len(prompts))]
+
+        # AI 生成封面
+        cover_prompt = prompts[0]
+        cover_path = os.path.join(output_dir, f"page-1.png")
+        enhanced = enhance_image_prompt(
+            cover_prompt, config["brand_style"], visual_style, page_index=0
+        )
+        try:
+            path = await generate_image_ai(semaphore, enhanced, cover_path, config)
+            db.update_image_status(db_ids[0], "done", path)
+            results[0] = {"index": 1, "path": path, "status": "done"}
+            print(f"  [AI] page-1.png 封面生成成功")
+        except Exception as e:
+            print(f"  [AI] page-1.png 封面失败: {e}，将降级截图", file=sys.stderr)
+
+        # 内容页走 HTML 截图
+        html_path = os.path.join(output_dir, "post.html")
+        if not os.path.exists(html_path):
+            post_dir = draft.get("post_dir", output_dir)
+            html_path = os.path.join(post_dir, "post.html")
+
+        screenshot_paths = generate_image_html(html_path, output_dir)
+        if screenshot_paths:
+            print(f"  [截图] 成功生成 {len(screenshot_paths)} 张")
+
+        # 内容页使用截图结果（跳过封面 index 0 如果 AI 成功）
+        for idx in range(1, len(prompts)):
+            if idx < len(screenshot_paths) and os.path.exists(screenshot_paths[idx]):
+                db.update_image_status(db_ids[idx], "done", screenshot_paths[idx])
+                results[idx] = {"index": idx + 1, "path": screenshot_paths[idx], "status": "done"}
+            else:
+                db.update_image_status(db_ids[idx], "failed")
+                results[idx] = {"index": idx + 1, "path": None, "status": "failed",
+                                "error": "screenshot not available for this page"}
+
+        # 封面 AI 失败时，用截图兜底
+        if results[0]["status"] != "done" and screenshot_paths and os.path.exists(screenshot_paths[0]):
+            db.update_image_status(db_ids[0], "done", screenshot_paths[0])
+            results[0] = {"index": 1, "path": screenshot_paths[0], "status": "done"}
+
+        return results
+
+    elif strategy in ("ai", "auto") and config["api_key"]:
         # 并行 AI 生成
         async def _gen_one(idx, prompt):
             img_path = os.path.join(output_dir, f"page-{idx + 1}.png")
-            enhanced = enhance_image_prompt(prompt, config["brand_style"], page_index=idx)
+            enhanced = enhance_image_prompt(prompt, config["brand_style"], visual_style, page_index=idx)
             try:
                 path = await generate_image_ai(semaphore, enhanced, img_path, config)
                 db.update_image_status(db_ids[idx], "done", path)
@@ -349,7 +436,7 @@ async def regenerate_image(post_id, page_index, new_prompt=None):
     if not output_path:
         output_path = os.path.join(POSTS_DIR, f"regen-{post_id}-{page_index}.png")
 
-    enhanced = enhance_image_prompt(prompt, config["brand_style"], page_index=page_index - 1)
+    enhanced = enhance_image_prompt(prompt, config["brand_style"], visual_style="", page_index=page_index - 1)
     semaphore = asyncio.Semaphore(1)
 
     try:
@@ -393,7 +480,7 @@ if __name__ == "__main__":
 
     if len(sys.argv) < 2:
         print("用法: python image_generator.py <post_id> [strategy]")
-        print("  strategy: auto (默认) / ai / html")
+        print("  strategy: auto (默认) / ai / html / cover_ai")
         sys.exit(1)
 
     post_id = int(sys.argv[1])
