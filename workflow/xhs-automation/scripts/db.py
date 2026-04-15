@@ -144,7 +144,8 @@ def init_db():
 # ---- Posts ----
 
 def add_post(date_str, slot, post_dir, title, content, tags, post_type,
-             github_repo=None, github_stars=None, scheduled_at=None):
+             github_repo=None, github_stars=None, scheduled_at=None,
+             angle=None, style=None, pattern_used=None):
     conn = get_conn()
     existing = conn.execute(
         "SELECT id FROM posts WHERE date=? AND slot=? AND post_dir=? ORDER BY id DESC LIMIT 1",
@@ -157,10 +158,10 @@ def add_post(date_str, slot, post_dir, title, content, tags, post_type,
 
     cur = conn.execute(
         """INSERT INTO posts (date, slot, post_dir, title, content, tags, post_type,
-           github_repo, github_stars, scheduled_at, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')""",
+           github_repo, github_stars, scheduled_at, status, angle, style, pattern_used)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)""",
         (date_str, slot, post_dir, title, content, json.dumps(tags, ensure_ascii=False),
-         post_type, github_repo, github_stars, scheduled_at)
+         post_type, github_repo, github_stars, scheduled_at, angle, style, pattern_used)
     )
     conn.commit()
     post_id = cur.lastrowid
@@ -289,6 +290,11 @@ def migrate_db():
     pm_columns = {row["name"] for row in cursor.fetchall()}
     if "checkpoint" not in pm_columns:
         conn.execute("ALTER TABLE post_metrics ADD COLUMN checkpoint TEXT DEFAULT 'review'")
+    # posts: pattern_used 字段
+    cursor = conn.execute("PRAGMA table_info(posts)")
+    posts_columns = {row["name"] for row in cursor.fetchall()}
+    if "pattern_used" not in posts_columns:
+        conn.execute("ALTER TABLE posts ADD COLUMN pattern_used TEXT")
     conn.commit()
     conn.close()
 

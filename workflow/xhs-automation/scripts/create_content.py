@@ -65,6 +65,25 @@ def build_knowledge_context():
     return "\n\n".join(context_parts) if context_parts else ""
 
 
+
+def _detect_pattern_used(title):
+    """根据标题特征推断使用了哪个 pattern"""
+    import re as _re
+    # 数字清单体：标题包含数字
+    if _re.search(r'\d+\s*[个款种步招条]', title):
+        return "P01-number-list"
+    # 痛点共鸣体：包含"别再"、"不要"、"千万"
+    if any(kw in title for kw in ["别再", "不要", "千万", "别乱"]):
+        return "P02-pain-point"
+    # 反差悬念体：包含问号或"竟然"、"没想到"
+    if "？" in title or "?" in title or any(kw in title for kw in ["竟然", "没想到", "居然"]):
+        return "P03-suspense"
+    # 效果展示体：包含"效率"、"翻倍"、"神器"
+    if any(kw in title for kw in ["效率", "翻倍", "神器", "绝了", "太好用"]):
+        return "P04-effect-show"
+    return None
+
+
 def _find_executable(name, candidates=None):
     candidates = candidates or []
     for candidate in candidates:
@@ -698,6 +717,13 @@ def create_post(candidate, date_str, slot, post_number):
         json.dump(meta, f, ensure_ascii=False, indent=2)
     print(f"  ✅ meta.json 保存")
 
+    # 推断内容角度和风格
+    angle = "discovery" if slot == "noon" else "tutorial"
+    style = "casual-sharing" if slot == "noon" else "step-by-step"
+
+    # 推断使用的 pattern（从知识库匹配）
+    pattern_used = _detect_pattern_used(title)
+
     # 5. 写入 DB
     post_id = db.add_post(
         date_str=date_str,
@@ -709,8 +735,12 @@ def create_post(candidate, date_str, slot, post_number):
         post_type="tool_recommend" if slot == "noon" else "skill_tip",
         github_repo=candidate.get("repo"),
         github_stars=candidate.get("stars"),
-        scheduled_at=schedule_at
+        scheduled_at=schedule_at,
+        angle=angle,
+        style=style,
+        pattern_used=pattern_used
     )
+
     print(f"  ✅ DB 记录: post_id={post_id}")
 
     return {
