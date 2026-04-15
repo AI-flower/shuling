@@ -18,6 +18,8 @@ import base64
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 import telegram
+import db
+from datetime import datetime, timedelta
 
 
 
@@ -149,7 +151,7 @@ def get_qrcode_and_alert():
                 # 提取 URL
                 for word in text.split():
                     if word.startswith("http"):
-                        qr_url = word.strip('"\'')
+                        qr_url = word.strip("\"'")
                         break
             if item.get("type") == "image":
                 qr_image_data = item.get("data", "")
@@ -183,6 +185,88 @@ def get_qrcode_and_alert():
         telegram.send_error("保活检测", f"登录过期，二维码处理失败: {e}")
 
 
+def collect_pending_metrics():
+    """检查已发布帖子是否需要采集 T+1h/6h/24h/72h 数据"""
+    db.init_db()
+    db.migrate_db()
+    posts = db.get_published_posts_with_notes()
+    now = datetime.now()
+    collected = 0
+
+    for post in posts:
+        published_at = post.get("published_at")
+        if not published_at:
+            continue
+        try:
+            pub_time = datetime.fromisoformat(published_at)
+        except (ValueError, TypeError):
+            continue
+
+        note_id = post.get("xhs_note_id")
+        if not note_id:
+            continue
+
+        for hours in [1, 6, 24, 72]:
+            checkpoint = f"T+{hours}h"
+            target_time = pub_time + timedelta(hours=hours)
+            diff_seconds = abs((now - target_time).total_seconds())
+
+            # ±2 小时窗口内，且未采集过
+            if diff_seconds < 7200 and not db.has_metric_at_checkpoint(post["id"], checkpoint):
+                log(f"采集 post_id={post['id']} {checkpoint} 数据...")
+                metrics = _fetch_metrics_for_note(note_id)
+                if metrics:
+                    db.add_metrics(post["id"], checkpoint=checkpoint, **metrics)
+                    log(f"  {checkpoint}: ❤️{metrics['likes']} ⭐{metrics['saves']} 💬{metrics['comments']}")
+                    collected += 1
+                else:
+                    log(f"  {checkpoint}: 获取失败，下次重试")
+
+    if collected:
+        log(f"本轮采集 {collected} 条指标")
+
+
+def _fetch_metrics_for_note(note_id):
+    """通过 MCP 获取帖子互动数据"""
+    import re
+    resp = mcp_call("get_feed_detail", json.dumps({"feed_id": note_id, "xsec_token": ""}))
+    if resp is None:
+        return None
+
+    try:
+        if isinstance(resp, dict):
+            interact = resp.get("interact_info", resp.get("note_card", {}).get("interact_info", {}))
+            if not interact and "liked_count" in str(resp):
+                interact = resp
+            return {
+                "likes": int(interact.get("liked_count", 0)),
+                "saves": int(interact.get("collected_count", interact.get("saved_count", 0))),
+                "comments": int(interact.get("comment_count", 0)),
+                "shares": int(interact.get("share_count", 0))
+            }
+    except (ValueError, AttributeError, TypeError):
+        pass
+
+    # 正则回退（从原始文本提取）
+    text = json.dumps(resp) if isinstance(resp, dict) else str(resp)
+    metrics = {}
+    for key, patterns in {
+        "likes": [r'"liked_count":\s*"?(\d+)"?'],
+        "saves": [r'"collected_count":\s*"?(\d+)"?'],
+        "comments": [r'"comment_count":\s*"?(\d+)"?'],
+        "shares": [r'"share_count":\s*"?(\d+)"?'],
+    }.items():
+        for pat in patterns:
+            m = re.search(pat, text)
+            if m:
+                metrics[key] = int(m.group(1))
+                break
+        if key not in metrics:
+            metrics[key] = 0
+
+    return metrics if any(v > 0 for v in metrics.values()) else None
+
+
 def main():
     log("=== 开始保活检测 ===")
 
@@ -203,6 +287,13 @@ def main():
         log("登录状态正常 ✓")
     else:
         get_qrcode_and_alert()
+
+    # 3. 多时间点数据采集
+    log("📊 检查待采集指标...")
+    try:
+        collect_pending_metrics()
+    except Exception as e:
+        log(f"指标采集异常: {e}")
 
     log("=== 保活检测结束 ===")
 
