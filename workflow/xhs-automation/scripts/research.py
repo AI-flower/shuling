@@ -29,6 +29,20 @@ def resolve_mcp_script(script_name):
 
 MCP_CALL = resolve_mcp_script("mcp-call.sh")
 
+KNOWLEDGE_BASE_DIR = os.path.join(BASE_DIR, "knowledge-base")
+
+
+def load_knowledge_weights():
+    """从 knowledge-base/rules.json 读取权重，用于调整评分"""
+    rules_path = os.path.join(KNOWLEDGE_BASE_DIR, "rules.json")
+    if not os.path.exists(rules_path):
+        return None
+    try:
+        with open(rules_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
+
 
 def fetch_github_trending(language="", since="daily"):
     """抓取 GitHub trending 页面，提取仓库信息"""
@@ -438,6 +452,9 @@ def run_research(date_str=None):
         date_str = date.today().isoformat()
 
     db.init_db()
+    knowledge = load_knowledge_weights()
+    if knowledge:
+        print(f"\U0001F4DA 知识库已加载（phase={knowledge.get('phase', '?')}, post_count={knowledge.get('post_count', '?')}）")
     print(f"=== XHS 晨间研究 {date_str} ===\n")
 
     # 1. 获取 GitHub trending
