@@ -63,6 +63,57 @@ if [ ! -f "$INSTALL_ROOT/config/runtime.env" ] || ! grep -q "LLM_PROVIDER" "$INS
         printf '  LLM 配置已写入 runtime.env\n'
     fi
 fi
+
+# 图片生成配置提示
+if [ -f "$INSTALL_ROOT/config/runtime.env" ] && ! grep -q "IMAGE_GEN_PROVIDER" "$INSTALL_ROOT/config/runtime.env"; then
+    printf '\n=== 图片生成配置 ===\n'
+    printf '用于自动生成小红书配图（未配置则全部走 HTML 截图）。\n'
+    printf '  1) OpenAI / 兼容 API（gpt-image-1 等）\n'
+    printf '  2) Google Gemini（Nano Banana，有免费额度）\n'
+    printf '  3) 暂不配置（全部走 HTML 截图）\n'
+    read -p "选择 [1/2/3] (默认 3): " img_choice
+    img_choice=${img_choice:-3}
+    case $img_choice in
+        1)
+            read -p "OpenAI API Key: " img_key
+            read -p "Base URL (留空用 https://api.openai.com/v1): " img_url
+            img_url=${img_url:-https://api.openai.com/v1}
+            read -p "模型名 (留空用 gpt-image-1): " img_model
+            img_model=${img_model:-gpt-image-1}
+            {
+                echo ""
+                echo "# ---- 图片生成配置 ----"
+                echo "IMAGE_GEN_PROVIDER=openai"
+                echo "IMAGE_GEN_API_KEY=$img_key"
+                echo "IMAGE_GEN_BASE_URL=$img_url"
+                echo "IMAGE_GEN_MODEL=$img_model"
+                echo "IMAGE_GEN_SIZE=1024x1024"
+            } >> "$INSTALL_ROOT/config/runtime.env"
+            printf '  图片生成配置已写入（OpenAI）\n'
+            ;;
+        2)
+            printf '\n  Gemini API Key 获取地址: https://aistudio.google.com/api-keys\n'
+            read -p "Gemini API Key (AIza...): " img_key
+            read -p "模型名 (留空用 gemini-2.0-flash-preview-image-generation): " img_model
+            img_model=${img_model:-gemini-2.0-flash-preview-image-generation}
+            read -p "宽高比 (留空用 3:4): " img_ratio
+            img_ratio=${img_ratio:-3:4}
+            {
+                echo ""
+                echo "# ---- 图片生成配置（Gemini）----"
+                echo "IMAGE_GEN_PROVIDER=gemini"
+                echo "IMAGE_GEN_API_KEY=$img_key"
+                echo "IMAGE_GEN_MODEL=$img_model"
+                echo "IMAGE_GEN_ASPECT_RATIO=$img_ratio"
+            } >> "$INSTALL_ROOT/config/runtime.env"
+            printf '  图片生成配置已写入（Gemini）\n'
+            ;;
+        *)
+            printf '  跳过图片生成配置，将使用 HTML 截图模式\n'
+            ;;
+    esac
+fi
+
 cat <<EOF
 
 Install complete.
