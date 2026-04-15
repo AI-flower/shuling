@@ -8,7 +8,7 @@ LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 printf 'Installing to %s\n' "$INSTALL_ROOT"
 
 mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills" "$HOME/.codex/skills"
-mkdir -p "$INSTALL_ROOT" "$INSTALL_ROOT/logs" "$INSTALL_ROOT/posts" "$INSTALL_ROOT/output" "$INSTALL_ROOT/data" "$INSTALL_ROOT/config" "$INSTALL_ROOT/launchd"
+mkdir -p "$INSTALL_ROOT" "$INSTALL_ROOT/logs" "$INSTALL_ROOT/posts" "$INSTALL_ROOT/output" "$INSTALL_ROOT/data" "$INSTALL_ROOT/config" "$INSTALL_ROOT/launchd" "$INSTALL_ROOT/knowledge-base/reviews"
 
 rsync -a "$BUNDLE_ROOT/skills/xiaohongshu/" "$HOME/.agents/skills/xiaohongshu/"
 ln -sfn "$HOME/.agents/skills/xiaohongshu" "$HOME/.claude/skills/xiaohongshu"
@@ -34,6 +34,35 @@ done
 chmod +x "$INSTALL_ROOT/publish.sh"
 chmod +x "$HOME/.agents/skills/xiaohongshu/scripts/"*.sh
 
+
+# LLM 配置提示
+if [ ! -f "$INSTALL_ROOT/config/runtime.env" ] || ! grep -q "LLM_PROVIDER" "$INSTALL_ROOT/config/runtime.env"; then
+    printf '\n=== LLM 配置 ===\n'
+    printf 'workflow 后台脚本需要 LLM 调用能力。\n'
+    printf '  1) Claude API (Anthropic)\n'
+    printf '  2) OpenAI API\n'
+    printf '  3) 兼容 OpenAI 格式的其他服务\n'
+    read -p "选择 [1/2/3] (默认 1): " llm_choice
+    llm_choice=${llm_choice:-1}
+    case $llm_choice in
+        1) llm_provider="claude"; llm_model="claude-sonnet-4-20250514" ;;
+        2) llm_provider="openai"; llm_model="gpt-4o-mini" ;;
+        3) llm_provider="openai-compatible"; llm_model="" ;;
+    esac
+    read -p "API Key: " llm_key
+    read -p "Base URL (留空用默认): " llm_url
+    if [ -n "$llm_provider" ]; then
+        {
+            echo ""
+            echo "# ---- LLM 配置 ----"
+            echo "LLM_PROVIDER=$llm_provider"
+            echo "LLM_API_KEY=$llm_key"
+            echo "LLM_BASE_URL=$llm_url"
+            echo "LLM_MODEL=$llm_model"
+        } >> "$INSTALL_ROOT/config/runtime.env"
+        printf '  LLM 配置已写入 runtime.env\n'
+    fi
+fi
 cat <<EOF
 
 Install complete.
