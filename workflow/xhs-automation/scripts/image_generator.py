@@ -2,9 +2,13 @@
 
 支持四种策略：
   - cover_ai: 封面 AI 生成 + 内容页 HTML 截图（推荐默认）
-  - ai: 全部 OpenAI 兼容 API 生成
+  - ai: 全部 AI 生成
   - html: 全部 HTML 截图（Playwright）
   - auto: 等同 cover_ai（向后兼容）
+
+支持两种 AI 图片后端（IMAGE_GEN_PROVIDER）：
+  - openai: OpenAI 兼容 API（gpt-image-1 等）
+  - gemini: Google Gemini API（Nano Banana Pro 等，零 SDK 依赖）
 """
 import base64
 import glob
@@ -28,11 +32,21 @@ POSTS_DIR = os.path.join(BASE_DIR, "posts")
 
 
 def get_image_config():
+    provider = os.environ.get("IMAGE_GEN_PROVIDER", "openai").strip().lower()
+
+    # 根据 provider 设置默认 model
+    default_model = {
+        "openai": "gpt-image-1",
+        "gemini": "gemini-2.0-flash-preview-image-generation",
+    }.get(provider, "gpt-image-1")
+
     return {
+        "provider": provider,
         "api_key": os.environ.get("IMAGE_GEN_API_KEY", "").strip(),
         "base_url": os.environ.get("IMAGE_GEN_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
-        "model": os.environ.get("IMAGE_GEN_MODEL", "gpt-image-1"),
+        "model": os.environ.get("IMAGE_GEN_MODEL", default_model),
         "size": os.environ.get("IMAGE_GEN_SIZE", "1024x1024"),
+        "aspect_ratio": os.environ.get("IMAGE_GEN_ASPECT_RATIO", "3:4"),
         "style": os.environ.get("IMAGE_GEN_STYLE", "vivid"),
         "brand_style": os.environ.get("IMAGE_BRAND_STYLE", "").strip(),
         "concurrency": int(os.environ.get("DRAFT_CONCURRENCY", "3")),
@@ -163,10 +177,23 @@ def recommend_image_strategy(draft):
 
 
 # ---------------------------------------------------------------------------
-# AI 图片生成（OpenAI 兼容 API）
+# AI 图片生成 — 路由
 # ---------------------------------------------------------------------------
 
 async def generate_image_ai(semaphore, prompt, output_path, config):
+    """通过 AI API 生成单张图片（自动路由 OpenAI / Gemini）"""
+    provider = config.get("provider", "openai")
+    if provider == "gemini":
+        return await _generate_image_gemini(semaphore, prompt, output_path, config)
+    else:
+        return await _generate_image_openai(semaphore, prompt, output_path, config)
+
+
+# ---------------------------------------------------------------------------
+# OpenAI 兼容 API 后端
+# ---------------------------------------------------------------------------
+
+async def _generate_image_openai(semaphore, prompt, output_path, config):
     """通过 OpenAI 兼容 API 生成单张图片"""
     async with semaphore:
         payload = json.dumps({
@@ -193,7 +220,7 @@ async def generate_image_ai(semaphore, prompt, output_path, config):
             data = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             body = e.read().decode(errors="replace")[:300]
-            raise RuntimeError(f"API error {e.code}: {body}")
+            raise RuntimeError(f"OpenAI API error {e.code}: {body}")
 
         image_data = data.get("data", [{}])[0]
 
@@ -204,12 +231,155 @@ async def generate_image_ai(semaphore, prompt, output_path, config):
                 None, lambda: urllib.request.urlopen(image_data["url"], timeout=60))
             img_bytes = img_resp.read()
         else:
-            raise ValueError("API response contains neither b64_json nor url")
+            raise ValueError("OpenAI response contains neither b64_json nor url")
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "wb") as f:
             f.write(img_bytes)
         return output_path
+
+
+# ---------------------------------------------------------------------------
+# Google Gemini API 后端（零 SDK 依赖，直接 REST 调用）
+# ---------------------------------------------------------------------------
+
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+
+
+async def _generate_image_gemini(semaphore, prompt, output_path, config):
+    """通过 Google Gemini API 生成单张图片
+
+    使用 generateContent 端点 + responseModalities=IMAGE，
+    支持 Nano Banana Pro / Nano Banana 2 等 Gemini 图像生成模型。
+    """
+    async with semaphore:
+        model = config["model"]
+        api_key = config["api_key"]
+        aspect_ratio = config.get("aspect_ratio", "3:4")
+
+        url = f"{GEMINI_API_BASE}/models/{model}:generateContent?key={api_key}"
+
+        payload = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "responseModalities": ["IMAGE"],
+            },
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+
+        loop = asyncio.get_event_loop()
+        try:
+            resp = await loop.run_in_executor(
+                None, lambda: urllib.request.urlopen(req, timeout=180))
+            data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            body = e.read().decode(errors="replace")[:500]
+            raise RuntimeError(f"Gemini API error {e.code}: {body}")
+
+        # 从 candidates 中提取图片
+        candidates = data.get("candidates", [])
+        if not candidates:
+            # 检查是否有 promptFeedback 被拒
+            feedback = data.get("promptFeedback", {})
+            block_reason = feedback.get("blockReason", "")
+            if block_reason:
+                raise RuntimeError(f"Gemini 拒绝生成: {block_reason}")
+            raise RuntimeError(f"Gemini 返回空 candidates: {json.dumps(data)[:300]}")
+
+        parts = candidates[0].get("content", {}).get("parts", [])
+        for part in parts:
+            inline_data = part.get("inlineData")
+            if inline_data and inline_data.get("data"):
+                img_bytes = base64.b64decode(inline_data["data"])
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                with open(output_path, "wb") as f:
+                    f.write(img_bytes)
+                return output_path
+
+        raise RuntimeError(
+            f"Gemini 响应中无图片数据, parts={json.dumps(parts)[:200]}"
+        )
+
+
+async def _generate_image_gemini_with_ref(semaphore, prompt, output_path, config,
+                                          reference_image_path=None):
+    """Gemini 生图 + 参考图（保持风格一致性）
+
+    将参考图作为 contents 的一部分传入，Gemini 会参考其风格生成新图。
+    适用于 cover_ai 策略：先生成封面，后续页面以封面为参考。
+    """
+    async with semaphore:
+        model = config["model"]
+        api_key = config["api_key"]
+
+        url = f"{GEMINI_API_BASE}/models/{model}:generateContent?key={api_key}"
+
+        content_parts = []
+
+        # 如果有参考图，先放参考图
+        if reference_image_path and os.path.exists(reference_image_path):
+            with open(reference_image_path, "rb") as f:
+                ref_bytes = f.read()
+            ref_b64 = base64.b64encode(ref_bytes).decode("utf-8")
+            # 判断 MIME 类型
+            mime = "image/png" if reference_image_path.endswith(".png") else "image/jpeg"
+            content_parts.append({
+                "inlineData": {"mimeType": mime, "data": ref_b64}
+            })
+            content_parts.append({
+                "text": f"参考上面这张图的视觉风格和配色，生成以下内容的插画：{prompt}"
+            })
+        else:
+            content_parts.append({"text": prompt})
+
+        payload = json.dumps({
+            "contents": [{"parts": content_parts}],
+            "generationConfig": {
+                "responseModalities": ["IMAGE"],
+            },
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+
+        loop = asyncio.get_event_loop()
+        try:
+            resp = await loop.run_in_executor(
+                None, lambda: urllib.request.urlopen(req, timeout=180))
+            data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            body = e.read().decode(errors="replace")[:500]
+            raise RuntimeError(f"Gemini API error {e.code}: {body}")
+
+        candidates = data.get("candidates", [])
+        if not candidates:
+            feedback = data.get("promptFeedback", {})
+            block_reason = feedback.get("blockReason", "")
+            if block_reason:
+                raise RuntimeError(f"Gemini 拒绝生成: {block_reason}")
+            raise RuntimeError(f"Gemini 返回空 candidates: {json.dumps(data)[:300]}")
+
+        parts = candidates[0].get("content", {}).get("parts", [])
+        for part in parts:
+            inline_data = part.get("inlineData")
+            if inline_data and inline_data.get("data"):
+                img_bytes = base64.b64decode(inline_data["data"])
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                with open(output_path, "wb") as f:
+                    f.write(img_bytes)
+                return output_path
+
+        raise RuntimeError(
+            f"Gemini 响应中无图片数据, parts={json.dumps(parts)[:200]}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -281,6 +451,9 @@ async def generate_images(draft, post_id, output_dir):
     os.makedirs(output_dir, exist_ok=True)
     config = get_image_config()
 
+    provider = config["provider"]
+    use_gemini_ref = (provider == "gemini")
+
     # 确定策略
     strategy = draft.get("image_strategy", "auto")
     if strategy == "auto":
@@ -307,11 +480,12 @@ async def generate_images(draft, post_id, output_dir):
     ai_failed = []
 
     # 注册到 DB + AI 并行生成
+    model_name = config["model"] if strategy in ("ai", "cover_ai") else "screenshot"
     db_ids = []
     for i, prompt in enumerate(prompts):
         img_id = db.add_generated_image(
             post_id, i + 1, prompt,
-            gen_model=config["model"] if strategy in ("ai", "cover_ai") else "screenshot",
+            gen_model=model_name,
             gen_strategy=strategy,
         )
         db_ids.append(img_id)
@@ -330,9 +504,9 @@ async def generate_images(draft, post_id, output_dir):
             path = await generate_image_ai(semaphore, enhanced, cover_path, config)
             db.update_image_status(db_ids[0], "done", path)
             results[0] = {"index": 1, "path": path, "status": "done"}
-            print(f"  [AI] page-1.png 封面生成成功")
+            print(f"  [{provider.upper()}] page-1.png 封面生成成功")
         except Exception as e:
-            print(f"  [AI] page-1.png 封面失败: {e}，将降级截图", file=sys.stderr)
+            print(f"  [{provider.upper()}] page-1.png 封面失败: {e}，将降级截图", file=sys.stderr)
 
         # 内容页走 HTML 截图
         html_path = os.path.join(output_dir, "post.html")
@@ -362,21 +536,55 @@ async def generate_images(draft, post_id, output_dir):
         return results
 
     elif strategy in ("ai", "auto") and config["api_key"]:
-        # 并行 AI 生成
+        # 全 AI 生成：Gemini 时利用参考图保持风格一致
+        cover_path_for_ref = None
+
         async def _gen_one(idx, prompt):
+            nonlocal cover_path_for_ref
             img_path = os.path.join(output_dir, f"page-{idx + 1}.png")
             enhanced = enhance_image_prompt(prompt, config["brand_style"], visual_style, page_index=idx)
             try:
-                path = await generate_image_ai(semaphore, enhanced, img_path, config)
+                if use_gemini_ref and idx > 0 and cover_path_for_ref:
+                    # Gemini：后续页面以封面为参考图，保持风格一致
+                    path = await _generate_image_gemini_with_ref(
+                        semaphore, enhanced, img_path, config,
+                        reference_image_path=cover_path_for_ref,
+                    )
+                else:
+                    path = await generate_image_ai(semaphore, enhanced, img_path, config)
+
+                # 封面生成成功后记录路径，供后续页面参考
+                if idx == 0:
+                    cover_path_for_ref = path
+
                 db.update_image_status(db_ids[idx], "done", path)
-                print(f"  [AI] page-{idx + 1}.png 生成成功")
+                print(f"  [{provider.upper()}] page-{idx + 1}.png 生成成功")
                 return {"index": idx + 1, "path": path, "status": "done"}
             except Exception as e:
-                print(f"  [AI] page-{idx + 1}.png 失败: {e}", file=sys.stderr)
+                print(f"  [{provider.upper()}] page-{idx + 1}.png 失败: {e}", file=sys.stderr)
                 return {"index": idx + 1, "path": None, "status": "failed", "error": str(e)}
 
-        tasks = [_gen_one(i, p) for i, p in enumerate(prompts)]
-        results = await asyncio.gather(*tasks)
+        if use_gemini_ref and len(prompts) > 1:
+            # Gemini 参考图模式：先生成封面，再并行生成后续页面
+            cover_result = await _gen_one(0, prompts[0])
+            results = [cover_result]
+
+            if cover_result["status"] == "done":
+                # 封面成功，后续页面并行生成（带参考图）
+                tasks = [_gen_one(i, p) for i, p in enumerate(prompts) if i > 0]
+                rest = await asyncio.gather(*tasks)
+                results.extend(rest)
+            else:
+                # 封面失败，后续页面不带参考图并行生成
+                tasks = [_gen_one(i, p) for i, p in enumerate(prompts) if i > 0]
+                rest = await asyncio.gather(*tasks)
+                results.extend(rest)
+        else:
+            # OpenAI 或单图：全部并行
+            tasks = [_gen_one(i, p) for i, p in enumerate(prompts)]
+            results = await asyncio.gather(*tasks)
+
+        results = sorted(results, key=lambda r: r["index"])
 
         # 收集失败的索引
         ai_failed = [r["index"] - 1 for r in results if r["status"] == "failed"]
@@ -510,8 +718,11 @@ if __name__ == "__main__":
         ]
 
     config = get_image_config()
+    provider = config["provider"]
     print(f"[image_gen] 帖子 #{post_id}「{post['title']}」生成 {len(prompts)} 张图片")
-    print(f"  策略: {cli_strategy}, AI API: {'可用' if config['api_key'] else '未配置'}")
+    print(f"  策略: {cli_strategy}, Provider: {provider}, API: {'可用' if config['api_key'] else '未配置'}")
+    if provider == "gemini":
+        print(f"  Gemini 模型: {config['model']}, 宽高比: {config['aspect_ratio']}")
 
     draft_like = {
         "title": post["title"],
