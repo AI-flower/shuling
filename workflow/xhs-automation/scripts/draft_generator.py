@@ -250,8 +250,20 @@ async def generate_one_draft(semaphore, candidate, angle, style, slot,
   "key_points": ["要点1", "要点2", "要点3"],
   "tags": ["#标签1", "#标签2"],
   "suggested_format": "image_text 或 image_only",
-  "image_prompts": ["封面图描述", "配图1描述", "配图2描述"]
-}}"""
+  "visual_style": "这篇帖子所有配图的统一视觉风格描述，30-50词英文，包含色调、构图、元素风格（如：warm orange gradient background, rounded info-cards with soft shadows, cute tech icons, lobster mascot in corner, low-saturation Xiaohongshu aesthetic）",
+  "image_prompts": [
+    "封面图：必须抓眼球，包含主题核心元素的插画描述，突出视觉冲击力",
+    "第2页配图：与该页具体内容相关的插画描述",
+    "第3页配图：与该页具体内容相关的插画描述"
+  ]
+}}
+
+image_prompts 要求：
+- 每个 prompt 用英文，30-60 词
+- 封面图（第1个）要突出 eye-catching、vibrant，适合信息流点击
+- 内容页配图要与该页的具体知识点相关，不要泛泛写 illustration for content
+- 所有 prompt 共享 visual_style 中的色调和风格，保持多页一致性
+- prompt 描述画面内容，不要写文字（文字由 HTML 截图处理）"""
 
         LOG.info("Generating draft %s ...", draft_id)
         proc = await asyncio.create_subprocess_exec(
@@ -317,11 +329,19 @@ async def generate_drafts(candidate, slot, date_str=None):
             LOG.warning("Draft task raised: %s", r)
             continue
         if isinstance(r, dict) and r.get("title"):
+            # 将 visual_style 嵌入 image_prompts 结构，统一存储
+            raw_prompts = r.get("image_prompts", [])
+            visual_style = r.get("visual_style", "")
+            image_prompts_structured = {
+                "visual_style": visual_style,
+                "prompts": raw_prompts if isinstance(raw_prompts, list) else [],
+            }
+
             row_id = db.add_draft(
                 date_str, slot, r["draft_id"], r["angle"], r["style"],
                 r["title"], r["content"], r.get("tags"),
                 r.get("suggested_format", "image_text"),
-                r.get("image_prompts"), r.get("key_points"),
+                image_prompts_structured, r.get("key_points"),
             )
             r["db_id"] = row_id
             drafts.append(r)
