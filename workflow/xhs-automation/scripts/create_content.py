@@ -19,6 +19,51 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 POSTS_DIR = os.path.join(BASE_DIR, "posts")
 RULES_FILE = os.path.join(DATA_DIR, "content-rules.md")
 
+KNOWLEDGE_BASE_DIR = os.path.join(BASE_DIR, "knowledge-base")
+
+
+def build_knowledge_context():
+    """从 knowledge-base/ 读取活跃 pattern 和规则，构建 prompt 注入片段"""
+    context_parts = []
+
+    readme_path = os.path.join(KNOWLEDGE_BASE_DIR, "README.md")
+    if os.path.exists(readme_path):
+        with open(readme_path, "r", encoding="utf-8") as f:
+            readme = f.read()
+        context_parts.append(f"## 当前运营知识\n{readme}")
+
+    patterns_path = os.path.join(KNOWLEDGE_BASE_DIR, "patterns.md")
+    if os.path.exists(patterns_path):
+        with open(patterns_path, "r", encoding="utf-8") as f:
+            patterns = f.read()
+        active_sections = []
+        for section in patterns.split("\n### "):
+            if "[DEPRECATED]" not in section and section.strip():
+                active_sections.append(section)
+        if active_sections:
+            active_text = "\n### ".join(active_sections)
+            context_parts.append(f"## 已验证有效的内容模式（请参考但不要机械套用）\n{active_text}")
+
+    rules_path = os.path.join(KNOWLEDGE_BASE_DIR, "rules.json")
+    if os.path.exists(rules_path):
+        try:
+            with open(rules_path, "r", encoding="utf-8") as f:
+                rules = json.load(f)
+            angle_w = rules.get("angle_weights", {})
+            style_w = rules.get("style_weights", {})
+            if angle_w:
+                ranked_angles = sorted(angle_w.items(), key=lambda x: x[1], reverse=True)
+                angle_text = "、".join(f"{a}({w:.0%})" for a, w in ranked_angles)
+                context_parts.append(f"## 角度偏好（按历史效果排序）\n{angle_text}")
+            if style_w:
+                ranked_styles = sorted(style_w.items(), key=lambda x: x[1], reverse=True)
+                style_text = "、".join(f"{s}({w:.0%})" for s, w in ranked_styles)
+                context_parts.append(f"## 风格偏好（按历史效果排序）\n{style_text}")
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    return "\n\n".join(context_parts) if context_parts else ""
+
 
 def _find_executable(name, candidates=None):
     candidates = candidates or []
@@ -382,6 +427,17 @@ def generate_html_with_claude(candidate, slot, rules):
 - 引导收藏和互动
 """
 
+    knowledge_context = build_knowledge_context()
+    knowledge_section = ""
+    if knowledge_context:
+        knowledge_section = f"""
+
+## 历史运营数据洞察（参考，不要照搬）
+{knowledge_context}
+
+基于以上洞察，在写作时优先参考 confidence 为 medium/high 的 pattern。
+"""
+
     prompt = f"""你是一个真实的科技博主，在小红书上分享 GitHub 开源项目。品牌叫 OpenClaw（开源龙虾🦞）。
 
 你不是机器人，你是一个真实使用过这些工具的人，用大白话分享自己的发现和体验。
@@ -393,7 +449,7 @@ def generate_html_with_claude(candidate, slot, rules):
 **简介：** {desc}
 **主要语言：** {language}
 **标签：** {', '.join(topics[:6])}
-{readme_section}
+{readme_section}{knowledge_section}
 
 ## 写作要求
 {writing_angle}
