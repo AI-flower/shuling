@@ -1,0 +1,423 @@
+{
+  "date": "2026-04-14",
+  "total_analyzed": 15,
+  "selected": [
+    {
+      "repo": "kepano/obsidian-skills",
+      "url": "https://github.com/kepano/obsidian-skills",
+      "description": "Agent skills for Obsidian. Teach your agent to use Markdown, Bases, JSON Canvas, and use the CLI.",
+      "stars": 23571,
+      "language": null,
+      "topics": [
+        "claude",
+        "clawdbot",
+        "cli",
+        "codex",
+        "defuddle",
+        "obsidian",
+        "openclaw",
+        "opencode",
+        "skills"
+      ],
+      "readme": "Agent Skills for use with Obsidian.\n\nThese skills follow the [Agent Skills specification](https://agentskills.io/specification) so they can be used by any skills-compatible agent, including Claude Code and Codex CLI.\n\n## Installation\n\n### Marketplace\n\n```\n/plugin marketplace add kepano/obsidian-skills\n/plugin install obsidian@obsidian-skills\n```\n\n### npx skills\n\n```\nnpx skills add git@github.com:kepano/obsidian-skills.git\n```\n\n### Manually\n\n#### Claude Code\n\nAdd the contents of this repo to a `/.claude` folder in the root of your Obsidian vault (or whichever folder you're using with Claude Code). See more in the [official Claude Skills documentation](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview).\n\n#### Codex CLI\n\nCopy the `skills/` directory into your Codex skills path (typically `~/.codex/skills`). See the [Agent Skills specification](https://agentskills.io/specification) for the standard skill format.\n\n#### OpenCode\n\nClone the entire repo into the OpenCode skills directory (`~/.opencode/skills/`):\n\n```sh\ngit clone https://github.com/kepano/obsidian-skills.git ~/.opencode/skills/obsidian-skills\n```\n\nDo not copy only the inner `skills/` folder — clone the full repo so the directory structure is `~/.opencode/skills/obsidian-skills/skills/<skill-name>/SKILL.md`.\n\nOpenCode auto-discovers all `SKILL.md` files under `~/.opencode/skills/`. No changes to `opencode.json` or any config file are needed. Skills become available after restarting OpenCode.\n\n## Skills\n\n| Skill | Description |\n|-------|-------------|\n| [obsidian-markdown](skills/obsidian-markdown) | Create and edit [Obsidian Flavored Markdown](https://help.obsidian.md/obsidian-flavored-markdown) (`.md`) with wikilinks, embeds, callouts, properties, and other Obsidian-specific syntax |\n| [obsidian-bases](skills/obsidian-bases) | Create and edit [Obsidian Bases](https://help.obsidian.md/bases/syntax) (`.base`) with views, filters, formulas, and summaries |\n| [json-canvas](skills/json-canvas) | Create and edit [JSON Canvas](https://jsoncanvas.org/) files (`.canvas`) with nodes, edges, groups, and connections |\n| [obsidian-cli](skills/obsidian-cli) | Interact with Obsidian vaults via the [Obsidian CLI](https://help.obsidian.md/cli) including plugin and theme development |\n| [defuddle](skills/defuddle) | Extract clean markdown from web pages using [Defuddle](https://github.com/kepano/defuddle-cli), removing clutter to save tokens |",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 145
+    },
+    {
+      "repo": "mvanhorn/last30days-skill",
+      "url": "https://github.com/mvanhorn/last30days-skill",
+      "description": "AI agent skill that researches any topic across Reddit, X, YouTube, HN, Polymarket, and the web - then synthesizes a grounded summary",
+      "stars": 21554,
+      "language": "Python",
+      "topics": [
+        "ai-prompts",
+        "ai-skill",
+        "bluesky",
+        "claude",
+        "claude-code",
+        "clawhub",
+        "deep-research",
+        "hackernews",
+        "instagram",
+        "openclaw",
+        "polymarket",
+        "recency",
+        "reddit",
+        "research",
+        "social-media",
+        "tiktok",
+        "trends",
+        "twitter",
+        "web-search",
+        "youtube"
+      ],
+      "readme": "# /last30days\n\n  <a href=\"https://github.com/mvanhorn/last30days-skill\">\n  </a>\n  <br/>\n  <a href=\"https://trendshift.io/repositories/21997\" target=\"_blank\">\n  </a>\n</p>\n\n**An AI agent-led search engine scored by upvotes, likes, and real money - not editors.**\n\nThis README tracks the current v3 pipeline. The runtime skill spec lives in [skills/last30days/SKILL.md](skills/last30days/SKILL.md), which is the source of truth for the latest command and setup behavior.\n\nClaude Code:\n```\n/plugin marketplace add mvanhorn/last30days-skill\n```\n\nOpenClaw:\n```\nclawhub install last30days-official\n```\n\nHermes:\n```\n# The skill auto-deploys when you run sync.sh\n# Or manually copy to ~/.hermes/skills/research/last30days/\n```\n\nZero config. Reddit, HN, Polymarket, and GitHub work immediately. Run it once and the setup wizard unlocks X, YouTube, TikTok, and more in 30 seconds.\n\n---\n\nReddit upvotes. X likes. YouTube transcripts. TikTok engagement. Polymarket odds backed by real money and insider information. That's millions of people voting with their attention and their wallets every day. /last30days searches all of it in parallel, scores it by what real people actually engage with, and an AI agent judge synthesizes it into one brief.\n\nGoogle aggregates editors. /last30days searches people.\n\nYou can't get this search anywhere else because no single AI has access to all of it. Google search doesn't touch Reddit comments or X posts. ChatGPT has a deal with Reddit but can't search X or TikTok. Gemini has YouTube but not Reddit. Claude has none of them natively. Each platform is a walled garden with its own API, its own tokens, its own auth. But you can bring your own keys and browser sessions, and suddenly an AI agent can search all of them at once, score them against each other, and tell you what actually matters.\n\nThat's the unlock. Not one better search engine. A dozen disconnected platforms, bridged by an agent.\n\n```\n/last30days Peter Steinberger\n```\n\nYou have a meeting tomorrow. You Google them. You get their LinkedIn from 2023. /last30days gives you what they're actually doing this month: joined OpenAI to work on Codex, fighting Anthropic's ban on third-party agents, shipping 23 PRs at 85% merge rate, building \"LobsterOS\" for cross-device agent control, and r/ClaudeCode hit 569 upvotes debating whether he's a hero or \"insufferable.\" Scattered across X posts, Reddit threads, YouTube transcripts, and GitHub commits. None of it was on Google.\n\n## Why this exists\n\nI built it to keep up in AI. Everything changes every day and the Reddit and X nerds are always on top of it first. I needed better prompts, and the training data was always months behind what the community had already figured out.\n\nBut it turned into something bigger. Now I run it before a sales call to know the last 30 days truth about a business. Before a meeting to read someone's recent tweets and podcast transcripts. Before a Disney World trip to know which rides are closed and what the community says ",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 142
+    }
+  ],
+  "all_candidates": [
+    {
+      "repo": "volcengine/OpenViking",
+      "url": "https://github.com/volcengine/OpenViking",
+      "description": "OpenViking is an open-source context database designed specifically for AI Agents(such as openclaw). OpenViking unifies the management of context (memory, resources, and skills) that Agents need through a file system paradigm, enabling hierarchical context delivery and self-evolving.",
+      "stars": 22196,
+      "language": "Python",
+      "topics": [
+        "agent",
+        "agentic-rag",
+        "ai-agents",
+        "clawbot",
+        "context-database",
+        "context-engineering",
+        "filesystem",
+        "llm",
+        "memory",
+        "openclaw",
+        "opencode",
+        "rag",
+        "skill"
+      ],
+      "readme": "<div align=\"center\">\n\n<a href=\"https://openviking.ai/\" target=\"_blank\">\n  <picture>\n  </picture>\n</a>\n\n### OpenViking: The Context Database for AI Agents\n\nEnglish / [中文](README_CN.md) / [日本語](README_JA.md)\n\n<a href=\"https://www.openviking.ai\">Website</a> · <a href=\"https://github.com/volcengine/OpenViking\">GitHub</a> · <a href=\"https://github.com/volcengine/OpenViking/issues\">Issues</a> · <a href=\"./docs\">Docs</a>\n\n\n👋 Join our Community\n\n📱 <a href=\"./docs/en/about/01-about-us.md#lark-group\">Lark Group</a> · <a href=\"./docs/en/about/01-about-us.md#wechat-group\">WeChat</a> · <a href=\"https://discord.com/invite/eHvx8E9XF3\">Discord</a> · <a href=\"https://x.com/openvikingai\">X</a>\n\n<a href=\"https://trendshift.io/repositories/19668\" target=\"_blank\"><img src=\"https://trendshift.io/api/badge/repositories/19668\" alt=\"volcengine%2FOpenViking | Trendshift\" style=\"width: 250px; height: 55px;\" width=\"250\" height=\"55\"/></a>\n\n</div>\n\n---\n\n## Overview\n\n### Challenges in Agent Development\n\nIn the AI era, data is abundant, but high-quality context is hard to come by. When building AI Agents, developers often face these challenges:\n\n- **Fragmented Context**: Memories are in code, resources are in vector databases, and skills are scattered, making them difficult to manage uniformly.\n- **Surging Context Demand**: An Agent's long-running tasks produce context at every execution. Simple truncation or compression leads to information loss.\n- **Poor Retrieval Effectiveness**: Traditional RAG uses flat storage, lacking a global view and making it difficult to understand the full context of information.\n- **Unobservable Context**: The implicit retrieval chain of traditional RAG is like a black box, making it hard to debug when errors occur.\n- **Limited Memory Iteration**: Current memory is just a record of user interactions, lacking Agent-related task memory.\n\n### The OpenViking Solution\n\n**OpenViking** is an open-source **Context Database** designed specifically for AI Agents.\n\nWe aim to define a minimalist context interaction paradigm for Agents, allowing developers to completely say goodbye to the hassle of context management. OpenViking abandons the fragmented vector storage model of traditional RAG and innovatively adopts a **\"file system paradigm\"** to unify the structured organization of memories, resources, and skills needed by Agents.\n\nWith OpenViking, developers can build an Agent's brain just like managing local files:\n\n- **Filesystem Management Paradigm** → **Solves Fragmentation**: Unified context management of memories, resources, and skills based on a filesystem paradigm.\n- **Tiered Context Loading** → **Reduces Token Consumption**: L0/L1/L2 three-tier structure, loaded on demand, significantly saving costs.\n- **Directory Recursive Retrieval** → **Improves Retrieval Effect**: Supports native filesystem retrieval methods, combining directory positioning with semantic search to achieve recursive and precise context acquisition.\n- **Visualized Retrieval Traject",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 147
+    },
+    {
+      "repo": "kepano/obsidian-skills",
+      "url": "https://github.com/kepano/obsidian-skills",
+      "description": "Agent skills for Obsidian. Teach your agent to use Markdown, Bases, JSON Canvas, and use the CLI.",
+      "stars": 23571,
+      "language": null,
+      "topics": [
+        "claude",
+        "clawdbot",
+        "cli",
+        "codex",
+        "defuddle",
+        "obsidian",
+        "openclaw",
+        "opencode",
+        "skills"
+      ],
+      "readme": "Agent Skills for use with Obsidian.\n\nThese skills follow the [Agent Skills specification](https://agentskills.io/specification) so they can be used by any skills-compatible agent, including Claude Code and Codex CLI.\n\n## Installation\n\n### Marketplace\n\n```\n/plugin marketplace add kepano/obsidian-skills\n/plugin install obsidian@obsidian-skills\n```\n\n### npx skills\n\n```\nnpx skills add git@github.com:kepano/obsidian-skills.git\n```\n\n### Manually\n\n#### Claude Code\n\nAdd the contents of this repo to a `/.claude` folder in the root of your Obsidian vault (or whichever folder you're using with Claude Code). See more in the [official Claude Skills documentation](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview).\n\n#### Codex CLI\n\nCopy the `skills/` directory into your Codex skills path (typically `~/.codex/skills`). See the [Agent Skills specification](https://agentskills.io/specification) for the standard skill format.\n\n#### OpenCode\n\nClone the entire repo into the OpenCode skills directory (`~/.opencode/skills/`):\n\n```sh\ngit clone https://github.com/kepano/obsidian-skills.git ~/.opencode/skills/obsidian-skills\n```\n\nDo not copy only the inner `skills/` folder — clone the full repo so the directory structure is `~/.opencode/skills/obsidian-skills/skills/<skill-name>/SKILL.md`.\n\nOpenCode auto-discovers all `SKILL.md` files under `~/.opencode/skills/`. No changes to `opencode.json` or any config file are needed. Skills become available after restarting OpenCode.\n\n## Skills\n\n| Skill | Description |\n|-------|-------------|\n| [obsidian-markdown](skills/obsidian-markdown) | Create and edit [Obsidian Flavored Markdown](https://help.obsidian.md/obsidian-flavored-markdown) (`.md`) with wikilinks, embeds, callouts, properties, and other Obsidian-specific syntax |\n| [obsidian-bases](skills/obsidian-bases) | Create and edit [Obsidian Bases](https://help.obsidian.md/bases/syntax) (`.base`) with views, filters, formulas, and summaries |\n| [json-canvas](skills/json-canvas) | Create and edit [JSON Canvas](https://jsoncanvas.org/) files (`.canvas`) with nodes, edges, groups, and connections |\n| [obsidian-cli](skills/obsidian-cli) | Interact with Obsidian vaults via the [Obsidian CLI](https://help.obsidian.md/cli) including plugin and theme development |\n| [defuddle](skills/defuddle) | Extract clean markdown from web pages using [Defuddle](https://github.com/kepano/defuddle-cli), removing clutter to save tokens |",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 145
+    },
+    {
+      "repo": "mvanhorn/last30days-skill",
+      "url": "https://github.com/mvanhorn/last30days-skill",
+      "description": "AI agent skill that researches any topic across Reddit, X, YouTube, HN, Polymarket, and the web - then synthesizes a grounded summary",
+      "stars": 21554,
+      "language": "Python",
+      "topics": [
+        "ai-prompts",
+        "ai-skill",
+        "bluesky",
+        "claude",
+        "claude-code",
+        "clawhub",
+        "deep-research",
+        "hackernews",
+        "instagram",
+        "openclaw",
+        "polymarket",
+        "recency",
+        "reddit",
+        "research",
+        "social-media",
+        "tiktok",
+        "trends",
+        "twitter",
+        "web-search",
+        "youtube"
+      ],
+      "readme": "# /last30days\n\n  <a href=\"https://github.com/mvanhorn/last30days-skill\">\n  </a>\n  <br/>\n  <a href=\"https://trendshift.io/repositories/21997\" target=\"_blank\">\n  </a>\n</p>\n\n**An AI agent-led search engine scored by upvotes, likes, and real money - not editors.**\n\nThis README tracks the current v3 pipeline. The runtime skill spec lives in [skills/last30days/SKILL.md](skills/last30days/SKILL.md), which is the source of truth for the latest command and setup behavior.\n\nClaude Code:\n```\n/plugin marketplace add mvanhorn/last30days-skill\n```\n\nOpenClaw:\n```\nclawhub install last30days-official\n```\n\nHermes:\n```\n# The skill auto-deploys when you run sync.sh\n# Or manually copy to ~/.hermes/skills/research/last30days/\n```\n\nZero config. Reddit, HN, Polymarket, and GitHub work immediately. Run it once and the setup wizard unlocks X, YouTube, TikTok, and more in 30 seconds.\n\n---\n\nReddit upvotes. X likes. YouTube transcripts. TikTok engagement. Polymarket odds backed by real money and insider information. That's millions of people voting with their attention and their wallets every day. /last30days searches all of it in parallel, scores it by what real people actually engage with, and an AI agent judge synthesizes it into one brief.\n\nGoogle aggregates editors. /last30days searches people.\n\nYou can't get this search anywhere else because no single AI has access to all of it. Google search doesn't touch Reddit comments or X posts. ChatGPT has a deal with Reddit but can't search X or TikTok. Gemini has YouTube but not Reddit. Claude has none of them natively. Each platform is a walled garden with its own API, its own tokens, its own auth. But you can bring your own keys and browser sessions, and suddenly an AI agent can search all of them at once, score them against each other, and tell you what actually matters.\n\nThat's the unlock. Not one better search engine. A dozen disconnected platforms, bridged by an agent.\n\n```\n/last30days Peter Steinberger\n```\n\nYou have a meeting tomorrow. You Google them. You get their LinkedIn from 2023. /last30days gives you what they're actually doing this month: joined OpenAI to work on Codex, fighting Anthropic's ban on third-party agents, shipping 23 PRs at 85% merge rate, building \"LobsterOS\" for cross-device agent control, and r/ClaudeCode hit 569 upvotes debating whether he's a hero or \"insufferable.\" Scattered across X posts, Reddit threads, YouTube transcripts, and GitHub commits. None of it was on Google.\n\n## Why this exists\n\nI built it to keep up in AI. Everything changes every day and the Reddit and X nerds are always on top of it first. I needed better prompts, and the training data was always months behind what the community had already figured out.\n\nBut it turned into something bigger. Now I run it before a sales call to know the last 30 days truth about a business. Before a meeting to read someone's recent tweets and podcast transcripts. Before a Disney World trip to know which rides are closed and what the community says ",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 142
+    },
+    {
+      "repo": "multica-ai/multica",
+      "url": "https://github.com/multica-ai/multica",
+      "description": "The open-source managed agents platform. Turn coding agents into real teammates — assign tasks, track progress, compound skills.",
+      "stars": 11074,
+      "forks": 1382,
+      "language": "TypeScript",
+      "topics": [],
+      "created_at": "2026-01-13T17:59:46Z",
+      "updated_at": "2026-04-13T23:58:42Z",
+      "readme": "</p>\n\n<div align=\"center\">\n\n<picture>\n  <source media=\"(prefers-color-scheme: dark)\" srcset=\"docs/assets/logo-dark.svg\">\n  <source media=\"(prefers-color-scheme: light)\" srcset=\"docs/assets/logo-light.svg\">\n</picture>\n\n# Multica\n\n**Your next 10 hires won't be human.**\n\nThe open-source managed agents platform.<br/>\nTurn coding agents into real teammates — assign tasks, track progress, compound skills.\n\n\n[Website](https://multica.ai) · [Cloud](https://multica.ai/app) · [X](https://x.com/MulticaAI) · [Self-Hosting](SELF_HOSTING.md) · [Contributing](CONTRIBUTING.md)\n\n**English | [简体中文](README.zh-CN.md)**\n\n</div>\n\n## What is Multica?\n\nMultica turns coding agents into real teammates. Assign issues to an agent like you'd assign to a colleague — they'll pick up the work, write code, report blockers, and update statuses autonomously.\n\nNo more copy-pasting prompts. No more babysitting runs. Your agents show up on the board, participate in conversations, and compound reusable skills over time. Think of it as open-source infrastructure for managed agents — vendor-neutral, self-hosted, and designed for human + AI teams. Works with **Claude Code**, **Codex**, **OpenClaw**, and **OpenCode**.\n\n</p>\n\n## Features\n\nMultica manages the full agent lifecycle: from task assignment to execution monitoring to skill reuse.\n\n- **Agents as Teammates** — assign to an agent like you'd assign to a colleague. They have profiles, show up on the board, post comments, create issues, and report blockers proactively.\n- **Autonomous Execution** — set it and forget it. Full task lifecycle management (enqueue, claim, start, complete/fail) with real-time progress streaming via WebSocket.\n- **Reusable Skills** — every solution becomes a reusable skill for the whole team. Deployments, migrations, code reviews — skills compound your team's capabilities over time.\n- **Unified Runtimes** — one dashboard for all your compute. Local daemons and cloud runtimes, auto-detection of available CLIs, real-time monitoring.\n- **Multi-Workspace** — organize work across teams with workspace-level isolation. Each workspace has its own agents, issues, and settings.\n\n---\n\n## Quick Install\n\n### macOS / Linux (Homebrew - recommended)\n\n```bash\nbrew install multica-ai/tap/multica\n```\n\nUse `brew upgrade multica-ai/tap/multica` to keep the CLI current.\n\n### macOS / Linux (install script)\n\n```bash\ncurl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash\n```\n\nUse this if Homebrew is not available. The script installs the Multica CLI on macOS and Linux by using Homebrew when it is on `PATH`, otherwise it downloads the binary directly.\n\n### Windows (PowerShell)\n\n```powershell\nirm https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.ps1 | iex\n```\n\nThen configure, authenticate, and start the daemon in one command:\n\n```bash\nmultica setup          # Connect to Multica Cloud, log in, start daemon\n```\n\n> **Self-hosting?** Add `--with-server` to deploy a full Multica",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 136
+    },
+    {
+      "repo": "zhayujie/CowAgent",
+      "url": "https://github.com/zhayujie/CowAgent",
+      "description": "CowAgent (chatgpt-on-wechat) 是基于大模型的超级AI助理，能主动思考和任务规划、访问操作系统和外部资源、创造和执行Skills、通过长期记忆和知识库不断成长，比OpenClaw更轻量和便捷。同时支持微信、飞书、钉钉、企微、QQ、公众号、网页等接入，可选择OpenAI/Claude/Gemini/DeepSeek/ Qwen/GLM/Kimi/LinkAI，能处理文本、语音、图片和文件，可快速搭建个人AI助理和企业数字员工。",
+      "stars": 43098,
+      "language": "Python",
+      "topics": [
+        "ai",
+        "ai-agent",
+        "chatgpt-on-wechat",
+        "claude",
+        "deepseek",
+        "dingtalk",
+        "feishu-bot",
+        "gemini",
+        "kimi",
+        "linkai",
+        "llm",
+        "mcp",
+        "multi-agent",
+        "openai",
+        "openclaw",
+        "python3",
+        "qwen",
+        "skills",
+        "wechat",
+        "weixin"
+      ],
+      "readme": "<a href=\"https://github.com/zhayujie/CowAgent/releases/latest\"><img src=\"https://img.shields.io/github/v/release/zhayujie/CowAgent\" alt=\"Latest release\"></a>\n  <a href=\"https://github.com/zhayujie/CowAgent/blob/master/LICENSE\"><img src=\"https://img.shields.io/github/license/zhayujie/CowAgent\" alt=\"License: MIT\"></a>\n  <a href=\"https://github.com/zhayujie/CowAgent\"><img src=\"https://img.shields.io/github/stars/zhayujie/CowAgent?style=flat-square\" alt=\"Stars\"></a> <br/>\n  [中文] | [<a href=\"docs/en/README.md\">English</a>] | [<a href=\"docs/ja/README.md\">日本語</a>]\n</p>\n\n**CowAgent** 是基于大模型的超级 AI 助理，能够主动思考和任务规划、操作计算机和外部资源、创造和执行 Skills、拥有长期记忆和知识库并不断成长，比 OpenClaw 更轻量和便捷。CowAgent 支持灵活切换多种模型，能处理文本、语音、图片、文件等多模态消息，可接入微信、飞书、钉钉、企微智能机器人、QQ、企微自建应用、微信公众号、网页中使用，7*24小时运行于你的个人电脑或服务器中。\n\n  <a href=\"https://cowagent.ai/\">🌐 官网</a> &nbsp;·&nbsp;\n  <a href=\"https://docs.cowagent.ai/\">📖 文档中心</a> &nbsp;·&nbsp;\n  <a href=\"https://docs.cowagent.ai/guide/quick-start\">🚀 快速开始</a> &nbsp;·&nbsp;\n  <a href=\"https://skills.cowagent.ai/\">🧩 技能广场</a> &nbsp;·&nbsp;\n  <a href=\"https://link-ai.tech/cowagent/create\">☁️ 在线体验</a>\n</p>\n\n\n# 简介\n\n> 该项目既是一个可以开箱即用的超级 AI 助理，也是一个支持高扩展的 Agent 框架，可以通过为项目扩展大模型接口、接入渠道、内置工具、Skills 系统来灵活实现各种定制需求。核心能力如下：\n\n-  ✅  **自主任务规划**：能够理解复杂任务并自主规划执行，持续思考和调用工具直到完成目标\n-  ✅  **长期记忆：** 自动将对话记忆持久化至本地文件和数据库中，包括核心记忆和日级记忆，支持关键词及向量检索\n-  ✅  **个人知识库：** 自动整理结构化知识，通过交叉引用构建知识图谱，支持通过对话管理和可视化浏览知识库\n-  ✅  **技能系统：** Skills 安装和运行的引擎，支持从 [Skill Hub](https://skills.cowagent.ai/)、GitHub 等一键安装技能，或通过对话创造 Skills\n-  ✅  **工具系统：** 内置文件读写、终端执行、浏览器操作、定时任务等工具，Agent 自主调用以完成复杂任务\n-  ✅  **CLI系统：** 提供终端命令和对话命令，支持进程管理、技能安装、配置修改等操作\n-  ✅  **多模态消息：** 支持对文本、图片、语音、文件等多类型消息进行解析、处理、生成、发送等操作\n-  ✅  **多模型支持：** 支持 OpenAI, Claude, Gemini, DeepSeek, MiniMax、GLM、Qwen、Kimi、Doubao 等国内外主流模型厂商\n-  ✅  **多通道接入：** 支持运行在本地计算机或服务器，可集成到微信、飞书、钉钉、企业微信、QQ、微信公众号、网页中使用\n\n## 声明\n\n1. 本项目遵循 [MIT 开源协议](/LICENSE)，主要用于技术研究和学习，使用本项目时需遵守所在地法律法规、相关政策以及企业章程，禁止用于任何违法或侵犯他人权益的行为。任何个人、团队和企业，无论以何种方式使用该项目、对何对象提供服务，所产生的一切后果，本项目均不承担任何责任。\n2. 成本与安全：Agent 模式下 Token 使用量高于普通对话模式，请根据效果及成本综合选择模型。Agent 具有访问所在操作系统的能力，请谨慎选择项目部署环境。同时项目也会持续升级安全机制、并降低模型消耗成本。\n3. CowAgent 项目专注于开源技术开发，不会参与、授权或发行任何加密货币。\n\n## 演示\n\n- 使用说明( Agent 模式)：[CowAgent 介绍](https://docs.cowagent.ai/intro/features)\n\n- 免部署在线体验：[CowAgent](https://link-ai.tech/cowagent/create)\n\n- DEMO 视频(对话模式)：https://cdn.link-ai.tech/doc/cow_demo.mp4\n\n## 社区\n\n添加小助手微信加入开源项目交流群：\n\n\n<br/>\n\n# 企业服务\n\n<a href=\"https://link-ai.tech\" target=\"_blank\"><img width=\"650\" src=\"https://cdn.link-ai.tech/image/link-ai-intro.jpg\"></a>\n\n> [LinkAI](https://link-ai.tech/) 是面向企业和个人的一站式 AI 智能体平台，聚合多模态大模型、知识库、技能、工作流等能力，支持一键接入主流平台并管理，支持 SaaS、私有化部署等多种模式，可免部署在线运行[CowAgent 助理](https://link-ai.tech/cowagent/create)。\n>\n> LinkAI 目前已在智能客服、私域运营、企业效率助手等场景积累了丰富的 AI 解决方案，在消费、健康、文教、科技制造等各行业沉淀了大模型落地应用的最佳实践，致力于帮助更多企业和开发者拥抱 AI 生产力。\n\n**产品咨询和企业服务** 可联系产品客服：\n\n\n<br/>\n\n# 🏷 更新日志\n\n>**2026.04.01：** [2.0.5版本](https://github.com/zhayujie/CowAgent/releases/tag/2.0.5)，Cow CLI 命令系统、Skill Hub 开源、浏览器工具、企微扫码创建、多项优化和修复。\n\n>**2026.03.22：** [2.0.4版本](https://github.com/zhayujie/CowAgent",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 134
+    },
+    {
+      "repo": "safishamsi/graphify",
+      "url": "https://github.com/safishamsi/graphify",
+      "description": "AI coding assistant skill (Claude Code, Codex, OpenCode, Cursor, Gemini CLI, GitHub Copilot CLI, OpenClaw, Factory Droid, Trae, Google Antigravity). Turn any folder of code, docs, papers, images, or videos into a queryable knowledge graph",
+      "stars": 25117,
+      "language": "Python",
+      "topics": [
+        "antigravity",
+        "claude-code",
+        "codex",
+        "gemini",
+        "graphrag",
+        "knowledge-graph",
+        "openclaw",
+        "skills"
+      ],
+      "readme": "# graphify\n\n\n**A Claude Code skill.** Type `/graphify` in Claude Code - it reads your files, builds a knowledge graph, and gives you back structure you didn't know was there.\n\nFully multimodal. Drop in code, PDFs, markdown, screenshots, diagrams, whiteboard photos, even images in other languages - graphify uses Claude vision to extract concepts and relationships from all of it and connects them into one graph.\n\n> Andrej Karpathy keeps a `/raw` folder where he drops papers, tweets, screenshots, and notes. graphify is the answer to that problem - 71.5x fewer tokens per query vs reading the raw files, persistent across sessions, honest about what it found vs guessed.\n\n```\n/graphify .                        # works on any folder - your codebase, notes, papers, anything\n```\n\n```\ngraphify-out/\n├── graph.html       interactive graph - click nodes, search, filter by community\n├── obsidian/        open as Obsidian vault\n├── wiki/            Wikipedia-style articles for agent navigation (--wiki)\n├── GRAPH_REPORT.md  god nodes, surprising connections, suggested questions\n├── graph.json       persistent graph - query weeks later without re-reading\n└── cache/           SHA256 cache - re-runs only process changed files\n```\n\n## Install\n\n**Requires:** [Claude Code](https://claude.ai/code) and Python 3.10+\n\n```bash\npip install graphifyy && graphify install\n```\n\n> The PyPI package is temporarily named `graphifyy` while the `graphify` name is being reclaimed. The CLI and skill command are still `graphify`.\n\nThen open Claude Code in any directory and type:\n\n```\n/graphify .\n```\n\n<details>\n<summary>Manual install (curl)</summary>\n\n```bash\nmkdir -p ~/.claude/skills/graphify\ncurl -fsSL https://raw.githubusercontent.com/safishamsi/graphify/v1/skills/graphify/skill.md \\\n  > ~/.claude/skills/graphify/SKILL.md\n```\n\nAdd to `~/.claude/CLAUDE.md`:\n\n```\n- **graphify** (`~/.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`\nWhen the user types `/graphify`, invoke the Skill tool with `skill: \"graphify\"` before doing anything else.\n```\n\n</details>\n\n## Usage\n\n```\n/graphify                          # run on current directory\n/graphify ./raw                    # run on a specific folder\n/graphify ./raw --mode deep        # more aggressive INFERRED edge extraction\n/graphify ./raw --update           # re-extract only changed files, merge into existing graph\n\n/graphify add https://arxiv.org/abs/1706.03762        # fetch a paper, save, update graph\n/graphify add https://x.com/karpathy/status/...       # fetch a tweet\n\n/graphify query \"what connects attention to the optimizer?\"\n/graphify path \"DigestAuth\" \"Response\"\n/graphify explain \"SwinTransformer\"\n\n/graphify ./raw --watch            # auto-sync graph as files change (code: instant, docs: notifies you)\n/graphify ./raw --wiki             # build agent-crawlable wiki (index.md + article per community)\n/graphify ./raw --svg              # export graph.svg\n/graphify ./raw --graphml          # export grap",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 132
+    },
+    {
+      "repo": "VoltAgent/awesome-openclaw-skills",
+      "url": "https://github.com/VoltAgent/awesome-openclaw-skills",
+      "description": "The awesome collection of OpenClaw skills. 5,400+ skills filtered and categorized from the official OpenClaw Skills Registry.🦞",
+      "stars": 45884,
+      "language": null,
+      "topics": [
+        "agent-skills",
+        "awesome",
+        "awesome-list",
+        "awesome-lists",
+        "clawd",
+        "clawdbot",
+        "clawdbot-skill",
+        "clawdhub",
+        "moltbot",
+        "moltbot-skills",
+        "openclaw",
+        "openclaw-skills"
+      ],
+      "readme": "<div align=\"center\">\n\n<a href=\"https://clawskills.sh/\">\n</a>\n\n<br/>\n<br/>\n\n<div align=\"center\">\n    <strong>Discover 5200+ community-built OpenClaw skills, organized by category.\n    </strong>\n    <br />\n    <br />\n</div>\n  \n<a href=\"https://github.com/VoltAgent/voltagent\">\n</a> \n\n</div>\n\n<div align=\"center\">\n    <strong>More awesome collections for developers</strong>\n    <br />\n    <br />\n</div>\n\n<div align=\"center\">\n\n\n</div>\n\n</div>\n\n</div>\n\n# Awesome OpenClaw Skills\n\nOpenClaw is a locally-running AI assistant that operates directly on your machine. Skills extend its capabilities, allowing it to interact with external services, automate workflows, and perform specialized tasks. This collection helps you discover and install the right skills for your needs. It can also serve as a source of inspiration for OpenClaw use cases.\n\nSkills in this list are sourced from ClawHub (OpenClaw's public skills registry) and categorized for easier discovery.\n\n### Installation\n\n#### ClawHub CLI\n\n\n```bash\nclawhub install <skill-slug>\n```\n\n#### Manual Installation\n\nCopy the skill folder to one of these locations:\n\n| Location | Path |\n|----------|------|\n| Global | `~/.openclaw/skills/` |\n| Workspace | `<project>/skills/` |\n\nPriority: Workspace > Local > Bundled\n\n#### Alternative\n\nYou can also paste the skill's GitHub repository link directly into your assistant's chat and ask it to use it. The assistant will handle the setup automatically in the background.\n\n\n### Why This List Exists?\n\nOpenClaw's public registry (ClawHub) hosts **13,729 community-built skills** as of February 28, 2026. This awesome list has **5,211 skills**. Here's what we filtered out:\n\n| Filter | Excluded |\n|--------|----------|\n| Possibly spam — bulk accounts, bot accounts, test/junk | 4,065 |\n| Duplicate / Similar name | 1,040 |\n| Low-quality or non-English descriptions | 851 |\n| Crypto / Blockchain / Finance / Trade | 886 |\n| Malicious — identified by security audits published by researchers (excluding VirusTotal) | 373 |\n| **Total not taken from OpenClaw's official skill registry** | **7,215** |\n\n\n#### Want to add a skill?\n\nThis list only includes skills that are **already published** in the `github.com/openclaw/skills` repository. We do not accept links to personal repos, gists, or any other external source. If your skill isn't in the OpenClaw skills repo yet, publish it there first. \n\nInclude both the ClawHub link (e.g. `https://clawhub.ai/steipete/slack`) and the GitHub link (e.g. `https://github.com/openclaw/skills/tree/main/skills/steipete/slack`) in your PR description. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.\n\n\n## OpenClaw Ecosystem Tools\n\n### 🔌 Connecting to External Services\n\nOpenClaw agents can interact with external services like GitHub, Slack, Gmail, and more. You can build integrations yourself with Skills or Plugins, or use a managed service to handle auth, token refresh, and permissions across all your connections.\n\n<a href=\"https://composio.dev/claw?utm_source=git",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 129
+    },
+    {
+      "repo": "forrestchang/andrej-karpathy-skills",
+      "url": "https://github.com/forrestchang/andrej-karpathy-skills",
+      "description": "A single CLAUDE.md file to improve Claude Code behavior, derived from Andrej Karpathy's observations on LLM coding pitfalls.",
+      "stars": 24859,
+      "forks": 2017,
+      "language": null,
+      "topics": [],
+      "created_at": "2026-01-27T03:53:13Z",
+      "updated_at": "2026-04-14T00:00:08Z",
+      "readme": "# Karpathy-Inspired Claude Code Guidelines\n\n> **Looking for a managed agents platform?** Check out [Multica](https://github.com/multica-ai/multica) — an open-source platform for running and managing coding agents with reusable skills.\n\nA single `CLAUDE.md` file to improve Claude Code behavior, derived from [Andrej Karpathy's observations](https://x.com/karpathy/status/2015883857489522876) on LLM coding pitfalls.\n\n## The Problems\n\nFrom Andrej's post:\n\n> \"The models make wrong assumptions on your behalf and just run along with them without checking. They don't manage their confusion, don't seek clarifications, don't surface inconsistencies, don't present tradeoffs, don't push back when they should.\"\n\n> \"They really like to overcomplicate code and APIs, bloat abstractions, don't clean up dead code... implement a bloated construction over 1000 lines when 100 would do.\"\n\n> \"They still sometimes change/remove comments and code they don't sufficiently understand as side effects, even if orthogonal to the task.\"\n\n## The Solution\n\nFour principles in one file that directly address these issues:\n\n| Principle | Addresses |\n|-----------|-----------|\n| **Think Before Coding** | Wrong assumptions, hidden confusion, missing tradeoffs |\n| **Simplicity First** | Overcomplication, bloated abstractions |\n| **Surgical Changes** | Orthogonal edits, touching code you shouldn't |\n| **Goal-Driven Execution** | Leverage through tests-first, verifiable success criteria |\n\n## The Four Principles in Detail\n\n### 1. Think Before Coding\n\n**Don't assume. Don't hide confusion. Surface tradeoffs.**\n\nLLMs often pick an interpretation silently and run with it. This principle forces explicit reasoning:\n\n- **State assumptions explicitly** — If uncertain, ask rather than guess\n- **Present multiple interpretations** — Don't pick silently when ambiguity exists\n- **Push back when warranted** — If a simpler approach exists, say so\n- **Stop when confused** — Name what's unclear and ask for clarification\n\n### 2. Simplicity First\n\n**Minimum code that solves the problem. Nothing speculative.**\n\nCombat the tendency toward overengineering:\n\n- No features beyond what was asked\n- No abstractions for single-use code\n- No \"flexibility\" or \"configurability\" that wasn't requested\n- No error handling for impossible scenarios\n- If 200 lines could be 50, rewrite it\n\n**The test:** Would a senior engineer say this is overcomplicated? If yes, simplify.\n\n### 3. Surgical Changes\n\n**Touch only what you must. Clean up only your own mess.**\n\nWhen editing existing code:\n\n- Don't \"improve\" adjacent code, comments, or formatting\n- Don't refactor things that aren't broken\n- Match existing style, even if you'd do it differently\n- If you notice unrelated dead code, mention it — don't delete it\n\nWhen your changes create orphans:\n\n- Remove imports/variables/functions that YOUR changes made unused\n- Don't remove pre-existing dead code unless asked\n\n**The test:** Every changed line should trace directly to the user's requ",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 114
+    },
+    {
+      "repo": "jamiepine/voicebox",
+      "url": "https://github.com/jamiepine/voicebox",
+      "description": "The open-source voice synthesis studio",
+      "stars": 16276,
+      "forks": 1939,
+      "language": "TypeScript",
+      "topics": [
+        "ai",
+        "cuda",
+        "mlx",
+        "qwen3-tts",
+        "qwen3-tts-ui",
+        "voice-ai",
+        "voice-clone",
+        "whisper"
+      ],
+      "created_at": "2026-01-25T12:27:03Z",
+      "updated_at": "2026-04-13T23:57:34Z",
+      "readme": "</p>\n\n<h1 align=\"center\">Voicebox</h1>\n\n  <strong>The open-source voice synthesis studio.</strong><br/>\n  Clone voices. Generate speech. Apply effects. Build voice-powered apps.<br/>\n  All running locally on your machine.\n</p>\n\n  <a href=\"https://github.com/jamiepine/voicebox/releases\">\n  </a>\n  <a href=\"https://github.com/jamiepine/voicebox/releases/latest\">\n  </a>\n  <a href=\"https://github.com/jamiepine/voicebox/stargazers\">\n  </a>\n  <a href=\"https://github.com/jamiepine/voicebox/blob/main/LICENSE\">\n  </a>\n</p>\n\n  <a href=\"https://voicebox.sh\">voicebox.sh</a> •\n  <a href=\"https://docs.voicebox.sh\">Docs</a> •\n  <a href=\"#download\">Download</a> •\n  <a href=\"#features\">Features</a> •\n  <a href=\"#api\">API</a>\n</p>\n\n<br/>\n\n  <a href=\"https://voicebox.sh\">\n  </a>\n</p>\n\n  <em>Click the image above to watch the demo video on <a href=\"https://voicebox.sh\">voicebox.sh</a></em>\n</p>\n\n<br/>\n\n</p>\n\n</p>\n\n<br/>\n\n## What is Voicebox?\n\nVoicebox is a **local-first voice cloning studio** — a free and open-source alternative to ElevenLabs. Clone voices from a few seconds of audio, generate speech in 23 languages across 5 TTS engines, apply post-processing effects, and compose multi-voice projects with a timeline editor.\n\n- **Complete privacy** — models and voice data stay on your machine\n- **5 TTS engines** — Qwen3-TTS, LuxTTS, Chatterbox Multilingual, Chatterbox Turbo, and HumeAI TADA\n- **23 languages** — from English to Arabic, Japanese, Hindi, Swahili, and more\n- **Post-processing effects** — pitch shift, reverb, delay, chorus, compression, and filters\n- **Expressive speech** — paralinguistic tags like `[laugh]`, `[sigh]`, `[gasp]` via Chatterbox Turbo\n- **Unlimited length** — auto-chunking with crossfade for scripts, articles, and chapters\n- **Stories editor** — multi-track timeline for conversations, podcasts, and narratives\n- **API-first** — REST API for integrating voice synthesis into your own projects\n- **Native performance** — built with Tauri (Rust), not Electron\n- **Runs everywhere** — macOS (MLX/Metal), Windows (CUDA), Linux, AMD ROCm, Intel Arc, Docker\n\n---\n\n## Download\n\n| Platform              | Download                                               |\n| --------------------- | ------------------------------------------------------ |\n| macOS (Apple Silicon) | [Download DMG](https://voicebox.sh/download/mac-arm)   |\n| macOS (Intel)         | [Download DMG](https://voicebox.sh/download/mac-intel) |\n| Windows               | [Download MSI](https://voicebox.sh/download/windows)   |\n| Docker                | `docker compose up`                                    |\n\n> **[View all binaries →](https://github.com/jamiepine/voicebox/releases/latest)**\n\n> **Linux** — Pre-built binaries are not yet available. See [voicebox.sh/linux-install](https://voicebox.sh/linux-install) for build-from-source instructions.\n\n---\n\n## Features\n\n### Multi-Engine Voice Cloning\n\nFive TTS engines with different strengths, switchable per-generation:\n\n| Engine                      |",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 96
+    },
+    {
+      "repo": "TapXWorld/ChinaTextbook",
+      "url": "https://github.com/TapXWorld/ChinaTextbook",
+      "description": "所有小初高、大学PDF教材。",
+      "stars": 68880,
+      "forks": 15365,
+      "language": "Roff",
+      "topics": [],
+      "created_at": "2020-01-05T04:11:06Z",
+      "updated_at": "2026-04-13T23:57:52Z",
+      "readme": "## 项目的由来\n虽然国内教育网站已提供免费资源，但大多数普通人获取信息的途径依然受限。有些人利用这一点，在某站上销售这些带有私人水印的资源。为了应对这种情况，我计划将这些资源集中并开源，以促进义务教育的普及和消除地区间的教育贫困。\n\n还有一个最重要的原因是，希望海外华人能够让自己的孩子继续了解国内教育。\n\n## 学习数学\n\n希望未来出现更多不是为了考学而读书的人。\n\n### 小学数学\n- [一年级上册](https://github.com/TapXWorld/ChinaTextbook/blob/master/%E5%B0%8F%E5%AD%A6/%E6%95%B0%E5%AD%A6/%E4%BA%BA%E6%95%99%E7%89%88/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%20%C2%B7%20%E6%95%B0%E5%AD%A6%E4%B8%80%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C.pdf)\n- [一年级下册](https://github.com/TapXWorld/ChinaTextbook/blob/master/%E5%B0%8F%E5%AD%A6/%E6%95%B0%E5%AD%A6/%E4%BA%BA%E6%95%99%E7%89%88/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E6%95%B0%E5%AD%A6%E4%B8%80%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.pdf)\n- [二年级上册](https://github.com/TapXWorld/ChinaTextbook/blob/master/%E5%B0%8F%E5%AD%A6/%E6%95%B0%E5%AD%A6/%E4%BA%BA%E6%95%99%E7%89%88/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%20%C2%B7%20%E6%95%B0%E5%AD%A6%E4%BA%8C%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C.pdf)\n- [二年级下册](https://github.com/TapXWorld/ChinaTextbook/blob/master/%E5%B0%8F%E5%AD%A6/%E6%95%B0%E5%AD%A6/%E4%BA%BA%E6%95%99%E7%89%88/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E6%95%B0%E5%AD%A6%E4%BA%8C%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.pdf)\n- [三年级上册](https://github.com/TapXWorld/ChinaTextbook/blob/master/%E5%B0%8F%E5%AD%A6/%E6%95%B0%E5%AD%A6/%E4%BA%BA%E6%95%99%E7%89%88/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%20%C2%B7%20%E6%95%B0%E5%AD%A6%E4%B8%89%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C.pdf)\n- [三年级下册](https://github.com/TapXWorld/ChinaTextbook/blob/master/%E5%B0%8F%E5%AD%A6/%E6%95%B0%E5%AD%A6/%E4%BA%BA%E6%95%99%E7%89%88/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E6%95%B0%E5%AD%A6%E4%B8%89%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.pdf)\n- [四年级上册](https://github.com/TapXWorld/ChinaTextbook/blob/master/%E5%B0%8F%E5%AD%A6/%E6%95%B0%E5%AD%A6/%E4%BA%BA%E6%95%99%E7%89%88/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%20%C2%B7%20%E6%95%B0%E5%AD%A6%E5%9B%9B%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C.pdf)\n- [四年级下册](https://github.com/TapXWorld/ChinaTextbook/blob/master/%E5%B0%8F%E5%AD%A6/%E6%95%B0%E5%AD%A6/%E4%BA%BA%E6%95%99%E7%89%88/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E6%95%B0%E5%AD%A6%E5%9B%9B%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.pdf)\n- [五年级上册](https://github.com/TapXWorld/ChinaTextbook/blob/master/%E5%B0%8F%E5%AD%A6/%E6%95%B0%E5%AD%A6/%E4%BA%BA%E6%95%99%E7%89%88/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%20%C2%B7%20%E6%95%B0%E5%AD%A6%E4%BA%94%E5%B9%B4%E7%BA%A7%E4%B8%8A%E5%86%8C.pdf)\n- [五年级下册](https://github.com/TapXWorld/ChinaTextbook/blob/master/%E5%B0%8F%E5%AD%A6/%E6%95%B0%E5%AD%A6/%E4%BA%BA%E6%95%99%E7%89%88/%E4%B9%89%E5%8A%A1%E6%95%99%E8%82%B2%E6%95%99%E7%A7%91%E4%B9%A6%C2%B7%E6%95%B0%E5%AD%A6%E4%BA%94%E5%B9%B4%E7%BA%A7%E4%B8%8B%E5%86%8C.pdf)\n- [六年级上册](https://github.com/TapXWorld/ChinaTextbook/blob/master/%E5%B0%8F%E5%AD%A6/%",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 90
+    },
+    {
+      "repo": "anthropics/claude-cookbooks",
+      "url": "https://github.com/anthropics/claude-cookbooks",
+      "description": "A collection of notebooks/recipes showcasing some fun and effective ways of using Claude.",
+      "stars": 39476,
+      "forks": 4390,
+      "language": "Jupyter Notebook",
+      "topics": [],
+      "created_at": "2023-08-15T20:23:51Z",
+      "updated_at": "2026-04-13T23:59:02Z",
+      "readme": "# Claude Cookbooks\n\nThe Claude Cookbooks provide code and guides designed to help developers build with Claude, offering copy-able code snippets that you can easily integrate into your own projects.\n\n## Prerequisites\n\nTo make the most of the examples in this cookbook, you'll need a Claude API key (sign up for free [here](https://www.anthropic.com)).\n\nWhile the code examples are primarily written in Python, the concepts can be adapted to any programming language that supports interaction with the Claude API.\n\nIf you're new to working with the Claude API, we recommend starting with our [Claude API Fundamentals course](https://github.com/anthropics/courses/tree/master/anthropic_api_fundamentals) to get a solid foundation.\n\n## Explore Further\n\nLooking for more resources to enhance your experience with Claude and AI assistants? Check out these helpful links:\n\n- [Anthropic developer documentation](https://docs.claude.com/claude/docs/guide-to-anthropics-prompt-engineering-resources)\n- [Anthropic support docs](https://support.anthropic.com)\n- [Anthropic Discord community](https://www.anthropic.com/discord)\n\n## Contributing\n\nThe Claude Cookbooks thrives on the contributions of the developer community. We value your input, whether it's submitting an idea, fixing a typo, adding a new guide, or improving an existing one. By contributing, you help make this resource even more valuable for everyone.\n\nTo avoid duplication of efforts, please review the existing issues and pull requests before contributing.\n\nIf you have ideas for new examples or guides, share them on the [issues page](https://github.com/anthropics/anthropic-cookbook/issues).\n\n## Table of recipes\n\n### Capabilities\n- [Classification](https://github.com/anthropics/anthropic-cookbook/tree/main/capabilities/classification): Explore techniques for text and data classification using Claude.\n- [Retrieval Augmented Generation](https://github.com/anthropics/anthropic-cookbook/tree/main/capabilities/retrieval_augmented_generation): Learn how to enhance Claude's responses with external knowledge.\n- [Summarization](https://github.com/anthropics/anthropic-cookbook/tree/main/capabilities/summarization): Discover techniques for effective text summarization with Claude.\n\n### Tool Use and Integration\n- [Tool use](https://github.com/anthropics/anthropic-cookbook/tree/main/tool_use): Learn how to integrate Claude with external tools and functions to extend its capabilities.\n  - [Customer service agent](https://github.com/anthropics/anthropic-cookbook/blob/main/tool_use/customer_service_agent.ipynb)\n  - [Calculator integration](https://github.com/anthropics/anthropic-cookbook/blob/main/tool_use/calculator_tool.ipynb)\n  - [SQL queries](https://github.com/anthropics/anthropic-cookbook/blob/main/misc/how_to_make_sql_queries.ipynb)\n\n### Third-Party Integrations\n- [Retrieval augmented generation](https://github.com/anthropics/anthropic-cookbook/tree/main/third_party): Supplement Claude's knowledge with external data sourc",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 56
+    },
+    {
+      "repo": "gsd-build/get-shit-done",
+      "url": "https://github.com/gsd-build/get-shit-done",
+      "description": "A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code by TÂCHES.",
+      "stars": 52082,
+      "forks": 4364,
+      "language": "JavaScript",
+      "topics": [
+        "claude-code",
+        "context-engineering",
+        "meta-prompting",
+        "spec-driven-development"
+      ],
+      "created_at": "2025-12-14T14:17:12Z",
+      "updated_at": "2026-04-14T00:00:23Z",
+      "readme": "<div align=\"center\">\n\n# GET SHIT DONE\n\n**English** · [Português](README.pt-BR.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja-JP.md) · [한국어](README.ko-KR.md)\n\n**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, Kilo, Codex, Copilot, Cursor, Windsurf, Antigravity, Augment, Trae, Qwen Code, Cline, and CodeBuddy.**\n\n**Solves context rot — the quality degradation that happens as Claude fills its context window.**\n\n\n<br>\n\n```bash\nnpx get-shit-done-cc@latest\n```\n\n**Works on Mac, Windows, and Linux.**\n\n<br>\n\n\n<br>\n\n*\"If you know clearly what you want, this WILL build it for you. No bs.\"*\n\n*\"I've done SpecKit, OpenSpec and Taskmaster — this has produced the best results for me.\"*\n\n*\"By far the most powerful addition to my Claude Code. Nothing over-engineered. Literally just gets shit done.\"*\n\n<br>\n\n**Trusted by engineers at Amazon, Google, Shopify, and Webflow.**\n\n[Why I Built This](#why-i-built-this) · [How It Works](#how-it-works) · [Commands](#commands) · [Why It Works](#why-it-works) · [User Guide](docs/USER-GUIDE.md)\n\n</div>\n\n---\n\n> [!IMPORTANT]\n> ### Welcome Back to GSD\n>\n> If you're returning to GSD after the recent Anthropic Terms of Service changes — welcome back. We kept building while you were gone.\n>\n> **To re-import an existing project into GSD:**\n> 1. Run `/gsd-map-codebase` to scan and index your current codebase state\n> 2. Run `/gsd-new-project` to initialize a fresh GSD planning structure using the codebase map as context\n> 3. Review [docs/USER-GUIDE.md](docs/USER-GUIDE.md) and the [CHANGELOG](CHANGELOG.md) for updates — a lot has changed since you were last here\n>\n> Your code is fine. GSD just needs its planning context rebuilt. The two commands above handle that.\n\n---\n\n## Why I Built This\n\nI'm a solo developer. I don't write code — Claude Code does.\n\nOther spec-driven development tools exist; BMAD, Speckit... But they all seem to make things way more complicated than they need to be (sprint ceremonies, story points, stakeholder syncs, retrospectives, Jira workflows) or lack real big picture understanding of what you're building. I'm not a 50-person software company. I don't want to play enterprise theater. I'm just a creative person trying to build great things that work.\n\nSo I built GSD. The complexity is in the system, not in your workflow. Behind the scenes: context engineering, XML prompt formatting, subagent orchestration, state management. What you see: a few commands that just work.\n\nThe system gives Claude everything it needs to do the work *and* verify it. I trust the workflow. It just does a good job.\n\nThat's what this is. No enterprise roleplay bullshit. Just an incredibly effective system for building cool stuff consistently using Claude Code.\n\n— **TÂCHES**\n\n---\n\nVibecoding has a bad reputation. You describe what you want, AI generates code, and you get inconsistent garbage that falls apart at scale.\n\nGSD fixes that. It's the context eng",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 48
+    },
+    {
+      "repo": "snarktank/ralph",
+      "url": "https://github.com/snarktank/ralph",
+      "description": "Ralph is an autonomous AI agent loop that runs repeatedly until all PRD items are complete. ",
+      "stars": 16502,
+      "forks": 1632,
+      "language": "TypeScript",
+      "topics": [],
+      "created_at": "2026-01-07T14:45:10Z",
+      "updated_at": "2026-04-13T23:58:55Z",
+      "readme": "# Ralph\n\n\nRalph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.\n\nBased on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).\n\n[Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)\n\n## Prerequisites\n\n- One of the following AI coding tools installed and authenticated:\n  - [Amp CLI](https://ampcode.com) (default)\n  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)\n- `jq` installed (`brew install jq` on macOS)\n- A git repository for your project\n\n## Setup\n\n### Option 1: Copy to your project\n\nCopy the ralph files into your project:\n\n```bash\n# From your project root\nmkdir -p scripts/ralph\ncp /path/to/ralph/ralph.sh scripts/ralph/\n\n# Copy the prompt template for your AI tool of choice:\ncp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp\n# OR\ncp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code\n\nchmod +x scripts/ralph/ralph.sh\n```\n\n### Option 2: Install skills globally (Amp)\n\nCopy the skills to your Amp or Claude config for use across all projects:\n\nFor AMP\n```bash\ncp -r skills/prd ~/.config/amp/skills/\ncp -r skills/ralph ~/.config/amp/skills/\n```\n\nFor Claude Code (manual)\n```bash\ncp -r skills/prd ~/.claude/skills/\ncp -r skills/ralph ~/.claude/skills/\n```\n\n### Option 3: Use as Claude Code Marketplace\n\nAdd the Ralph marketplace to Claude Code:\n\n```bash\n/plugin marketplace add snarktank/ralph\n```\n\nThen install the skills:\n\n```bash\n/plugin install ralph-skills@ralph-marketplace\n```\n\nAvailable skills after installation:\n- `/prd` - Generate Product Requirements Documents\n- `/ralph` - Convert PRDs to prd.json format\n\nSkills are automatically invoked when you ask Claude to:\n- \"create a prd\", \"write prd for\", \"plan this feature\"\n- \"convert this prd\", \"turn into ralph format\", \"create prd.json\"\n\n### Configure Amp auto-handoff (recommended)\n\nAdd to `~/.config/amp/settings.json`:\n\n```json\n{\n  \"amp.experimental.autoHandoff\": { \"context\": 90 }\n}\n```\n\nThis enables automatic handoff when context fills up, allowing Ralph to handle large stories that exceed a single context window.\n\n## Workflow\n\n### 1. Create a PRD\n\nUse the PRD skill to generate a detailed requirements document:\n\n```\nLoad the prd skill and create a PRD for [your feature description]\n```\n\nAnswer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.\n\n### 2. Convert PRD to Ralph format\n\nUse the Ralph skill to convert the markdown PRD to JSON:\n\n```\nLoad the ralph skill and convert tasks/prd-[feature-name].md to prd.json\n```\n\nThis creates `prd.json` with user stories structured for autonomous execution.\n\n### 3. Run Ralph\n\n```bash\n# Using Amp (default)\n./scripts/ralph/ra",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": 34
+    },
+    {
+      "repo": "ahujasid/blender-mcp",
+      "url": "https://github.com/ahujasid/blender-mcp",
+      "description": null,
+      "stars": 19477,
+      "forks": 1883,
+      "language": "Python",
+      "topics": [],
+      "created_at": "2025-03-07T09:58:58Z",
+      "updated_at": "2026-04-14T00:00:05Z",
+      "readme": "# BlenderMCP - Blender Model Context Protocol Integration\n\nBlenderMCP connects Blender to Claude AI through the Model Context Protocol (MCP), allowing Claude to directly interact with and control Blender. This integration enables prompt assisted 3D modeling, scene creation, and manipulation.\n\n**We have no official website. Any website you see online is unofficial and has no affiliation with this project. Use them at your own risk.**\n\n[Full tutorial](https://www.youtube.com/watch?v=lCyQ717DuzQ)\n\n### Join the Community\n\nGive feedback, get inspired, and build on top of the MCP: [Discord](https://discord.gg/z5apgR8TFU)\n\n### Supporters\n\n[CodeRabbit](https://www.coderabbit.ai/)\n\n**All supporters:**\n\n[Support this project](https://github.com/sponsors/ahujasid)\n\n## Current version(1.5.5)\n- Added Hunyuan3D support\n- View screenshots for Blender viewport to better understand the scene\n- Search and download Sketchfab models\n- Support for Poly Haven assets through their API\n- Support to generate 3D models using Hyper3D Rodin\n- Run Blender MCP on a remote host\n- Telemetry for tools executed (completely anonymous)\n\n### Installating a new version (existing users)\n- For newcomers, you can go straight to Installation. For existing users, see the points below\n- Download the latest addon.py file and replace the older one, then add it to Blender\n- Delete the MCP server from Claude and add it back again, and you should be good to go!\n\n\n## Features\n\n- **Two-way communication**: Connect Claude AI to Blender through a socket-based server\n- **Object manipulation**: Create, modify, and delete 3D objects in Blender\n- **Material control**: Apply and modify materials and colors\n- **Scene inspection**: Get detailed information about the current Blender scene\n- **Code execution**: Run arbitrary Python code in Blender from Claude\n\n## Components\n\nThe system consists of two main components:\n\n1. **Blender Addon (`addon.py`)**: A Blender addon that creates a socket server within Blender to receive and execute commands\n2. **MCP Server (`src/blender_mcp/server.py`)**: A Python server that implements the Model Context Protocol and connects to the Blender addon\n\n## Installation\n\n\n### Prerequisites\n\n- Blender 3.0 or newer\n- Python 3.10 or newer\n- uv package manager: \n\n**If you're on Mac, please install uv as**\n```bash\nbrew install uv\n```\n**On Windows**\n```powershell\npowershell -c \"irm https://astral.sh/uv/install.ps1 | iex\" \n```\nand then add uv to the user path in Windows (you may need to restart Claude Desktop after):\n```powershell\n$localBin = \"$env:USERPROFILE\\.local\\bin\"\n$userPath = [Environment]::GetEnvironmentVariable(\"Path\", \"User\")\n[Environment]::SetEnvironmentVariable(\"Path\", \"$userPath;$localBin\", \"User\")\n```\n\nOtherwise installation instructions are on their website: [Install uv](https://docs.astral.sh/uv/getting-started/installation/)\n\n**⚠️ Do not proceed before installing UV**\n\n### Environment Variables\n\nThe following environment variables can be used to configure the Blender",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": -18
+    },
+    {
+      "repo": "shiyu-coder/Kronos",
+      "url": "https://github.com/shiyu-coder/Kronos",
+      "description": "Kronos: A Foundation Model for the Language of Financial Markets",
+      "stars": 16978,
+      "forks": 3201,
+      "language": "Python",
+      "topics": [],
+      "created_at": "2025-07-01T02:54:32Z",
+      "updated_at": "2026-04-13T23:58:59Z",
+      "readme": "<div align=\"center\">\r\n  <h2><b>Kronos: A Foundation Model for the Language of Financial Markets </b></h2>\r\n</div>\r\n\r\n\r\n<div align=\"center\">\r\n\r\n</a> \r\n<a href=\"https://huggingface.co/NeoQuasar\"> \r\n</a> \r\n<a href=\"https://shiyu-coder.github.io/Kronos-demo/\"> <img src=\"https://img.shields.io/badge/🚀-Live_Demo-brightgreen\" alt=\"Live Demo\"> </a>\r\n<a href=\"https://github.com/shiyu-coder/Kronos/graphs/commit-activity\"> \r\n</a> \r\n<a href=\"https://github.com/shiyu-coder/Kronos/stargazers\"> \r\n</a> \r\n<a href=\"https://github.com/shiyu-coder/Kronos/network/members\"> \r\n</a> \r\n<a href=\"./LICENSE\"> \r\n</a>\r\n\r\n</div>\r\n\r\n<div align=\"center\">\r\n  <!-- Keep these links. Translations will automatically update with the README. -->\r\n  <a href=\"https://zdoc.app/de/shiyu-coder/Kronos\">Deutsch</a> | \r\n  <a href=\"https://zdoc.app/es/shiyu-coder/Kronos\">Español</a> | \r\n  <a href=\"https://zdoc.app/fr/shiyu-coder/Kronos\">Français</a> | \r\n  <a href=\"https://zdoc.app/ja/shiyu-coder/Kronos\">日本語</a> | \r\n  <a href=\"https://zdoc.app/ko/shiyu-coder/Kronos\">한국어</a> | \r\n  <a href=\"https://zdoc.app/pt/shiyu-coder/Kronos\">Português</a> | \r\n  <a href=\"https://zdoc.app/ru/shiyu-coder/Kronos\">Русский</a> | \r\n  <a href=\"https://zdoc.app/zh/shiyu-coder/Kronos\">中文</a>\r\n</div>\r\n\r\n\r\n\r\n</p>\r\n\r\n> Kronos is the **first open-source foundation model** for financial candlesticks (K-lines), \r\n> trained on data from over **45 global exchanges**.\r\n\r\n\r\n</div>\r\n\r\n## 📰 News\r\n*   🚩 **[2025.11.10]** Kronos has been accpeted by AAAI 2026.\r\n*   🚩 **[2025.08.17]** We have released the scripts for fine-tuning! Check them out to adapt Kronos to your own tasks.\r\n*   🚩 **[2025.08.02]** Our paper is now available on [arXiv](https://arxiv.org/abs/2508.02739)!\r\n\r\n\r\n## 📜 Introduction\r\n\r\n**Kronos** is a family of decoder-only foundation models, pre-trained specifically for the \"language\" of financial markets—K-line sequences. Unlike general-purpose TSFMs, Kronos is designed to handle the unique, high-noise characteristics of financial data. It leverages a novel two-stage framework: \r\n1. A specialized tokenizer first quantizes continuous, multi-dimensional K-line data (OHLCV) into **hierarchical discrete tokens**. \r\n2. A large, autoregressive Transformer is then pre-trained on these tokens, enabling it to serve as a unified model for diverse quantitative tasks.\r\n\r\n</p>\r\n\r\n## ✨ Live Demo \r\nWe have set up a live demo to visualize Kronos's forecasting results. The webpage showcases a forecast for the **BTC/USDT** trading pair over the next 24 hours. \r\n\r\n**👉 [Access the Live Demo Here](https://shiyu-coder.github.io/Kronos-demo/)** \r\n\r\n## 📦 Model Zoo \r\nWe release a family of pre-trained models with varying capacities to suit different computational and application needs. All models are readily accessible from the Hugging Face Hub.\r\n\r\n| Model        | Tokenizer                                                                       | Context length | Params  | Open-source                                                             ",
+      "xhs_competition": {
+        "count": 0,
+        "top_likes": 0,
+        "has_viral": false
+      },
+      "score": -18
+    }
+  ]
+}

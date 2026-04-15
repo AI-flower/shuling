@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新手先别这样用</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { display:flex; flex-direction:column; align-items:center; gap:32px; padding:32px; background:#f4f1ea; font-family:'Noto Sans SC', sans-serif; }
+  .page { width:1080px; height:1440px; border:6px solid #111; box-shadow:14px 14px 0 #111; overflow:hidden; }
+  .shell { height:100%; padding:48px; display:flex; flex-direction:column; gap:18px; }
+  .cover { background:#ffe14f; }
+  .page2 { background:#d7f6ff; }
+  .page3 { background:#ffd7e6; }
+  .page4 { background:#fff7ef; }
+  .page5 { background:#defee0; }
+  h1, h2 { font-family:'Arial Black','Noto Sans SC',sans-serif; line-height:1.05; }
+  h1 { font-size:96px; }
+  h2 { font-size:52px; }
+  .tag { display:inline-block; border:4px solid #111; background:#fff; padding:10px 16px; font-size:22px; font-weight:900; }
+  .note, .card, .warn, .cta { border:5px solid #111; background:#fff; padding:22px 24px; }
+  .note p, .card p, .warn li, .cta p { font-size:28px; line-height:1.65; font-weight:600; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .card h3 { font-size:30px; margin-bottom:8px; }
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .stat { border:5px solid #111; background:#fff7ef; padding:18px 20px; }
+  .stat .big { font-size:44px; font-weight:900; }
+  .stat .small { font-size:18px; line-height:1.5; font-weight:700; margin-top:6px; }
+  ul { padding-left:24px; }
+</style>
+</head>
+<body>
+  <section class="page cover"><div class="shell">
+    <div class="tag">OPENCLAW / 自动兜底稿</div>
+    <h1>新手先别这样用</h1>
+    <div class="note"><p>我觉得很多人第一次用 last30days-skill 都容易走偏，不是不会用，而是上来就把它想复杂了。</p></div>
+    <div class="stats">
+      <div class="stat"><div class="big">21,554</div><div class="small">开源社区 star</div></div>
+      <div class="stat"><div class="big">看点</div><div class="small">AI agent skill that researches any topic across Reddit, X, YouTube, HN, Polymark</div></div>
+      <div class="stat"><div class="big">适合</div><div class="small">ai-prompts / ai-skill / bluesky / claude</div></div>
+    </div>
+    <div class="cta"><p>last30days-skill 这类工具我更建议先拿一个小场景试，不要一上来就做大。</p></div>
+  </div></section>
+  <section class="page page2"><div class="shell">
+    <h2>我先看见了什么</h2>
+    <div class="note"><p>AI agent skill that researches any topic across Reddit, X, YouTube, HN, Polymarket, and the web - then synthesizes a grounded summary</p></div>
+    <div class="grid"><div class="card"><h3>1</h3><p>An AI agent-led search engine scored by upvotes, likes, and real money - not editors.**</p></div>
+<div class="card"><h3>2</h3><p>/plugin marketplace add mvanhorn/last30days-skill</p></div>
+<div class="card"><h3>3</h3><p>clawhub install last30days-official</p></div>
+<div class="card"><h3>4</h3><p>Google aggregates editors. /last30days searches people.</p></div></div>
+  </div></section>
+  <section class="page page3"><div class="shell">
+    <h2>它更适合谁</h2>
+    <div class="warn"><ul><li>适合想先做出第一版的人</li>
+<li>比较适合明确场景，不适合一上来就做大而全</li>
+<li>如果你经常重复做同一类事，这种工具更容易出效果</li></ul></div>
+    <div class="note"><p>仓库：mvanhorn/last30days-skill</p></div>
+  </div></section>
+  <section class="page page4"><div class="shell">
+    <h2>如果是我会怎么开始</h2>
+    <div class="grid">
+      <div class="card"><h3>先做小</h3><p>先让它只解决一个最常见问题，先有一个能顺手用的版本。</p></div>
+      <div class="card"><h3>先看资料</h3><p>先确认项目到底在解决什么，再决定是不是值得继续折腾。</p></div>
+      <div class="card"><h3>先测真实问题</h3><p>别只看 demo，要拿你自己真的会遇到的问题去试。</p></div>
+      <div class="card"><h3>别一口吃太多</h3><p>先把一个点用顺，再考虑要不要继续加功能和自动化。</p></div>
+    </div>
+  </div></section>
+  <section class="page page5"><div class="shell">
+    <h2>最后我会怎么判断</h2>
+    <div class="note"><p>如果它能帮我省掉一件重复小事，我就觉得值。如果只是看起来很强，但我用不上，那就先不折腾。</p></div>
+    <div class="cta"><p>想看我把 last30days-skill 再拆成更小白的用法，我可以继续往下写。</p></div>
+  </div></section>
+</body>
+</html>
