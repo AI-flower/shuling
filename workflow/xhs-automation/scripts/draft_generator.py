@@ -163,9 +163,9 @@ def build_feedback_section():
                 pass
 
     if not any([all_questions, all_praise, all_complaints, all_requests]):
-        return ""
-
-    section = "## 上期用户反馈（自动注入，请参考）\n"
+        section = ""
+    else:
+        section = "## 上期用户反馈（自动注入，请参考）\n"
     if all_questions:
         section += f"- 用户高频提问：{', '.join(all_questions[:5])}\n"
     if all_praise:
@@ -174,6 +174,49 @@ def build_feedback_section():
         section += f"- 用户吐槽点：{', '.join(all_complaints[:5])}\n"
     if all_requests:
         section += f"- 用户内容需求：{', '.join(all_requests[:5])}\n"
+
+    # 追加 NoteRx 诊断维度反馈
+    diagnoses = db.get_recent_diagnoses(limit=3)
+    if diagnoses:
+        section += "\n## 近期帖子诊断维度（NoteRx 数据驱动）\n"
+        for d in diagnoses:
+            title = d.get("title", "")[:20]
+            section += f"\n### 「{title}」{d.get('grade', '?')} {d.get('overall_score', 0):.0f}分\n"
+            section += (
+                f"- 内容质量: {d.get('content_score', 0):.0f} | "
+                f"视觉表现: {d.get('visual_score', 0):.0f} | "
+                f"增长策略: {d.get('growth_score', 0):.0f} | "
+                f"用户反应: {d.get('user_reaction_score', 0):.0f}\n"
+            )
+            # 找出最低维度作为改进重点
+            dims = {
+                "内容质量": d.get("content_score", 50),
+                "视觉表现": d.get("visual_score", 50),
+                "增长策略": d.get("growth_score", 50),
+                "用户反应": d.get("user_reaction_score", 50),
+            }
+            weakest = min(dims, key=dims.get)
+            section += f"- 短板维度: {weakest}（{dims[weakest]:.0f}分），本次创作请重点优化\n"
+
+            # 追加具体 issues/suggestions（如有完整诊断）
+            issues = []
+            if d.get("issues"):
+                try:
+                    issues = json.loads(d["issues"]) if isinstance(d["issues"], str) else d["issues"]
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            if issues:
+                section += f"- 具体问题: {'; '.join(str(i) for i in issues[:3])}\n"
+
+            suggestions = []
+            if d.get("suggestions"):
+                try:
+                    suggestions = json.loads(d["suggestions"]) if isinstance(d["suggestions"], str) else d["suggestions"]
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            if suggestions:
+                section += f"- 改进建议: {'; '.join(str(s) for s in suggestions[:2])}\n"
+
     return section
 
 
