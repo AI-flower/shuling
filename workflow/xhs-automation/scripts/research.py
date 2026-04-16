@@ -44,6 +44,27 @@ def load_knowledge_weights():
         return None
 
 
+def load_profile():
+    """从 knowledge-base/profile.json 读取博主画像"""
+    profile_path = os.path.join(KNOWLEDGE_BASE_DIR, "profile.json")
+    if not os.path.exists(profile_path):
+        return {}
+    try:
+        with open(profile_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+
+TECH_NICHES = {"ai", "科技", "编程", "开发", "工具", "程序", "tech", "开源"}
+
+
+def is_tech_niche(profile):
+    """判断用户 niche 是否属于科技类（走 GitHub 数据源）"""
+    niche = profile.get("niche", "").lower()
+    return any(kw in niche for kw in TECH_NICHES)
+
+
 def fetch_github_trending(language="", since="daily"):
     """抓取 GitHub trending 页面，提取仓库信息"""
     url = f"https://github.com/trending/{language}?since={since}"
@@ -446,6 +467,101 @@ def score_candidate(repo_info, xhs_info):
     return score
 
 
+def score_general_candidate(title, keyword, xhs_info, profile):
+    """通用品类候选打分"""
+    score = 50
+    count = xhs_info.get("count", 0)
+    if count == 0:
+        score += 30
+    elif count < 10:
+        score += 20
+    elif count < 50:
+        score += 10
+    elif count > 200:
+        score -= 10
+    if re.search(r'\d+', title):
+        score += 5
+    emotion_words = ["绝了", "好用", "必备", "神仙", "宝藏", "推荐", "分享", "攻略", "避雷"]
+    for w in emotion_words:
+        if w in title:
+            score += 3
+            break
+    niche = profile.get("niche", "").lower()
+    if niche and niche in title.lower():
+        score += 10
+    return min(score, 100)
+
+
+def run_general_research(date_str, profile):
+    """非科技品类的通用选题研究：基于小红书搜索"""
+    niche = profile.get("niche", "")
+    print(f"=== 通用品类研究：{niche} ===\n")
+
+    keywords = [niche]
+    if len(niche) >= 4:
+        mid = len(niche) // 2
+        keywords.append(niche[:mid])
+        keywords.append(niche[mid:])
+
+    candidates = []
+    seen_titles = set()
+    for kw in keywords[:3]:
+        print(f"🔍 搜索: '{kw}'")
+        xhs = check_xhs_competition(kw)
+        count = xhs.get("count", 0)
+        print(f"  找到 {count} 条相关内容")
+        for note in xhs.get("notes", [])[:5]:
+            title = note.get("title", note.get("display_title", ""))
+            if not title or title in seen_titles:
+                continue
+            seen_titles.add(title)
+            candidates.append({
+                "repo": f"xhs:{kw}",
+                "topic_keyword": kw,
+                "title_inspiration": title,
+                "source": "xhs_search",
+                "xhs_competition": xhs,
+                "score": score_general_candidate(title, kw, xhs, profile),
+            })
+
+    candidates.sort(key=lambda x: x["score"], reverse=True)
+
+    final = []
+    for c in candidates:
+        if not db.is_topic_used(c.get("topic_keyword", "")):
+            final.append(c)
+        if len(final) >= 2:
+            break
+    if not final and candidates:
+        final = candidates[:2]
+
+    for s in final:
+        db.add_topic(
+            date_str=date_str,
+            github_repo=s.get("repo", ""),
+            topic_keyword=s.get("topic_keyword", ""),
+            xhs_competition=s.get("xhs_competition", {}).get("count", 0),
+            selected=True,
+            reason=f"GENERAL PICK: score={s['score']}, niche={niche}"
+        )
+
+    output_file = os.path.join(DATA_DIR, f"candidates-{date_str}.json")
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump({
+            "date": date_str, "niche": niche, "research_mode": "general",
+            "total_analyzed": len(candidates), "selected": final,
+            "all_candidates": candidates,
+        }, f, ensure_ascii=False, indent=2)
+
+    print(f"\n✅ 通用研究完成！品类: {niche}")
+    print(f"  分析了 {len(candidates)} 个话题，选中 {len(final)} 个")
+    for i, s in enumerate(final):
+        print(f"    {i+1}. [{s.get('topic_keyword')}] {s.get('title_inspiration', '')[:30]} (得分{s['score']})")
+
+    return final
+
+
 def run_research(date_str=None):
     """执行完整研究流程"""
     if date_str is None:
@@ -455,6 +571,14 @@ def run_research(date_str=None):
     knowledge = load_knowledge_weights()
     if knowledge:
         print(f"\U0001F4DA 知识库已加载（phase={knowledge.get('phase', '?')}, post_count={knowledge.get('post_count', '?')}）")
+
+    # 检查用户 niche，非科技类走通用研究流程
+    profile = load_profile()
+    if profile and not is_tech_niche(profile):
+        niche = profile.get("niche", "未设置")
+        print(f"📋 博主领域: {niche}（非科技类，使用通用研究流程）")
+        return run_general_research(date_str, profile)
+
     print(f"=== XHS 晨间研究 {date_str} ===\n")
 
     # 1. 获取 GitHub trending
