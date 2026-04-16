@@ -2,7 +2,7 @@
 
 > 日期: 2026-04-15
 > 状态: approved
-> 项目: xiaohongshu-skill（现有项目升级）
+> 项目: shuling（现有项目升级）
 
 ## 一、系统定位
 

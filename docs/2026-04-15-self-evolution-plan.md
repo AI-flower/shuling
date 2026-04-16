@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add cross-cycle self-evolution capability to the existing xiaohongshu-skill project — the system learns from engagement data to automatically refine content patterns, rules, and scoring weights.
+**Goal:** Add cross-cycle self-evolution capability to the existing shuling project — the system learns from engagement data to automatically refine content patterns, rules, and scoring weights.
 
 **Architecture:** Three-component collaboration: (1) knowledge-base/ as file-based memory (4 files + 1 directory), (2) workflow Python scripts enhanced with multi-timepoint collection and weekly evolution analysis, (3) SKILL.md updated with cold-start and knowledge-reading instructions. LLM calls in scripts are provider-agnostic via a unified `llm.py` module.
 
 **Tech Stack:** Python 3 (existing), SQLite (existing), Markdown + JSON for knowledge base, Anthropic/OpenAI SDK for LLM calls.
 
-**Remote access:** All files live on `weiyong@100.79.106.110:/Users/weiyong/Documents/10/xiaohongshu-skill`. Use SSH for all operations.
+**Remote access:** All files live on `weiyong@100.79.106.110:/Users/weiyong/Documents/10/shuling`. Use SSH for all operations.
 
-**Path prefix:** `workflow/xhs-automation/` is referred to as `$WF` below. Full path: `/Users/weiyong/Documents/10/xiaohongshu-skill/workflow/xhs-automation/`.
+**Path prefix:** `workflow/xhs-automation/` is referred to as `$WF` below. Full path: `/Users/weiyong/Documents/10/shuling/workflow/xhs-automation/`.
 
 ---
 
@@ -24,7 +24,7 @@
 - [ ] **Step 1: Create knowledge-base directory skeleton**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill/workflow/xhs-automation && mkdir -p knowledge-base/reviews && touch knowledge-base/.gitkeep knowledge-base/reviews/.gitkeep"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling/workflow/xhs-automation && mkdir -p knowledge-base/reviews && touch knowledge-base/.gitkeep knowledge-base/reviews/.gitkeep"
 ```
 
 - [ ] **Step 2: Create .gitignore to keep skeleton but ignore runtime content**
@@ -42,14 +42,14 @@ reviews/*.md
 - [ ] **Step 3: Verify structure**
 
 ```bash
-ssh weiyong@100.79.106.110 "find /Users/weiyong/Documents/10/xiaohongshu-skill/workflow/xhs-automation/knowledge-base -type f"
+ssh weiyong@100.79.106.110 "find /Users/weiyong/Documents/10/shuling/workflow/xhs-automation/knowledge-base -type f"
 ```
 Expected: `.gitkeep` files and `.gitignore` only.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && git add workflow/xhs-automation/knowledge-base/ && git commit -m 'feat: add knowledge-base directory skeleton for self-evolution'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && git add workflow/xhs-automation/knowledge-base/ && git commit -m 'feat: add knowledge-base directory skeleton for self-evolution'"
 ```
 
 ---
@@ -137,7 +137,7 @@ def _call_openai(prompt, system, max_tokens, api_key, base_url, model):
 - [ ] **Step 3: Verify llm.py loads without import errors**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill/workflow/xhs-automation && python3 -c 'import scripts.llm; print(\"llm.py OK\")'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling/workflow/xhs-automation && python3 -c 'import scripts.llm; print(\"llm.py OK\")'"
 ```
 
 Expected: `llm.py OK` (no import errors; actual LLM call will fail without API key, which is fine).
@@ -145,7 +145,7 @@ Expected: `llm.py OK` (no import errors; actual LLM call will fail without API k
 - [ ] **Step 4: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && git add workflow/xhs-automation/scripts/llm.py workflow/xhs-automation/config/runtime.env.example && git commit -m 'feat: add unified LLM interface and provider-agnostic config'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && git add workflow/xhs-automation/scripts/llm.py workflow/xhs-automation/config/runtime.env.example && git commit -m 'feat: add unified LLM interface and provider-agnostic config'"
 ```
 
 ---
@@ -269,7 +269,7 @@ def get_draft_score_for_post(post_id):
 - [ ] **Step 5: Verify migration runs cleanly**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill/workflow/xhs-automation && python3 -c '
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling/workflow/xhs-automation && python3 -c '
 import scripts.db as db
 db.init_db()
 db.migrate_db()
@@ -286,7 +286,7 @@ print(\"Migration OK, columns:\", cols)
 - [ ] **Step 6: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && git add workflow/xhs-automation/scripts/db.py && git commit -m 'feat: add checkpoint field to post_metrics for multi-timepoint collection'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && git add workflow/xhs-automation/scripts/db.py && git commit -m 'feat: add checkpoint field to post_metrics for multi-timepoint collection'"
 ```
 
 ---
@@ -368,13 +368,13 @@ Replace the existing `log("=== 保活检测结束 ===")` line (move it after the
 - [ ] **Step 4: Verify keepalive.py imports work**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill/workflow/xhs-automation/scripts && python3 -c 'import keepalive; print(\"keepalive imports OK\")'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling/workflow/xhs-automation/scripts && python3 -c 'import keepalive; print(\"keepalive imports OK\")'"
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && git add workflow/xhs-automation/scripts/keepalive.py && git commit -m 'feat: add multi-timepoint metrics collection to keepalive'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && git add workflow/xhs-automation/scripts/keepalive.py && git commit -m 'feat: add multi-timepoint metrics collection to keepalive'"
 ```
 
 ---
@@ -781,13 +781,13 @@ At the end of `run_review()`, before `return posts_data`, add:
 - [ ] **Step 7: Verify review.py imports work**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill/workflow/xhs-automation/scripts && python3 -c 'import review; print(\"review imports OK\")'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling/workflow/xhs-automation/scripts && python3 -c 'import review; print(\"review imports OK\")'"
 ```
 
 - [ ] **Step 8: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && git add workflow/xhs-automation/scripts/review.py && git commit -m 'feat: add weekly evolution engine to review.py'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && git add workflow/xhs-automation/scripts/review.py && git commit -m 'feat: add weekly evolution engine to review.py'"
 ```
 
 ---
@@ -831,7 +831,7 @@ In `run_research()`, after `db.init_db()`, add:
 - [ ] **Step 3: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && git add workflow/xhs-automation/scripts/research.py && git commit -m 'feat: add knowledge-base reading to research.py'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && git add workflow/xhs-automation/scripts/research.py && git commit -m 'feat: add knowledge-base reading to research.py'"
 ```
 
 ---
@@ -922,13 +922,13 @@ Replace with: `{readme_section}{knowledge_section}`
 - [ ] **Step 3: Verify create_content.py imports work**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill/workflow/xhs-automation/scripts && python3 -c 'import create_content; print(\"create_content imports OK\")'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling/workflow/xhs-automation/scripts && python3 -c 'import create_content; print(\"create_content imports OK\")'"
 ```
 
 - [ ] **Step 4: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && git add workflow/xhs-automation/scripts/create_content.py && git commit -m 'feat: inject knowledge-base context into content generation prompt'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && git add workflow/xhs-automation/scripts/create_content.py && git commit -m 'feat: inject knowledge-base context into content generation prompt'"
 ```
 
 ---
@@ -1003,7 +1003,7 @@ Add the following at the end of the existing SKILL.md:
 - [ ] **Step 2: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && git add skills/xiaohongshu/SKILL.md && git commit -m 'feat: add self-evolution knowledge-base section to SKILL.md'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && git add skills/xiaohongshu/SKILL.md && git commit -m 'feat: add self-evolution knowledge-base section to SKILL.md'"
 ```
 
 ---
@@ -1068,7 +1068,7 @@ In the final `cat <<EOF` block, add after "5. Manual workflow test:":
 - [ ] **Step 4: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && git add install.sh && git commit -m 'feat: add knowledge-base setup and LLM config to install script'"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && git add install.sh && git commit -m 'feat: add knowledge-base setup and LLM config to install script'"
 ```
 
 ---
@@ -1078,7 +1078,7 @@ ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && 
 - [ ] **Step 1: Verify all imports work end-to-end**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill/workflow/xhs-automation/scripts && python3 -c '
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling/workflow/xhs-automation/scripts && python3 -c '
 import db; import llm; import review; import keepalive; import research; import create_content
 db.init_db(); db.migrate_db()
 print(\"All imports OK\")
@@ -1090,13 +1090,13 @@ print(\"Published posts:\", db.get_published_post_count())
 - [ ] **Step 2: Verify knowledge-base directory structure**
 
 ```bash
-ssh weiyong@100.79.106.110 "ls -la /Users/weiyong/Documents/10/xiaohongshu-skill/workflow/xhs-automation/knowledge-base/"
+ssh weiyong@100.79.106.110 "ls -la /Users/weiyong/Documents/10/shuling/workflow/xhs-automation/knowledge-base/"
 ```
 
 - [ ] **Step 3: Run a dry test of export_week_data**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill/workflow/xhs-automation/scripts && python3 -c '
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling/workflow/xhs-automation/scripts && python3 -c '
 import review
 result = review.export_week_data(\"2026-04-15\")
 print(\"Export result:\", result[0] if result[0] else \"No data (expected for new account)\")
@@ -1106,7 +1106,7 @@ print(\"Export result:\", result[0] if result[0] else \"No data (expected for ne
 - [ ] **Step 4: Verify git status is clean**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && git status && git log --oneline -10"
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && git status && git log --oneline -10"
 ```
 
 - [ ] **Step 5: Final commit with all remaining changes (if any)**

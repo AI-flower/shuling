@@ -1,5 +1,5 @@
 ---
-name: xiaohongshu
+name: shuling
 description: |
   小红书内容工具。使用场景：
   - 搜索小红书内容
