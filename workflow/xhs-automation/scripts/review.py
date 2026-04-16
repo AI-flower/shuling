@@ -9,7 +9,6 @@ from datetime import date, datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(__file__))
 import db
-import llm
 import telegram
 import feedback_analyzer
 import noterx_diagnose
@@ -546,7 +545,17 @@ def weekly_evolution(date_str):
         patterns_content=patterns_content or "（空，尚无 pattern）",
         rules_content=rules_content
     )
-    response = llm.call_llm(prompt, system="你是小红书数据分析专家，只输出 JSON。")
+    claude_bin = os.environ.get("XHS_CLAUDE_BIN", "claude")
+    full_prompt = "你是小红书数据分析专家，只输出 JSON。\n\n" + prompt
+    try:
+        llm_result = subprocess.run(
+            [claude_bin, "--dangerously-skip-permissions", "--print", "-p", full_prompt],
+            capture_output=True, text=True, timeout=180
+        )
+        response = llm_result.stdout.strip() if llm_result.returncode == 0 else None
+    except Exception as e:
+        print(f"  Claude CLI 调用失败: {e}", file=sys.stderr)
+        response = None
     if not response:
         print("  LLM 调用失败，跳过进化")
         return
