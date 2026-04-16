@@ -25,6 +25,89 @@ description: |
 
 ---
 
+## 0. 安装与环境检查
+
+> 触发条件：用户说"安装"、"setup"，或 `scripts/preflight.py` 未通过
+
+当用户要求安装此 skill 时，**你负责引导完成全部环境准备**。用户不需要看任何文档——你来检查、你来安装、你来问需要的信息。
+
+### 执行步骤
+
+**第一步：运行环境预检**
+
+```bash
+python3 scripts/preflight.py
+```
+
+这会输出 JSON，告诉你每个依赖的状态：
+- `status: "ok"` → 已就绪，不用管
+- `action: "auto_install"` / `action: "auto_fix"` → 你可以自动修复，直接执行 `install_cmd` 或 `fix_cmd`
+- `action: "ask_user"` → 需要用户提供信息，用 `ask` 字段中的话术引导用户
+- `action: "optional"` → 可选功能，问用户要不要配置
+
+**第二步：自动修复能修的**
+
+对所有 `auto_install` / `auto_fix` 项，直接执行修复命令，不需要问用户：
+- 数据库未初始化 → `bash scripts/db.sh init`
+- Playwright 未安装 → `npx playwright install chromium`
+- Node 模块缺失 → `npm install`
+
+**第三步：逐项引导用户完成需要人工配合的项**
+
+按这个顺序引导（重要的先问）：
+
+1. **xiaohongshu-mcp**（核心依赖——没有它就无法操作小红书）
+   - 如果未运行：问用户是否已安装 xiaohongshu-mcp
+   - 已安装但未启动：帮用户执行 `bash scripts/xhs.sh status`，根据输出判断
+   - 未安装：告诉用户需要安装，提供安装方式（参考 `docs/mcp-setup.md` 或项目仓库说明）
+   - MCP 启动后，执行 `bash scripts/xhs.sh status` 验证登录态
+   - 登录过期：执行 `bash scripts/xhs.sh login` 获取二维码链接，发给用户扫码
+
+2. **Telegram Bot**（通知渠道——用来推送选题、审图、日报）
+   - 引导用户创建 Bot：Telegram 搜索 @BotFather → /newbot → 记下 Token
+   - 引导获取 Chat ID：向 Bot 发一条消息 → 打开 `https://api.telegram.org/bot<Token>/getUpdates` → 找 `chat.id`
+   - 用户提供 Token 和 Chat ID 后，写入 `config/runtime.env`：
+     ```bash
+     mkdir -p workflow/xhs-automation/config
+     # 写入或更新 XHS_TELEGRAM_BOT_TOKEN 和 XHS_TELEGRAM_CHAT_ID
+     ```
+
+3. **图片生成 API**（可选——不配也能用，走 HTML 截图降级）
+   - 问用户："图片可以用 AI 生成（更好看），也可以用 HTML 模板截图（免费）。要配置 AI 图片吗？"
+   - 如果要：问 API Key，问服务商（openai/gemini），写入 `config/runtime.env`
+   - 如果不要：跳过，告诉用户后续想开可以再配
+
+**第四步：验证**
+
+所有配置完成后，再跑一次预检确认全部就绪：
+```bash
+python3 scripts/preflight.py
+```
+
+如果 `ready: true`，告诉用户：
+> "环境准备完成！现在可以开始了。告诉我你想在小红书上做什么方向的博主，我来帮你建立画像。"
+
+然后自动进入「1. 首次使用：建立博主画像」流程。
+
+### 配置文件位置
+
+所有用户配置统一写入 `workflow/xhs-automation/config/runtime.env`：
+
+```bash
+# === 必填 ===
+XHS_TELEGRAM_BOT_TOKEN=xxx     # Telegram Bot Token
+XHS_TELEGRAM_CHAT_ID=xxx       # Telegram Chat ID
+MCP_URL=http://localhost:18060  # xiaohongshu-mcp 地址
+
+# === 可选 ===
+IMAGE_GEN_PROVIDER=gemini      # openai 或 gemini
+IMAGE_GEN_API_KEY=xxx          # 图片生成 API Key
+```
+
+> **注意**：不需要配置 LLM API Key。你（智能体）本身就是 LLM，所有需要 AI 的地方直接用你的能力即可。
+
+---
+
 ## 1. 首次使用：建立博主画像
 
 > 触发条件：`knowledge-base/profile.json` 不存在
