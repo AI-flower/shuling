@@ -21,14 +21,31 @@ NOTERX_TIMEOUT_FULL = int(os.environ.get("NOTERX_TIMEOUT_FULL", "150"))
 # 品类映射：我们的帖子 → NoteRx 支持的 category
 # NoteRx 支持: food, fashion, tech, travel, beauty, fitness, lifestyle, home
 CATEGORY_MAP = {
-    "tech": "tech",
-    "ai": "tech",
-    "科技": "tech",
-    "编程": "tech",
-    "开发": "tech",
-    "工具": "tech",
+    # 科技
+    "tech": "tech", "ai": "tech", "科技": "tech", "编程": "tech",
+    "开发": "tech", "工具": "tech", "程序": "tech",
+    # 美食
+    "food": "food", "美食": "food", "探店": "food", "烘焙": "food",
+    "菜谱": "food", "吃货": "food", "料理": "food",
+    # 时尚
+    "fashion": "fashion", "穿搭": "fashion", "时尚": "fashion",
+    "潮流": "fashion", "搭配": "fashion", "ootd": "fashion",
+    # 旅游
+    "travel": "travel", "旅游": "travel", "旅行": "travel",
+    "攻略": "travel", "探险": "travel",
+    # 生活
+    "lifestyle": "lifestyle", "生活": "lifestyle", "日常": "lifestyle",
+    "家居": "lifestyle", "收纳": "lifestyle", "好物": "lifestyle",
+    # 美妆
+    "beauty": "beauty", "美妆": "beauty", "护肤": "beauty",
+    "化妆": "beauty", "彩妆": "beauty",
+    # 健身
+    "fitness": "fitness", "健身": "fitness", "运动": "fitness",
+    "减脂": "fitness", "瑜伽": "fitness",
+    # 家装
+    "home": "home", "家装": "home", "装修": "home",
 }
-DEFAULT_CATEGORY = "tech"
+DEFAULT_CATEGORY = "lifestyle"
 
 
 def _map_category(our_category):
@@ -37,6 +54,28 @@ def _map_category(our_category):
         return DEFAULT_CATEGORY
     key = our_category.lower().strip()
     return CATEGORY_MAP.get(key, DEFAULT_CATEGORY)
+
+
+SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _get_category_from_profile():
+    """从 knowledge-base/profile.json 读取用户领域，映射到 NoteRx 品类"""
+    profile_path = os.path.join(SKILL_DIR, "knowledge-base", "profile.json")
+    if not os.path.exists(profile_path):
+        return DEFAULT_CATEGORY
+    try:
+        with open(profile_path, "r", encoding="utf-8") as f:
+            niche = json.load(f).get("niche", "")
+        if not niche:
+            return DEFAULT_CATEGORY
+        niche_lower = niche.lower()
+        for keyword, category in CATEGORY_MAP.items():
+            if keyword in niche_lower:
+                return category
+        return DEFAULT_CATEGORY
+    except Exception:
+        return DEFAULT_CATEGORY
 
 
 def pre_score(title, content="", category="tech", tags=None, image_count=0):
@@ -82,7 +121,7 @@ def full_diagnose(title, content="", category="tech", tags=None):
         return None
 
 
-def diagnose_post(post_id, title, content="", tags=None, category="tech",
+def diagnose_post(post_id, title, content="", tags=None, category=None,
                   full=False, image_count=0):
     """
     诊断一篇帖子并写入 DB。
@@ -90,6 +129,8 @@ def diagnose_post(post_id, title, content="", tags=None, category="tech",
     full=True:  调完整诊断（60-90s，消耗对方 LLM tokens）
     返回诊断结果 dict 或 None。
     """
+    if category is None:
+        category = _get_category_from_profile()
     tag_list = []
     if tags:
         if isinstance(tags, str):
@@ -224,7 +265,8 @@ def backfill_diagnosis(days=3, full=False):
         tags = p.get("tags")
         images = db.get_post_images(p["id"])
         img_count = len(images) if images else 0
-        diagnose_post(p["id"], p["title"], p.get("content", ""), tags, full=full, image_count=img_count)
+        diagnose_post(p["id"], p["title"], p.get("content", ""), tags,
+                      full=full, image_count=img_count, category=_get_category_from_profile())
         print()
 
 
