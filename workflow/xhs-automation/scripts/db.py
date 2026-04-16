@@ -136,6 +136,23 @@ def init_db():
         gen_status TEXT DEFAULT 'pending',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS note_diagnosis (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id INTEGER REFERENCES posts(id),
+        diagnosed_at TEXT NOT NULL,
+        source TEXT DEFAULT 'noterx',
+        overall_score REAL,
+        grade TEXT,
+        content_score REAL,
+        visual_score REAL,
+        growth_score REAL,
+        user_reaction_score REAL,
+        issues TEXT,
+        suggestions TEXT,
+        debate_summary TEXT,
+        diagnosis_json TEXT
+    );
     """)
     conn.commit()
     conn.close()
@@ -295,6 +312,28 @@ def migrate_db():
     posts_columns = {row["name"] for row in cursor.fetchall()}
     if "pattern_used" not in posts_columns:
         conn.execute("ALTER TABLE posts ADD COLUMN pattern_used TEXT")
+    # note_diagnosis table (NoteRx integration)
+    try:
+        conn.execute("SELECT 1 FROM note_diagnosis LIMIT 1")
+    except sqlite3.OperationalError:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS note_diagnosis (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                post_id INTEGER REFERENCES posts(id),
+                diagnosed_at TEXT NOT NULL,
+                source TEXT DEFAULT 'noterx',
+                overall_score REAL,
+                grade TEXT,
+                content_score REAL,
+                visual_score REAL,
+                growth_score REAL,
+                user_reaction_score REAL,
+                issues TEXT,
+                suggestions TEXT,
+                debate_summary TEXT,
+                diagnosis_json TEXT
+            )
+        """)
     conn.commit()
     conn.close()
 
@@ -460,6 +499,70 @@ def get_unanalyzed_posts(days=3):
         SELECT p.* FROM posts p
         LEFT JOIN comment_analysis ca ON ca.post_id = p.id
         WHERE p.status = 'published' AND ca.id IS NULL
+          AND p.date >= date('now', ?)
+    """, (f"-{days} days",)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+# ---- Note Diagnosis (NoteRx) ----
+
+def add_diagnosis(post_id, source="noterx", overall_score=0, grade="",
+                  content_score=0, visual_score=0, growth_score=0,
+                  user_reaction_score=0, issues=None, suggestions=None,
+                  debate_summary="", diagnosis_json=None):
+    conn = get_conn()
+    conn.execute(
+        """INSERT INTO note_diagnosis (post_id, diagnosed_at, source,
+           overall_score, grade, content_score, visual_score,
+           growth_score, user_reaction_score, issues, suggestions,
+           debate_summary, diagnosis_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (post_id, datetime.now().isoformat(), source,
+         overall_score, grade, content_score, visual_score,
+         growth_score, user_reaction_score,
+         json.dumps(issues, ensure_ascii=False) if issues else None,
+         json.dumps(suggestions, ensure_ascii=False) if suggestions else None,
+         debate_summary,
+         json.dumps(diagnosis_json, ensure_ascii=False) if diagnosis_json else None)
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_latest_diagnosis(post_id):
+    """获取某篇帖子最新一次诊断"""
+    conn = get_conn()
+    row = conn.execute(
+        """SELECT * FROM note_diagnosis WHERE post_id = ?
+           ORDER BY diagnosed_at DESC LIMIT 1""",
+        (post_id,)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_recent_diagnoses(limit=5):
+    """获取最近 N 次诊断结果（用于反馈注入）"""
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT nd.*, p.title, p.angle, p.style, p.slot
+           FROM note_diagnosis nd
+           JOIN posts p ON p.id = nd.post_id
+           ORDER BY nd.diagnosed_at DESC LIMIT ?""",
+        (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_undiagnosed_posts(days=3):
+    """获取最近 N 天已发布但未诊断的帖子"""
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT p.* FROM posts p
+        LEFT JOIN note_diagnosis nd ON nd.post_id = p.id
+        WHERE p.status = 'published' AND nd.id IS NULL
           AND p.date >= date('now', ?)
     """, (f"-{days} days",)).fetchall()
     conn.close()
