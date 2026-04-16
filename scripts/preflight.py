@@ -97,7 +97,7 @@ def check_mcp():
                 "status": "missing",
                 "detail": "xhs.sh 脚本未找到",
                 "action": "ask_user",
-                "ask": "xiaohongshu-mcp 服务未安装。请参考文档安装后，告诉我 MCP 的地址（默认 http://localhost:18060）",
+                "ask": "xiaohongshu-mcp 服务未安装。这是小红书操作的核心依赖。\n安装指南见 docs/mcp-setup.md\n安装完成后告诉我，我来验证。",
             }
 
     # 尝试调 status
