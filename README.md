@@ -1,6 +1,6 @@
-# 小红书博主成长助手
+# 薯灵 (ShuLing)
 
-> 帮你选题、写稿、发布、复盘，越用越懂你。
+> 小红书博主成长助手 — 帮你选题、写稿、发布、复盘，越用越懂你。
 
 ---
 
@@ -19,7 +19,7 @@
 
 ```bash
 # 1. 安装
-git clone <repo-url> && cd xiaohongshu-skill
+git clone <repo-url> && cd shuling
 bash install.sh
 
 # 2. 首次对话，建立博主画像
@@ -79,7 +79,7 @@ templates/
 ## 文件结构
 
 ```
-xiaohongshu-skill/
+shuling/
 ├── SKILL.md              # Agent 主剧本（核心）
 ├── install.sh            # 安装脚本
 ├── scripts/

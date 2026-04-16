@@ -1,6 +1,6 @@
 # Claude Code 适配指南
 
-将小红书博主成长助手作为 Claude Code skill 使用。
+将薯灵 (ShuLing) 作为 Claude Code skill 使用。
 
 ---
 
@@ -9,13 +9,13 @@
 ### 方式一：复制
 
 ```bash
-cp -r /path/to/xiaohongshu-skill ~/.claude/skills/xiaohongshu
+cp -r /path/to/shuling ~/.claude/skills/xiaohongshu
 ```
 
 ### 方式二：符号链接（推荐，便于更新）
 
 ```bash
-ln -sfn /path/to/xiaohongshu-skill ~/.claude/skills/xiaohongshu
+ln -sfn /path/to/shuling ~/.claude/skills/xiaohongshu
 ```
 
 安装后初始化数据库：

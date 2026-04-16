@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Rebuild the xiaohongshu-skill from a Python-script-heavy architecture to a Skill-as-Brain design where SKILL.md contains all business logic and 4 thin scripts handle physical operations only.
+**Goal:** Rebuild the shuling from a Python-script-heavy architecture to a Skill-as-Brain design where SKILL.md contains all business logic and 4 thin scripts handle physical operations only.
 
 **Architecture:** SKILL.md is the single source of truth for all workflow logic (topic research, draft creation, self-evolution). Four scripts (xhs.sh, image.py, screenshot.cjs, db.sh) handle MCP calls, image generation, screenshots, and SQLite operations. Platform adapters (Hermes/Claude Code/Codex) provide scheduling and user interaction.
 
 **Tech Stack:** Bash (xhs.sh, db.sh), Python 3 (image.py), Node.js + Playwright (screenshot.cjs), SQLite, Markdown + JSON knowledge base.
 
-**Remote access:** All files live on `weiyong@100.79.106.110:/Users/weiyong/Documents/10/xiaohongshu-skill`. Use SSH for all file operations.
+**Remote access:** All files live on `weiyong@100.79.106.110:/Users/weiyong/Documents/10/shuling`. Use SSH for all file operations.
 
 **Existing assets to reuse:**
 - `skills/xiaohongshu/scripts/mcp-call.sh` → basis for `scripts/xhs.sh`
@@ -30,21 +30,21 @@
 - [ ] **Step 1: Create directory skeleton on remote machine**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   mkdir -p scripts data knowledge-base templates platform"
 ```
 
 - [ ] **Step 2: Add .gitkeep for empty dirs**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   touch knowledge-base/.gitkeep templates/.gitkeep"
 ```
 
 - [ ] **Step 3: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   git add scripts data knowledge-base templates platform && \
   git commit -m 'chore: create new project structure for skill redesign'"
 ```
@@ -73,7 +73,7 @@ The script should:
 - [ ] **Step 2: Test basic commands**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   chmod +x scripts/xhs.sh && \
   scripts/xhs.sh status"
 ```
@@ -83,7 +83,7 @@ Expected: JSON with login status (MCP is running on the 69 machine, but we test 
 - [ ] **Step 3: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   git add scripts/xhs.sh && \
   git commit -m 'feat: add scripts/xhs.sh — unified MCP entry point'"
 ```
@@ -110,7 +110,7 @@ Adapt gemini-generate-image.py:
 - [ ] **Step 2: Test --check**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   python3 scripts/image.py --check"
 ```
 
@@ -119,7 +119,7 @@ Expected: exit 2 (no key configured yet) or exit 0 if key exists in env
 - [ ] **Step 3: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   git add scripts/image.py && \
   git commit -m 'feat: add scripts/image.py — Gemini image generation'"
 ```
@@ -135,14 +135,14 @@ ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && 
 - [ ] **Step 1: Copy screenshot.cjs**
 
 ```bash
-ssh weiyong@100.79.106.110 "cp /Users/weiyong/Documents/10/xiaohongshu-skill/skills/xhs-content-generator/scripts/screenshot.cjs \
-  /Users/weiyong/Documents/10/xiaohongshu-skill/scripts/screenshot.cjs"
+ssh weiyong@100.79.106.110 "cp /Users/weiyong/Documents/10/shuling/skills/xhs-content-generator/scripts/screenshot.cjs \
+  /Users/weiyong/Documents/10/shuling/scripts/screenshot.cjs"
 ```
 
 - [ ] **Step 2: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   git add scripts/screenshot.cjs && \
   git commit -m 'feat: add scripts/screenshot.cjs — HTML to PNG screenshots'"
 ```
@@ -173,7 +173,7 @@ The script should:
 - [ ] **Step 2: Test init and basic operations**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   chmod +x scripts/db.sh && \
   scripts/db.sh init && \
   scripts/db.sh add-post '{\"date\":\"2026-04-15\",\"slot\":\"noon\",\"title\":\"测试帖子\",\"content\":\"测试内容\",\"tags\":\"[\\\"AI\\\",\\\"测试\\\"]\",\"status\":\"draft\"}' && \
@@ -185,7 +185,7 @@ Expected: JSON output with the inserted post
 - [ ] **Step 3: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   git add scripts/db.sh && \
   git commit -m 'feat: add scripts/db.sh — SQLite wrapper for 5-table schema'"
 ```
@@ -203,14 +203,14 @@ ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && 
 Copy the existing file, it's already well-written and comprehensive.
 
 ```bash
-ssh weiyong@100.79.106.110 "cp /Users/weiyong/Documents/10/xiaohongshu-skill/workflow/xhs-automation/data/content-rules.md \
-  /Users/weiyong/Documents/10/xiaohongshu-skill/data/content-rules.md"
+ssh weiyong@100.79.106.110 "cp /Users/weiyong/Documents/10/shuling/workflow/xhs-automation/data/content-rules.md \
+  /Users/weiyong/Documents/10/shuling/data/content-rules.md"
 ```
 
 - [ ] **Step 2: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   git add data/content-rules.md && \
   git commit -m 'feat: add data/content-rules.md — content compliance rules'"
 ```
@@ -250,7 +250,7 @@ Read the file back and check: could an Agent with no prior context execute every
 - [ ] **Step 3: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   git add SKILL.md && \
   git commit -m 'feat: add SKILL.md — complete Agent-executable playbook'"
 ```
@@ -289,7 +289,7 @@ Contents:
 - [ ] **Step 4: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   git add platform/ && \
   git commit -m 'feat: add platform adapters for Hermes, Claude Code, Codex'"
 ```
@@ -313,14 +313,14 @@ Simplified installer that:
 - [ ] **Step 2: Test dry run**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   bash install.sh --dry-run"
 ```
 
 - [ ] **Step 3: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   git add install.sh && \
   git commit -m 'feat: add simplified install.sh'"
 ```
@@ -346,7 +346,7 @@ The template should:
 - [ ] **Step 2: Test screenshot**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   NODE_PATH=\"\$(npm root -g)\" node scripts/screenshot.cjs templates/post.html /tmp/xhs-test/"
 ```
 
@@ -355,7 +355,7 @@ Expected: PNG files generated for each .page
 - [ ] **Step 3: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   git add templates/post.html && \
   git commit -m 'feat: add HTML template for XHS content cards'"
 ```
@@ -382,7 +382,7 @@ New structure:
 - [ ] **Step 2: Commit**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   git add README.md && \
   git commit -m 'docs: update README for new skill-as-brain architecture'"
 ```
@@ -394,7 +394,7 @@ ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && 
 - [ ] **Step 1: Verify file structure**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   find . -not -path './.git/*' -not -path './skills/*' -not -path './workflow/*' -not -name '.DS_Store' -not -path './.idea/*' -not -path './.session-recorder/*' | sort"
 ```
 
@@ -403,7 +403,7 @@ Expected: Clean new structure with SKILL.md, scripts/, data/, knowledge-base/, t
 - [ ] **Step 2: Verify scripts are executable**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   chmod +x scripts/xhs.sh scripts/db.sh && \
   scripts/db.sh init && echo 'DB OK' && \
   python3 scripts/image.py --check; echo \"image.py exit: \$?\""
@@ -416,6 +416,6 @@ Read SKILL.md and confirm every section from the spec is present and actionable.
 - [ ] **Step 4: Final commit with tag**
 
 ```bash
-ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/xiaohongshu-skill && \
+ssh weiyong@100.79.106.110 "cd /Users/weiyong/Documents/10/shuling && \
   git tag -a v2.0.0 -m 'Skill-as-Brain redesign complete'"
 ```

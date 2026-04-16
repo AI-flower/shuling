@@ -1,19 +1,19 @@
 # Codex 适配指南
 
-将小红书博主成长助手作为 Codex skill 使用。
+将薯灵 (ShuLing) 作为 Codex skill 使用。
 
 ---
 
 ## 安装
 
 ```bash
-cp -r /path/to/xiaohongshu-skill ~/.codex/skills/xiaohongshu
+cp -r /path/to/shuling ~/.codex/skills/xiaohongshu
 ```
 
 或使用符号链接：
 
 ```bash
-ln -sfn /path/to/xiaohongshu-skill ~/.codex/skills/xiaohongshu
+ln -sfn /path/to/shuling ~/.codex/skills/xiaohongshu
 ```
 
 初始化数据库：

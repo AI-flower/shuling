@@ -2,7 +2,7 @@
 
 > 日期: 2026-04-15
 > 状态: draft
-> 项目: xiaohongshu-skill
+> 项目: shuling
 
 ---
 
@@ -147,7 +147,7 @@
 ## 五、文件结构
 
 ```
-xiaohongshu-skill/
+shuling/
 ├── SKILL.md                          # 核心：Agent 的完整操作手册
 ├── scripts/
 │   ├── xhs.sh                        # 小红书 MCP 统一入口
@@ -181,7 +181,7 @@ xiaohongshu-skill/
 ```yaml
 name: xiaohongshu
 description: |
-  小红书博主成长助手。帮你选题、写稿、发布、复盘，越用越懂你。
+  薯灵。帮你选题、写稿、发布、复盘，越用越懂你。
   使用场景：
   - "帮我发小红书"
   - "今天发什么"
@@ -704,7 +704,7 @@ deliver: "telegram:用户ID"
 
 ```bash
 # 安装 skill
-cp -r xiaohongshu-skill ~/.claude/skills/xiaohongshu
+cp -r shuling ~/.claude/skills/xiaohongshu
 
 # 每日发布：用 /loop 或手动触发
 # 在 Claude Code 中输入：
@@ -717,7 +717,7 @@ cp -r xiaohongshu-skill ~/.claude/skills/xiaohongshu
 
 ```bash
 # 安装 skill
-cp -r xiaohongshu-skill ~/.codex/skills/xiaohongshu
+cp -r shuling ~/.codex/skills/xiaohongshu
 
 # 使用方式同 Claude Code
 ```

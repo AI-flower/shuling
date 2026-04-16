@@ -1,6 +1,6 @@
 # Hermes 平台适配指南
 
-将小红书博主成长助手部署到 [Hermes](https://github.com/anthropics/hermes) 平台，实现全自动每日发布与复盘。
+将薯灵 (ShuLing) 部署到 [Hermes](https://github.com/anthropics/hermes) 平台，实现全自动每日发布与复盘。
 
 ---
 
@@ -9,7 +9,7 @@
 ### 1. 复制 skill 文件
 
 ```bash
-SKILL_SRC="/path/to/xiaohongshu-skill"
+SKILL_SRC="/path/to/shuling"
 HERMES_SKILL_DIR="$HOME/.hermes/skills/social-media/xiaohongshu"
 
 mkdir -p "$HERMES_SKILL_DIR"

@@ -677,7 +677,7 @@ keyword_tracking ─── 关键词竞争度缓存
 ## 十二、文件清单
 
 ```
-xiaohongshu-skill/
+shuling/
 ├── README.md                           # 项目说明
 ├── install.sh                          # 一键安装脚本
 │
