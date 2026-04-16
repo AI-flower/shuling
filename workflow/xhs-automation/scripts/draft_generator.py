@@ -132,8 +132,6 @@ def _parse_default_combos(config):
 def build_feedback_section():
     """从 DB 读取最新反馈，格式化为 prompt 片段"""
     feedback = db.get_latest_feedback(limit=3)
-    if not feedback:
-        return ""
 
     all_questions = []
     all_praise = []

@@ -245,12 +245,16 @@ def run_review(date_str=None):
             print(f"  「{p['title'][:15]}」已有诊断: {existing['grade']} {existing['overall_score']}分")
             continue
         try:
+            # 获取图片数量（从 generated_images 表）
+            post_images = db.get_post_images(p["id"])
+            img_count = len(post_images) if post_images else 0
             result = noterx_diagnose.diagnose_post(
                 post_id=p["id"],
                 title=p["title"],
                 content=p.get("content", ""),
                 tags=p.get("tags"),
                 full=use_full_diagnose,
+                image_count=img_count,
             )
             if result:
                 diagnosis_results.append({

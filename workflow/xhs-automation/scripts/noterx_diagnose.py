@@ -83,7 +83,7 @@ def full_diagnose(title, content="", category="tech", tags=None):
 
 
 def diagnose_post(post_id, title, content="", tags=None, category="tech",
-                  full=False):
+                  full=False, image_count=0):
     """
     诊断一篇帖子并写入 DB。
     full=False: 只调 pre-score（快速，零成本）
@@ -101,7 +101,7 @@ def diagnose_post(post_id, title, content="", tags=None, category="tech",
             tag_list = tags
 
     # 1. 始终调 pre-score
-    pre = pre_score(title, content, category, tag_list)
+    pre = pre_score(title, content, category, tag_list, image_count=image_count)
     if not pre:
         print(f"  帖子 {post_id} pre-score 失败，跳过诊断")
         return None
@@ -222,7 +222,9 @@ def backfill_diagnosis(days=3, full=False):
     for p in posts:
         print(f"[{p['date']}] {p['title']}")
         tags = p.get("tags")
-        diagnose_post(p["id"], p["title"], p.get("content", ""), tags, full=full)
+        images = db.get_post_images(p["id"])
+        img_count = len(images) if images else 0
+        diagnose_post(p["id"], p["title"], p.get("content", ""), tags, full=full, image_count=img_count)
         print()
 
 
