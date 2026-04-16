@@ -12,6 +12,7 @@ import db
 import llm
 import telegram
 import feedback_analyzer
+import noterx_diagnose
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 KNOWLEDGE_BASE_DIR = os.path.join(BASE_DIR, "knowledge-base")
@@ -221,6 +222,51 @@ def run_review(date_str=None):
             except Exception as e:
                 print(f"  反馈分析「{p['title']}」失败: {e}", file=sys.stderr)
 
+
+    # 8.5 NoteRx 诊断：对已发布帖子进行多维度评分
+    print("\n🏥 NoteRx 诊断分析...")
+    diagnosis_results = []
+    use_full_diagnose = os.environ.get("NOTERX_FULL_DIAGNOSE", "").lower() in ("1", "true", "yes")
+    for p in posts:
+        if p.get("status") != "published":
+            continue
+        # 跳过已诊断的
+        existing = db.get_latest_diagnosis(p["id"])
+        if existing:
+            diagnosis_results.append({
+                "title": p["title"],
+                "score": existing["overall_score"],
+                "grade": existing["grade"],
+                "content": existing["content_score"],
+                "visual": existing["visual_score"],
+                "growth": existing["growth_score"],
+                "cached": True,
+            })
+            print(f"  「{p['title'][:15]}」已有诊断: {existing['grade']} {existing['overall_score']}分")
+            continue
+        try:
+            result = noterx_diagnose.diagnose_post(
+                post_id=p["id"],
+                title=p["title"],
+                content=p.get("content", ""),
+                tags=p.get("tags"),
+                full=use_full_diagnose,
+            )
+            if result:
+                diagnosis_results.append({
+                    "title": p["title"],
+                    "score": result["overall_score"],
+                    "grade": result["grade"],
+                    "content": result["content_score"],
+                    "visual": result["visual_score"],
+                    "growth": result["growth_score"],
+                    "issues": result.get("issues", [])[:3],
+                    "cached": False,
+                })
+                print(f"  「{p['title'][:15]}」: {result['grade']} {result['overall_score']}分")
+        except Exception as e:
+            print(f"  「{p['title'][:15]}」诊断失败: {e}", file=sys.stderr)
+
     # 9. 发送 Telegram 日报
     print("\n📤 发送 Telegram 日报...")
     success = telegram.send_daily_review(
@@ -238,6 +284,19 @@ def run_review(date_str=None):
         for ci in comment_insights:
             ci_lines.append(f"  「{ci['title'][:15]}」: {ci['summary']}")
         telegram.send("\n".join(ci_lines))
+
+    # 追加 NoteRx 诊断摘要
+    if diagnosis_results:
+        diag_lines = ["🏥 <b>NoteRx 诊断</b>"]
+        for dr in diagnosis_results:
+            cached_tag = " (缓存)" if dr.get("cached") else ""
+            diag_lines.append(
+                f"  「{dr['title'][:15]}」{dr['grade']} {dr['score']}分{cached_tag}"
+                f"  内容{dr.get('content', 0):.0f} 视觉{dr.get('visual', 0):.0f} 增长{dr.get('growth', 0):.0f}"
+            )
+            for iss in dr.get("issues", [])[:2]:
+                diag_lines.append(f"    ⚠️ {iss[:60]}")
+        telegram.send("\n".join(diag_lines))
 
     if success:
         db.mark_review_sent(date_str)
