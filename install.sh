@@ -144,6 +144,54 @@ else
     fi
 fi
 
+
+# ─── 7.5 配置 Telegram Bot ──────────────────────────────────────
+WORKFLOW_DIR="$SKILL_DIR/workflow/xhs-automation"
+CONFIG_DIR="$WORKFLOW_DIR/config"
+RUNTIME_ENV="$CONFIG_DIR/runtime.env"
+
+if [ -d "$WORKFLOW_DIR" ] && [ -d "$CONFIG_DIR" ]; then
+    if [ ! -f "$RUNTIME_ENV" ] && [ -f "$CONFIG_DIR/runtime.env.example" ]; then
+        cp "$CONFIG_DIR/runtime.env.example" "$RUNTIME_ENV"
+        info "runtime.env 已从模板创建"
+    fi
+
+    if [ -f "$RUNTIME_ENV" ]; then
+        EXISTING_TOKEN=$(grep "^XHS_TELEGRAM_BOT_TOKEN=" "$RUNTIME_ENV" 2>/dev/null | cut -d= -f2 | tr -d "'" | tr -d '"' || true)
+        if [ -z "$EXISTING_TOKEN" ]; then
+            printf "\n${BOLD}配置 Telegram Bot${RESET}（用于接收选题推送和日报）\n"
+            printf "  1. Telegram 搜索 @BotFather → /newbot → 记下 Token\n"
+            printf "  2. 向 Bot 发消息后，打开 https://api.telegram.org/bot<Token>/getUpdates 找 chat.id\n\n"
+            printf "  Bot Token（留空跳过）: "
+            read -r tg_token
+            if [ -n "$tg_token" ]; then
+                sed -i.bak "s|^XHS_TELEGRAM_BOT_TOKEN=.*|XHS_TELEGRAM_BOT_TOKEN=$tg_token|" "$RUNTIME_ENV"
+                info "Telegram Bot Token 已写入"
+                printf "  Chat ID: "
+                read -r tg_chat
+                if [ -n "$tg_chat" ]; then
+                    sed -i.bak "s|^XHS_TELEGRAM_CHAT_ID=.*|XHS_TELEGRAM_CHAT_ID=$tg_chat|" "$RUNTIME_ENV"
+                    info "Telegram Chat ID 已写入"
+                fi
+                rm -f "$RUNTIME_ENV.bak"
+            else
+                warn "跳过 Telegram 配置（后续可编辑 $RUNTIME_ENV）"
+            fi
+        else
+            info "Telegram Bot Token 已配置"
+        fi
+    fi
+fi
+
+# ─── 7.6 运行环境预检 ────────────────────────────────────────────
+printf "\n${BOLD}=== 环境预检 ===${RESET}\n\n"
+
+if [ -f "$SKILL_DIR/scripts/preflight.py" ]; then
+    python3 "$SKILL_DIR/scripts/preflight.py" 2>&1 >/dev/null
+else
+    warn "preflight.py 未找到，跳过环境预检"
+fi
+
 # ─── 8. 验证 & 输出下一步 ───────────────────────────────────────────
 printf "\n${BOLD}=== 安装完成 ===${RESET}\n\n"
 
