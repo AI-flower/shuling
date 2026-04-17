@@ -27,14 +27,14 @@ else
 fi
 
 if command -v python3 >/dev/null 2>&1; then
-    info "Python $(python3 --version 2>&1 | awk {print })"
+    info "Python $(python3 --version 2>&1 | awk '{print $1}')"
 else
     fail "Python 3 未安装（图片生成需要）"
     MISSING=1
 fi
 
 if command -v sqlite3 >/dev/null 2>&1; then
-    info "sqlite3 $(sqlite3 --version | awk {print })"
+    info "sqlite3 $(sqlite3 --version | awk '{print $1}')"
 else
     fail "sqlite3 未安装（数据存储需要）"
     MISSING=1
@@ -87,9 +87,10 @@ for entry in "${PLATFORMS[@]}"; do
     target="${entry#*:}"
     mkdir -p "$target"
     rsync -a --exclude=.git --exclude=.DS_Store --exclude=.idea \
-        --exclude=workflow --exclude=skills --exclude=docs \
+        --exclude=skills --exclude=docs \
         --exclude=.session-recorder --exclude=*.md \
-        --exclude=config --exclude=knowledge-base/profile.json \
+        --exclude=config/runtime.env --exclude=config/state.json \
+        --exclude=knowledge-base/profile.json \
         --exclude=knowledge-base/preferences.json --exclude=knowledge-base/patterns.md \
         --exclude=data/xhs.db --exclude=data/xhs.db-shm --exclude=data/xhs.db-wal \
         "$SKILL_DIR/" "$target/"
@@ -150,7 +151,7 @@ fi
 
 # ─── 7.5 确保每个 target 有 config/runtime.env（无交互，仅初始化）──
 # Telegram / IM 通讯凭证不在 skill 配置范围内 —— 由 hermes-agent 自己管理。
-RUNTIME_ENV_TEMPLATE="$SKILL_DIR/workflow/xhs-automation/config/runtime.env.example"
+RUNTIME_ENV_TEMPLATE="$SKILL_DIR/config/runtime.env.example"
 
 if [ -f "$RUNTIME_ENV_TEMPLATE" ]; then
     for entry in "${PLATFORMS[@]}"; do
