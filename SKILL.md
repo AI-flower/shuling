@@ -22,7 +22,7 @@ description: |
 2. **脚本只是手脚**：`scripts/` 里的工具只负责你做不了的物理操作（调小红书 API、生成图片、读写数据库）
 3. **数据驱动一切**：用户的每次选择、每条帖子的互动数据都记录在案，驱动系统进化
 4. **用户操作最小化**：从"每天选几次"渐进到"回复一个'发'字"
-5. **不读 workflow 目录**：`workflow/xhs-automation/` 是另一个独立后台项目（不属于本 skill），其中的 .py 脚本与本 skill 行为无关。**禁止 grep / Read / 引用** 该目录下任何文件。本 skill 的所有路径都相对 skill 根目录（包含本 SKILL.md 的目录）。
+5. **路径全部相对 skill 根目录**：所有脚本、配置、数据都在本 SKILL.md 同级或子目录下，不要去任何"上级/兄弟"目录读写文件。
 6. **不假设通讯渠道**：与用户的对话由 hermes-agent 负责（Telegram 或其他 IM）。本 skill 只产出**业务内容**（选题、草稿、发布结果、日报），由上层决定如何送达用户、如何收回回应。
 
 ---
@@ -113,7 +113,7 @@ python3 scripts/preflight.py
 
 ### 配置文件位置
 
-> **重要**：所有路径**相对 skill 根目录**（即包含本 SKILL.md 的目录）。**不要**在任何子目录如 `workflow/`、`xhs-automation/` 下创建配置——那是另一个独立项目。
+> **重要**：所有路径**相对 skill 根目录**（即包含本 SKILL.md 的目录）。
 
 | 文件 | 用途 |
 |------|------|
@@ -404,9 +404,11 @@ MCP_URL=http://localhost:18060/mcp
 
 ---
 
-## 3. 每日复盘：数据采集 → 日报
+## 3. 每日复盘：数据采集 → NoteRx 诊断 → 进化
 
-每天晚上执行一次（建议 22:00）。
+每天晚上执行（建议 22:00 由 hermes cron 触发，或用户说"复盘一下"也立即跑）。
+
+**目标**：拉今天发的所有帖子的真实数据 + 第三方诊断分数 → 你（大脑）综合判断 → **当晚立即更新** patterns/rules，让明天的创作变得更聪明。
 
 ### 步骤
 
@@ -414,51 +416,79 @@ MCP_URL=http://localhost:18060/mcp
    ```bash
    scripts/db.sh query-posts --today --status published
    ```
+   返回 JSON 数组，每条含 `id, note_id, title, topic_type, title_pattern, content_style`。
 
-2. **采集每篇帖子的互动数据**
-   
-   对每篇帖子：
+2. **逐篇拉互动数据**
+   对每个 `(post_id, note_id)`：
    ```bash
-   scripts/xhs.sh detail <note_id>
+   scripts/fetch-metrics.sh <post_id> <note_id>
    ```
-   从返回的 JSON 中提取 `liked_count`、`collected_count`、`comment_count`、`share_count`
-   
-   记录到数据库：
+   脚本已写入 `post_metrics` 表，并把 `{likes, saves, comments, shares}` 回吐给你。
+
+3. **逐篇拉评论原文（脚本已过滤垃圾评论）**
    ```bash
-   scripts/db.sh add-metrics '{"post_id":1,"likes":89,"saves":132,"comments":15,"shares":3,"checkpoint":"daily"}'
+   scripts/fetch-comments.sh <note_id> --limit 30
    ```
+   返回 `[{author, text, like_count}]`。**你自己读**评论，提炼：正面/负面/提问、用户内容需求（"能不能出一期 X"）、高频词。
 
-3. **分析评论**
-   
-   从 detail 返回中提取评论列表，过滤垃圾评论（纯 emoji / ≤2 字 / 含"加微"/"私聊"/"免费领"等引流词）。
-   
-   对有效评论做分析：
-   - 正面/负面/提问 分类
-   - 提取高频问题
-   - 提取用户内容需求（"能不能出一期XX"这类）
+4. **逐篇 NoteRx 诊断**
+   先查是否已诊断过：
+   ```bash
+   scripts/db.sh query-diagnosis --post-id <id>
+   ```
+   返回空数组就跑：
+   ```bash
+   scripts/noterx-diagnose.sh <post_id> "<title>" \
+       --content "<正文>" --tags "标签1,标签2" \
+       --category tech --image-count 6
+   ```
+   返回 5 维评分 + grade（S/A/B/C/D）+ issues（仅 --full 时有）+ suggestions。脚本已写入 `note_diagnosis` 表。
 
-4. **计算关键指标**
+   **--full 决策**：默认只跑 pre-score（< 50ms 零成本）。**只在帖子收藏率 ≥ 5% 或 ≤ 1%（极好极差两端）时**追加 `--full` 拿详细 issues，避免 token 浪费。
+
+5. **综合分析（你来想）**
+   把上面 3 份数据合在一起，对每篇帖子回答：
    - 收藏率 = saves / max(likes, 1)
-   - 与同类型历史帖子对比（查 DB 中相同 topic_type 的历史数据）
+   - 真实表现 vs NoteRx 预测分是否对齐？偏差大说明 NoteRx 在这个领域的校准需要修正
+   - 评论里反复出现的痛点 → 是否值得变成新选题
+   - NoteRx 给的 issues 里，哪些是 **结构性问题**（如"标题缺少数字钩子"），哪些是 **本帖特殊**？结构性问题应该回写到 patterns.md
 
-5. **更新偏好模型**（详见第 4 节自进化引擎）
+6. **当晚更新知识库**（这是"每天进化"的核心，不要攒到周末）
+   - **`knowledge-base/patterns.md`**：
+     - 收藏率 ≥ 5% 的帖子用了什么标题/正文 pattern？还没记录就追加，confidence 从 experimental 起
+     - 已存在 pattern 被验证有效（连续 3 次以上收藏率 ≥ 5%）→ confidence 升级（experimental → medium → high）
+     - 已存在 pattern 连续 3 次 < 2% → 移到 `knowledge-base/anti-patterns.md`
+     - patterns.md 活跃 ≤ 15 条，超出时淘汰 confidence 最低的
+   - **`knowledge-base/preferences.json`**：
+     - 表现好的 topic_type / content_style → weight + 0.1（上限 1.0）
+     - 表现差的 → weight - 0.1（下限 0.0）
+     - 重新计算 confidence_level（详见 4.1）
+   - **`knowledge-base/evolution-log.md`**：追加一段，包含：日期 / 改了什么 / 为什么改 / 数据依据
 
-6. **生成日报输出**
+7. **生成日报输出**
 
-   日报格式（输出后由 hermes 决定如何送达）：
+   日报格式（输出后由 hermes 决定如何送达用户）：
    ```
-   📊 今日数据
+   📊 今日数据（2026-04-17）
 
-   午间「标题」：❤️ 89  ⭐ 132  💬 15
-   晚间「标题」：❤️ 203  ⭐ 47   💬 8
+   午间「标题A」: ❤️ 89  ⭐ 132  💬 15
+       NoteRx: B 76 (内容 80 / 视觉 75 / 增长 70 / 反应 78)
+   晚间「标题B」: ❤️ 203  ⭐ 47   💬 8
+       NoteRx: A 82 (内容 85 / 视觉 80 / 增长 78 / 反应 84)
 
-   💡 洞察：
-   - 午间那条收藏率 148%，清单类内容你的受众很买账
-   - 晚间那条点赞高但收藏低，标题吸引点击但正文干货不够"存下来"
-   - 评论里有 4 人问"怎么安装XX"，这可能是明天的好选题
+   💡 今日洞察
+   - 「标题A」收藏率 148%，清单类内容继续验证有效
+   - 「标题B」NoteRx 评分高但实际收藏率低，可能 NoteRx 校准在这个细分场景偏乐观
+   - 评论里有 4 人问"怎么安装 X"，明天可以做一篇手把手教程
 
-   📈 本周累计：发布 8 条 | 总赞 1.2k | 总收藏 890 | 粉丝 +23
+   🧬 知识库更新
+   - patterns.md：「数字+痛点」标题 confidence experimental → medium
+   - preferences.json：tech-tools weight 0.65 → 0.75
+
+   📈 本周累计：发布 8 条 | 总赞 1.2k | 总收藏 890
    ```
+
+   **不要在日报里包含"@用户"或"telegram://"等渠道字样**——hermes 自己负责送达。
 
 ---
 
@@ -522,65 +552,76 @@ if 用户回复"换"（拒绝推荐）:
   - preferences.json 中对应的 weight - 0.1（下限 0.0）
   - 如果同类型连续 3 次 < 2% → 加入 `knowledge-base/anti-patterns.md`
 
-### 4.3 周进化分析
+### 4.3 周深度回顾
 
-**触发时机**：每周日的复盘流程中额外执行
+**触发时机**：每周日的复盘流程中，作为日常复盘的"加餐"
+
+**与每日复盘的区别**：每日复盘已经做了 patterns/rules 的实时调整。周回顾不再做硬调整，而是**抽离出一周的全景**给用户看：方向是否在收敛、有哪些反复出现的高频问题、要不要换打法。
 
 **步骤**：
 
-1. **导出本周数据**
+1. **读 evolution-log.md**：获取本周追加的所有变更
+   ```bash
+   tail -200 knowledge-base/evolution-log.md
+   ```
+
+2. **导出本周数据**
    ```bash
    scripts/db.sh query-posts --days 7
    ```
-   对每篇帖子获取互动数据：
+   对每篇帖子拉历史 metrics：
    ```bash
    scripts/db.sh query-metrics --post-id <id>
    ```
 
-2. **综合分析**（你自己做判断）：
-   - 哪种 topic_type + content_style 组合效果最好？
-   - 哪些 pattern 被验证有效（连续 3+ 次收藏率 ≥ 5%）？
-   - 哪些 pattern 应该淘汰（连续 3 次收藏率 < 2%）？
+3. **跨日整合分析**（你自己做）
+   - 哪种 topic_type + content_style 组合本周表现最稳定？
+   - 哪些 pattern 已经被反复验证可以晋升 high？
+   - 用户在评论区是否有积累的需求未满足？
+   - NoteRx 评分与实际收藏率的相关性如何？是否存在"NoteRx 系统偏差"应该被你内化？
 
-3. **更新知识库**：
-   - `patterns.md`：有效 pattern 的 confidence 升级（low→medium→high），失效 pattern 移入 anti-patterns.md
-   - `preferences.json`：根据数据微调各项 weight
-   - `knowledge-base/evolution-log.md`：追加本次进化记录
+4. **写入周快照**：`knowledge-base/reviews/<YYYY-W##>.md`
 
-4. **Pattern 生命周期**：
-   ```
-   competitor（冷启动播种）confidence: low
-     → 被使用且收藏率 ≥ 5% → confidence: medium
-     → 连续 3+ 次有效 → confidence: high
-   
-   experimental（自己数据发现）
-     → 验证 1 次 → confidence: medium
-     → 连续 3+ 次有效 → confidence: high
-   
-   连续 3 次收藏率 < 2% → deprecated（移入 anti-patterns.md）
-   patterns.md 活跃 pattern ≤ 15 条，超出时淘汰 confidence 最低的
+   ```markdown
+   # 2026-W17 周回顾
+
+   ## 一句话总结
+   本周发布 14 条，最稳定方向是 `tech-tools` + `清单体`。
+
+   ## 收敛信号
+   - 「数字 + 痛点」标题已连续 5 次收藏率 ≥ 5% → 升 high
+
+   ## 待验证
+   - 反差悬念体试了 2 次效果分化，下周再观察 1 次
+
+   ## 用户需求积压
+   - 8 条评论问"安装步骤"，下周必出一条手把手教程
+
+   ## NoteRx 校准
+   - tech 品类下 NoteRx 系统性偏低 ~5 分，明天起人为加权
    ```
 
 5. **生成周报输出**：
+
    ```
-   📈 本周成长报告
+   📈 本周成长报告（W17 / 2026-04-12 ~ 2026-04-18）
 
    发布 14 条 | 总赞 2.1k | 总收藏 1.5k | 粉丝 +47
 
-   🏆 最佳：「5个程序员必备的AI效率工具」收藏率 9.1%
+   🏆 最佳：「5 个程序员必备的 AI 效率工具」收藏率 9.1%
       → 清单体 + 每个工具写了"替你省哪一步"
-   
    📉 最差：「OpenClaw 是什么」收藏率 0.8%
       → 百科式开头，用户第一屏看不到"跟我有什么关系"
 
-   🧬 你正在形成的风格：
+   🧬 你正在形成的风格（已写入 knowledge-base/）
    - 受众最吃"工具清单 + 场景化推荐"（连续 3 周验证）
    - "避坑"类标题点击率高但转化低
    - 你偏好选 AI 工具类 > 编程教程类
 
-   🎯 下周建议：
-   - 继续清单体（已验证有效）
-   - 试一条回应评论区高频需求的教程
+   🎯 下周建议
+   - 继续清单体（已晋升 high confidence）
+   - 出一条回应评论高频需求的手把手教程
+   - 「反差悬念体」再试 1 次再决定保留/淘汰
    ```
 
 ---
@@ -667,7 +708,45 @@ scripts/db.sh query-posts [--today|--days N|--status S]  # 查询帖子
 scripts/db.sh query-metrics --post-id N                  # 查询互动数据
 scripts/db.sh query-preferences                          # 查询偏好统计
 scripts/db.sh update-post-status <id> <status> [note_id] # 更新状态
+scripts/db.sh add-diagnosis '<json>'                     # 写入 NoteRx 诊断
+scripts/db.sh query-diagnosis --post-id N                # 查最新诊断
+scripts/db.sh query-undiagnosed [--days N]               # 列已发布未诊断的帖子
 ```
+
+### scripts/fetch-metrics.sh — 拉互动数据
+
+```bash
+scripts/fetch-metrics.sh <post_id> <note_id> [xsec_token]
+```
+
+调 `xhs.sh detail` 提取 likes/saves/comments/shares，写入 `post_metrics` 表（checkpoint='daily'）并输出 JSON。供每日复盘批量调用。
+
+### scripts/fetch-comments.sh — 拉评论原文
+
+```bash
+scripts/fetch-comments.sh <note_id> [xsec_token] [--limit 50]
+```
+
+调 `xhs.sh detail` 提取评论数组，过滤垃圾评论（纯 emoji / ≤2 字 / 含"加微/私聊/免费领/http"），输出 `[{author, text, like_count}]` JSON 数组。**LLM 分析由你来做**，脚本只做物理过滤。
+
+### scripts/noterx-diagnose.sh — NoteRx 第三方诊断
+
+```bash
+# 默认只跑 pre-score（< 50ms，零成本）
+scripts/noterx-diagnose.sh <post_id> "<title>" \
+    --content "<正文>" --tags "标签1,标签2" \
+    --category tech --image-count 6
+
+# 加 --full 跑完整 5-Agent 诊断（60-90s，仅在两端跑：极好或极差）
+scripts/noterx-diagnose.sh <post_id> "<title>" --content "..." --full
+
+# --test 模式：只测 API 连通性，不写 DB
+scripts/noterx-diagnose.sh --test
+```
+
+调 `noterx.muran.tech` 拿 5 维评分 + grade + issues + suggestions，写入 `note_diagnosis` 表。环境变量：`NOTERX_API_URL`、`NOTERX_TIMEOUT_PRE`（默认 15s）、`NOTERX_TIMEOUT_FULL`（默认 150s）。
+
+支持的 category：`tech`/`food`/`fashion`/`travel`/`beauty`/`fitness`/`lifestyle`/`home`，未指定走 `lifestyle`。
 
 ---
 
@@ -691,7 +770,9 @@ scripts/db.sh update-post-status <id> <status> [note_id] # 更新状态
 | `post_metrics` | 互动数据时序（likes/saves/comments） |
 | `user_choices` | 用户选择记录（用于偏好学习） |
 | `topic_candidates` | 选题候选记录 |
-| `comment_insights` | 评论分析结果 |
+| `comment_insights` | 评论分析结果（助手写入） |
+| `note_diagnosis` | NoteRx 诊断分数与 issues |
+| `generated_images` | 图片生成历史（model/path/status） |
 
 ---
 
@@ -712,4 +793,3 @@ scripts/db.sh update-post-status <id> <status> [note_id] # 更新状态
 | `xhs.sh login` 返回"已登录"或"已进入注销流程" | 先视为已登录，调一次 `xhs.sh status` 确认；不要重复发起登录 |
 | 用户重复输入相同句子（≥2 次） | 上次明显没成。**换思路**：检查上一次失败原因，向用户说明，询问要换路径还是给更多信息 |
 | 用户主动提议替代方案 | **优先采纳**用户方案；除非有强证据该方案不可行，否则不要绕回默认路径 |
-| context compaction 后 task list 含"workflow"字样 | 标记为 cancelled 并解释；按当前 SKILL.md 重新规划任务 |
