@@ -348,11 +348,21 @@ MCP_URL=http://localhost:18060/mcp
 
 4. **AI 生图路径**（gemini-native 或 openai-chat 协议，由 IMAGE_GEN_PROTOCOL 决定）
    
-   对每张图分别调用：
+   **关键：必须分两阶段——先生封面，再带封面作 `--reference` 生其余各页。** 这是让多页风格统一的核心招式（向 RedInk 5.2k star 项目学的：Nano Banana Pro 支持 multimodal 输入，看到参考图后会自动锁定色调/字体/构图）。
+
    ```bash
+   # 阶段 a：先单独生成封面（无参考图）
    python3 scripts/image.py "封面：暖色调插画风格，展示XX主题的核心概念" /tmp/xhs-post/page-1.png
-   python3 scripts/image.py "内容页：信息图风格，展示3个要点" /tmp/xhs-post/page-2.png
+
+   # 阶段 b：每张内容页都带封面作参考图
+   python3 scripts/image.py "内容页：信息图风格，展示3个要点" /tmp/xhs-post/page-2.png \
+       --reference /tmp/xhs-post/page-1.png
+   python3 scripts/image.py "内容页：第二个要点的展示" /tmp/xhs-post/page-3.png \
+       --reference /tmp/xhs-post/page-1.png
+   # ... 后续每页都 --reference page-1.png
    ```
+
+   **推荐 model**：`gemini-3-pro-image-preview`（Nano Banana Pro，中文文字渲染最准 + 支持 multimodal）。在 `config/runtime.env` 配 `IMAGE_GEN_MODEL=gemini-3-pro-image-preview`。上一代的 `gemini-2.5-flash-image` 文字常乱码，不推荐用于含中文的封面。
    
    图片 prompt 要求：
    - 英文，30-60 词
