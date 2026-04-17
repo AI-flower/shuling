@@ -77,6 +77,39 @@ MCP 默认运行在 `http://localhost:18060`。如需更改：
 MCP_URL=http://你的地址:端口
 ```
 
+## Cookie 手动注入（备选方案）
+
+如果二维码登录不成功（如提示"已进入注销流程"），可以手动注入浏览器 Cookie：
+
+### 步骤
+
+1. **在浏览器中登录小红书**
+   - 打开 https://www.xiaohongshu.com 并登录
+
+2. **导出 Cookie**
+   - 打开开发者工具（Command+Option+I）
+   - 切到 Network 面板
+   - 刷新页面
+   - 点击任意 xiaohongshu.com 请求
+   - 在 Request Headers 中找到 `cookie:` 行，完整复制
+
+3. **转换为 cookies.json**
+   将 cookie 字符串转换为 JSON 数组格式（每个 cookie 一个对象），保存到 `~/cookies.json`：
+   ```json
+   [
+     {"name": "a1", "value": "xxx", "domain": ".xiaohongshu.com", "path": "/", "expires": 1807785435, "httpOnly": false, "secure": false},
+     {"name": "web_session", "value": "xxx", "domain": ".xiaohongshu.com", "path": "/", "expires": 1807785435, "httpOnly": true, "secure": true}
+   ]
+   ```
+
+4. **重启 MCP 服务**
+   MCP 启动时会自动读取 `~/cookies.json`。
+
+### 注意事项
+- Cookie 有效期通常为数天到数周
+- 过期后需要重新从浏览器获取
+- `web_session` 和 `id_token` 是最关键的字段
+
 ## 常见问题
 
 **Q: MCP 启动失败？**

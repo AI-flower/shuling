@@ -7,19 +7,19 @@
 ## 安装
 
 ```bash
-cp -r /path/to/shuling ~/.codex/skills/xiaohongshu
+cp -r /path/to/shuling ~/.codex/skills/shuling
 ```
 
 或使用符号链接：
 
 ```bash
-ln -sfn /path/to/shuling ~/.codex/skills/xiaohongshu
+ln -sfn /path/to/shuling ~/.codex/skills/shuling
 ```
 
 初始化数据库：
 
 ```bash
-bash ~/.codex/skills/xiaohongshu/scripts/db.sh init
+bash ~/.codex/skills/shuling/scripts/db.sh init
 ```
 
 ---
