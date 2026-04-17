@@ -326,19 +326,27 @@ MCP_URL=http://localhost:18060/mcp
 
 **步骤**：
 
-1. **规划图片内容**：根据草稿规划 5-6 张图
+1. **读图片 pattern 库 + 品牌风格**
+   ```bash
+   cat knowledge-base/image-patterns.md 2>/dev/null  # 没有就跳过
+   ```
+   - 选当前博主领域适用、`confidence ≥ medium` 的 pattern 作为本帖图片基线
+   - 如 `config/runtime.env` 配了 `IMAGE_BRAND_STYLE`，把它作为所有 prompt 的统一前缀
+   - 如果 image-patterns.md 不存在或全是 experimental，按本节后面的"prompt 通用要求"现编
+
+2. **规划图片内容**：根据草稿规划 5-6 张图
    - 第 1 张：封面（标题 + 核心视觉元素，抓眼球）
    - 第 2-5 张：内容页（每页对应正文的一个段落/知识点）
    - 最后 1 张：CTA 收尾页（收藏/关注引导）
 
-2. **检查图片生成能力**
+3. **检查图片生成能力**
    ```bash
    python3 scripts/image.py --check
    ```
    - 返回 0 → 走 Gemini AI 生图
    - 返回非 0 → 走 HTML 截图降级（不向用户要 Key，不阻塞流程）
 
-3. **Gemini AI 生图路径**
+4. **AI 生图路径**（gemini-native 或 openai-chat 协议，由 IMAGE_GEN_PROTOCOL 决定）
    
    对每张图分别调用：
    ```bash
@@ -348,12 +356,20 @@ MCP_URL=http://localhost:18060/mcp
    
    图片 prompt 要求：
    - 英文，30-60 词
+   - **如果第 1 步读到了适用 pattern**：用 pattern 的 template 作为基础，再注入本帖具体内容（如"5 个 AI 工具"），不要凭空发挥
+   - **如果配了 IMAGE_BRAND_STYLE**：把它拼在 prompt 最前面，确保多帖之间风格一致
    - 封面突出 eye-catching、vibrant
    - 内容页与该页具体知识点相关
    - 所有图片保持统一风格
    - 描述画面内容，不要包含文字（文字由 HTML 截图补充）
 
-4. **HTML 截图降级路径**
+   **记录**：每张图生成后，到 SKILL.md 第 2.4 节发布之前的某一步，把 prompt + image_path 写到 `generated_images` 表（这是图片自进化的数据基础）：
+   ```bash
+   sqlite3 data/xhs.db "INSERT INTO generated_images (post_id, image_index, prompt, image_path, gen_model, gen_strategy, gen_status) VALUES (<post_id>, <0/1/2...>, '<完整 prompt>', '<绝对路径>', '<model 名>', 'ai', 'success');"
+   ```
+   `<post_id>` 从 add-post 返回。如果 post 还没插入（图片在前），可以先用临时占位，发布完成后批量 UPDATE 关联。
+
+5. **HTML 截图降级路径**
 
    当 Gemini 不可用时：
    a) 生成包含草稿内容的 HTML 文件（使用 `templates/post.html` 的结构，每页 1080x1440px，包含 `.page` class）
@@ -362,7 +378,7 @@ MCP_URL=http://localhost:18060/mcp
    NODE_PATH="$(npm root -g)" node scripts/screenshot.cjs /tmp/xhs-post/post.html /tmp/xhs-post/
    ```
 
-5. **组装 meta.json**
+6. **组装 meta.json**
 
    将草稿内容和图片路径组装为发布数据：
    ```json
@@ -452,6 +468,13 @@ MCP_URL=http://localhost:18060/mcp
    - 真实表现 vs NoteRx 预测分是否对齐？偏差大说明 NoteRx 在这个领域的校准需要修正
    - 评论里反复出现的痛点 → 是否值得变成新选题
    - NoteRx 给的 issues 里，哪些是 **结构性问题**（如"标题缺少数字钩子"），哪些是 **本帖特殊**？结构性问题应该回写到 patterns.md
+   - **图片维度**：从 `generated_images` 拉本帖所有 prompt + 比对 NoteRx 的 `visual_score`：
+     ```bash
+     sqlite3 data/xhs.db "SELECT image_index, prompt FROM generated_images WHERE post_id=<id> ORDER BY image_index;"
+     ```
+     - `visual_score ≥ 80` 且收藏率正常 → 该帖的 prompt 共性提炼为新 image pattern
+     - `visual_score ≤ 40` → 该帖的 prompt 反模式，记入 image-anti-patterns
+     - 评论里有人吐槽图（"封面太花/字太多/看不清"）→ 立即标 anti-pattern
 
 6. **当晚更新知识库**（这是"每天进化"的核心，不要攒到周末）
    - **`knowledge-base/patterns.md`**：
@@ -463,7 +486,12 @@ MCP_URL=http://localhost:18060/mcp
      - 表现好的 topic_type / content_style → weight + 0.1（上限 1.0）
      - 表现差的 → weight - 0.1（下限 0.0）
      - 重新计算 confidence_level（详见 4.1）
-   - **`knowledge-base/evolution-log.md`**：追加一段，包含：日期 / 改了什么 / 为什么改 / 数据依据
+   - **`knowledge-base/image-patterns.md`**（如有图片信号）：
+     - visual_score ≥ 80 的帖子 → 提炼 prompt 共性写入，confidence 从 experimental 起
+     - 已存在 image pattern 连续 3 次 visual_score ≥ 75 → 升级（experimental → medium → high）
+     - 已存在 image pattern 连续 3 次 ≤ 50 → 移到 `knowledge-base/image-anti-patterns.md`
+     - image-patterns.md 活跃 ≤ 10 条
+   - **`knowledge-base/evolution-log.md`**：追加一段，包含：日期 / 改了什么（含图片维度）/ 为什么改 / 数据依据
 
 7. **生成日报输出**
 
@@ -758,9 +786,11 @@ scripts/noterx-diagnose.sh --test
 |------|------|---------|
 | `profile.json` | 博主画像（领域/受众/风格） | 首次使用时创建 |
 | `preferences.json` | 用户偏好（自动学习） | 每次用户选择时 |
-| `patterns.md` | 有效 pattern 库（≤15 条） | 每日/每周进化时 |
-| `anti-patterns.md` | 已淘汰的 pattern | 连续失效时 |
-| `evolution-log.md` | 进化日志 | 每周日 |
+| `patterns.md` | 有效文字 pattern 库（≤15 条） | 每日/每周进化时 |
+| `anti-patterns.md` | 已淘汰的文字 pattern | 连续失效时 |
+| `image-patterns.md` | 有效图片 prompt pattern 库（≤10 条） | 每日复盘时基于 NoteRx visual_score |
+| `image-anti-patterns.md` | 已淘汰的图片 prompt pattern | 连续 visual_score ≤ 50 时 |
+| `evolution-log.md` | 进化日志（含文字+图片两条线） | 每日 |
 
 ### SQLite 表（data/xhs.db）
 
