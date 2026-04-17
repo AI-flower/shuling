@@ -15,6 +15,7 @@ Usage:
     python3 scripts/image.py --check
     python3 scripts/image.py --set-key "KEY"
     python3 scripts/image.py "prompt" output.png
+    python3 scripts/image.py "prompt" page-2.png --reference page-1.png  # 封面回流
 
 Exit codes:
     0 - Success
@@ -179,7 +180,7 @@ def _gen_gemini_native(prompt, output_path):
 
 # ── 协议 2: openai-chat ──────────────────────────────────────────────────────
 
-def _gen_openai_chat(prompt, output_path):
+def _gen_openai_chat(prompt, output_path, reference_paths=None):
     api_key = get_api_key()
     base = get_base_url()
     model = get_model()
@@ -187,10 +188,34 @@ def _gen_openai_chat(prompt, output_path):
         print("[image] ERROR: openai-chat 模式必须配置 IMAGE_GEN_BASE_URL", file=sys.stderr)
         sys.exit(2)
 
+    # ── 拼装 multimodal content：有参考图时把它们作为视觉锚点喂回去 ──
+    user_content = prompt
+    if reference_paths:
+        ref_bytes_list = [_load_reference_image(p) for p in reference_paths]
+        n = len(ref_bytes_list)
+        enhanced = (
+            f"参考提供的 {n} 张图片的风格（色彩、光影、构图、字体、留白），生成一张新图片。\n"
+            f"\n新图片内容：{prompt}\n"
+            f"\n要求：\n"
+            f"1. 严格保持相似的色调和氛围\n"
+            f"2. 使用相似的字体风格和排版\n"
+            f"3. 保持一致的画面质感和留白\n"
+            f"4. 视觉风格必须与参考图统一"
+        )
+        content_parts = [{"type": "text", "text": enhanced}]
+        for ref_bytes in ref_bytes_list:
+            b64 = base64.b64encode(ref_bytes).decode("ascii")
+            content_parts.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
+            })
+        user_content = content_parts
+        print(f"[image] reference: {n} image(s) attached", file=sys.stderr)
+
     url = f"{base}/v1/chat/completions"
     payload = {
         "model": model,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": [{"role": "user", "content": user_content}],
         "modalities": ["text", "image"],
     }
     headers = {
@@ -252,6 +277,34 @@ def _gen_openai_chat(prompt, output_path):
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+def _load_reference_image(path, max_kb=300):
+    """读参考图，>max_kb 时尝试 PIL 压缩；PIL 不可用则原样返回（warn）。"""
+    with open(path, "rb") as f:
+        data = f.read()
+    if len(data) <= max_kb * 1024:
+        return data
+    try:
+        from PIL import Image
+        from io import BytesIO
+        img = Image.open(BytesIO(data))
+        if img.mode in ("RGBA", "LA", "P"):
+            img = img.convert("RGB")
+        buf = BytesIO()
+        for q in range(85, 25, -10):
+            buf.seek(0); buf.truncate(0)
+            img.save(buf, format="JPEG", quality=q, optimize=True)
+            if buf.tell() <= max_kb * 1024:
+                break
+        compressed = buf.getvalue()
+        print(f"[image] reference compressed: {len(data)} -> {len(compressed)} bytes",
+              file=sys.stderr)
+        return compressed
+    except ImportError:
+        print(f"[image] WARN: Pillow not installed, sending uncompressed reference ({len(data)} bytes)",
+              file=sys.stderr)
+        return data
+
+
 def _http_post(url, payload, headers):
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
@@ -301,7 +354,7 @@ def _fail_with_response(msg, body):
     sys.exit(3)
 
 
-def cmd_generate(prompt, output_path):
+def cmd_generate(prompt, output_path, reference_paths=None):
     api_key = get_api_key()
     if not api_key:
         print("[image] ERROR: API key is not configured.", file=sys.stderr)
@@ -310,8 +363,11 @@ def cmd_generate(prompt, output_path):
     print(f"[image] protocol={proto} model={get_model()}", file=sys.stderr)
     print(f"[image] prompt={prompt[:80]}...", file=sys.stderr)
     if proto == "openai-chat":
-        _gen_openai_chat(prompt, output_path)
+        _gen_openai_chat(prompt, output_path, reference_paths=reference_paths)
     else:
+        if reference_paths:
+            print("[image] WARN: gemini-native protocol does not support --reference yet, ignored",
+                  file=sys.stderr)
         _gen_gemini_native(prompt, output_path)
 
 
@@ -331,10 +387,24 @@ def main():
             sys.exit(1)
         cmd_set_key(sys.argv[2])
     else:
-        if len(sys.argv) < 3:
-            print("ERROR: usage: image.py <prompt> <output_path>", file=sys.stderr)
-            sys.exit(1)
-        cmd_generate(sys.argv[1], sys.argv[2])
+        # 解析: image.py <prompt> <output_path> [--reference path]...
+        positional = []
+        references = []
+        i = 1
+        while i < len(sys.argv):
+            a = sys.argv[i]
+            if a == "--reference":
+                if i + 1 >= len(sys.argv):
+                    print("ERROR: --reference requires a path", file=sys.stderr); sys.exit(1)
+                references.append(sys.argv[i + 1])
+                i += 2
+            else:
+                positional.append(a)
+                i += 1
+        if len(positional) < 2:
+            print("ERROR: usage: image.py <prompt> <output_path> [--reference path]...",
+                  file=sys.stderr); sys.exit(1)
+        cmd_generate(positional[0], positional[1], reference_paths=references or None)
 
 
 if __name__ == "__main__":
