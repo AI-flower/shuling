@@ -124,7 +124,7 @@ EOF
 **第一步：配置 LLM**
 
 询问用户：
-> workflow 后台脚本（定时选题/创作/复盘）需要独立的 LLM 调用能力。
+> 这个子 skill 仅做小红书 MCP 调用。如果作为薯灵主 skill 的一部分使用，主 SKILL.md 会负责 LLM 决策。
 > 请选择：
 > 1. Claude API (Anthropic)
 > 2. OpenAI API
@@ -164,6 +164,6 @@ EOF
 
 ### 知识库维护
 
-知识库的定期更新由 workflow 后台脚本自动完成（review.py 每周日触发进化分析），Skill 层不负责写入复盘和更新规则。
+知识库的定期更新由薯灵主 skill 的每日复盘流程负责（详见薯灵主 SKILL.md 第 3 节），由助手按 SKILL.md 决策、调用 fetch-metrics/fetch-comments/noterx-diagnose 等脚本完成。
 
 但如果用户在交互中明确要求（如"分析一下最近的数据"、"更新知识库"），可以手动读取 data/exports/ 下的数据文件，执行分析并更新 knowledge-base/。
