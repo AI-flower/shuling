@@ -15,23 +15,42 @@
 
 ---
 
+## 前置依赖（先备好）
+
+| 依赖 | 用途 | 安装 |
+|------|------|------|
+| **AI 助手** | 大脑，读 SKILL.md 后驱动整个流程 | 装 hermes、[claude code](https://claude.com/claude-code) 或 [codex](https://github.com/openai/codex) 任一 |
+| **xiaohongshu-mcp** | 操作小红书的 MCP 服务（搜索/发布/详情） | [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)，按其 README 装好并用自己的小红书账号登录 |
+| Node.js / Python 3 / sqlite3 / Playwright | 截图、数据库、生图 | macOS：`brew install node sqlite`，然后 `npx playwright install chromium`<br>Linux：`apt install nodejs sqlite3`，然后 `npx playwright install chromium` |
+| 图片生成 API（可选） | AI 生图（不配则走 HTML 截图，效果也不错） | Gemini Key（推荐，有免费额度）或 OpenAI Key |
+
+> **本 skill 不假设也不配置任何 IM 通讯渠道**（Telegram 等）。与用户对话由 AI 助手平台（如 hermes）自己负责。
+
+---
+
 ## 快速开始
 
 ```bash
-# 1. 安装
-git clone <repo-url> && cd shuling
+# 1. 克隆并安装
+git clone git@github.com:AI-flower/shuling.git && cd shuling
 bash install.sh
+# install.sh 会自动检测 hermes/claude/codex/agents 各平台目录并部署到对应位置
 
-# 2. 首次对话，建立博主画像
-#    在你的 AI 助手中说：
-#    "我想做小红书博主"
-#    助手会通过几轮对话了解你的方向、受众和风格偏好
+# 2. 在你的 AI 助手中说一句
+#    "我想做小红书博主"  →  助手通过对话了解你的方向、受众和风格
 
-# 3. 开始使用
+# 3. 登录小红书（两种方式任选）
+#    - 默认扫码：助手会调 scripts/xhs.sh login 拿二维码链接给你扫
+#    - 直接给 cookie：从浏览器 F12 复制完整 Cookie 头字符串，告诉助手
+#      "我给你 cookie：<贴在这里>"  →  助手会自动调 scripts/xhs.sh import-cookie
+
+# 4. 进入日常使用
 #    "帮我发小红书"     → 完整发布流程
 #    "今天发什么"       → 选题研究
 #    "看看昨天的数据"   → 数据复盘
 ```
+
+> **首次安装后**：`config/runtime.env`、`config/state.json`、`knowledge-base/profile.json`、`data/xhs.db` 等都是你的私人数据，已被 `.gitignore` 屏蔽。不要 `git add -f` 这些文件。
 
 ---
 

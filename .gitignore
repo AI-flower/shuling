@@ -1,0 +1,69 @@
+# =================================================================
+# 用户运行时数据 — 每个用户自己生成，绝不能跟随仓库分发
+# =================================================================
+
+# Skill 运行配置（含 MCP_URL、可选 API Key 等）
+config/runtime.env
+config/state.json
+
+# SQLite 数据库
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# 个人画像与偏好
+knowledge-base/profile.json
+knowledge-base/preferences.json
+knowledge-base/patterns.md
+knowledge-base/anti-patterns.md
+knowledge-base/evolution-log.md
+knowledge-base/reviews/
+knowledge-base/README.md
+
+# =================================================================
+# workflow/xhs-automation 子项目运行时数据
+# （这是独立后台脚本，与 skill 解耦，但同样含敏感数据）
+# =================================================================
+
+workflow/xhs-automation/config/runtime.env
+workflow/xhs-automation/data/*.db
+workflow/xhs-automation/data/*.db-shm
+workflow/xhs-automation/data/*.db-wal
+workflow/xhs-automation/logs/
+workflow/xhs-automation/data/exports/
+workflow/xhs-automation/knowledge-base/profile.json
+workflow/xhs-automation/knowledge-base/preferences.json
+workflow/xhs-automation/knowledge-base/patterns.md
+workflow/xhs-automation/knowledge-base/anti-patterns.md
+workflow/xhs-automation/knowledge-base/evolution-log.md
+workflow/xhs-automation/knowledge-base/reviews/
+workflow/xhs-automation/knowledge-base/README.md
+
+# =================================================================
+# 临时输出
+# =================================================================
+/tmp/xhs-post/
+*.log
+*.bak
+
+# =================================================================
+# 平台/IDE 本地数据（不属于 skill 本身）
+# =================================================================
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+.session-recorder/
+.claude/
+
+# =================================================================
+# Python / Node 构建产物
+# =================================================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+node_modules/
+.npm/
