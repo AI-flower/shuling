@@ -68,56 +68,60 @@ bash install.sh
 ## 架构
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   AI 助手（大脑）                 │
-│                                                   │
-│   读取 SKILL.md → 理解流程 → 做决策 → 调工具     │
-└──────────┬───────────────┬───────────────┬────────┘
-           │               │               │
-     ┌─────▼─────┐  ┌─────▼─────┐  ┌─────▼─────┐
-     │  xhs.sh   │  │  db.sh    │  │ image.py  │
-     │  小红书API │  │  数据存储  │  │ 图片生成   │
-     └─────┬─────┘  └─────┬─────┘  └─────┬─────┘
-           │               │               │
-     ┌─────▼─────┐  ┌─────▼─────┐  ┌─────▼─────┐
-     │ xiaohongshu│  │  SQLite   │  │  Gemini   │
-     │    MCP     │  │  xhs.db   │  │  / HTML   │
-     └───────────┘  └───────────┘  └───────────┘
+┌─────────────────────────────────────────────────────┐
+│              AI 助手（大脑 / Skill-as-Brain）         │
+│                                                       │
+│   读 SKILL.md → 业务路由 → 决策 → 调脚本 → 写知识库   │
+└─┬─────────┬─────────┬─────────┬──────────┬──────────┘
+  │         │         │         │          │
+┌─▼──────┐┌─▼──────┐┌─▼─────┐┌─▼────────┐┌─▼─────────┐
+│xhs.sh  ││db.sh   ││image  ││fetch-*   ││noterx-    │
+│小红书  ││数据库  ││.py    ││.sh       ││diagnose.sh│
+│MCP     ││SQLite  ││Gemini ││metrics + ││NoteRx API │
+│        ││xhs.db  ││/HTML  ││comments  ││5 维评分    │
+└────────┘└────────┘└───────┘└──────────┘└───────────┘
 
-knowledge-base/          data/
-├── profile.json         ├── xhs.db          ← 五张表
-├── preferences.json     └── content-rules.md
-└── evolution-log.json
-
-templates/
-└── post.html            ← HTML 截图降级模板
+knowledge-base/                data/
+├── profile.json               ├── xhs.db          ← 7 张表
+├── preferences.json           └── content-rules.md
+├── patterns.md
+├── anti-patterns.md
+├── evolution-log.md           templates/
+└── reviews/<YYYY-W##>.md      └── post.html       ← HTML 截图模板
 ```
 
+**只有一条路线**：智能体 → SKILL.md → scripts/。所有自动化（每日发布 + 每日复盘 + NoteRx 诊断 + 知识库进化）全部走这条路，由 hermes cron 定时唤起助手实现。
 ---
 
 ## 文件结构
 
 ```
 shuling/
-├── SKILL.md              # Agent 主剧本（核心）
-├── install.sh            # 安装脚本
+├── SKILL.md                  # 大脑剧本（核心）
+├── install.sh                # 安装脚本
+├── README.md                 # 本文件
+├── config/
+│   └── runtime.env.example   # 配置模板（MCP_URL / IMAGE_GEN_* / NOTERX_*）
 ├── scripts/
-│   ├── db.sh             # SQLite 数据库操作（增删改查）
-│   ├── xhs.sh            # 小红书 MCP 统一入口
-│   ├── image.py           # Gemini 图片生成
-│   └── screenshot.cjs     # HTML → PNG 截图（Playwright）
+│   ├── preflight.py          # 环境预检
+│   ├── db.sh                 # SQLite 增删改查
+│   ├── xhs.sh                # 小红书 MCP 入口
+│   ├── image.py              # Gemini 图片生成
+│   ├── screenshot.cjs        # HTML → PNG 截图
+│   ├── fetch-metrics.sh      # 拉互动数据写 DB
+│   ├── fetch-comments.sh     # 拉评论原文 + 过滤 spam
+│   └── noterx-diagnose.sh    # NoteRx 5 维诊断
 ├── data/
-│   ├── xhs.db            # SQLite 数据库
-│   └── content-rules.md   # 内容规则与平台限制
-├── knowledge-base/        # 博主画像与偏好（运行时生成）
+│   ├── xhs.db                # SQLite（7 张表，运行时生成）
+│   └── content-rules.md      # 内容规则与平台限制
+├── knowledge-base/           # 博主画像与偏好（运行时生成）
 ├── templates/
-│   └── post.html          # 小红书风格 HTML 模板
+│   └── post.html             # 小红书风格 HTML 模板
 └── platform/
-    ├── hermes.md          # Hermes 适配指南
-    ├── claude-code.md     # Claude Code 适配指南
-    └── codex.md           # Codex 适配指南
+    ├── hermes.md
+    ├── claude-code.md
+    └── codex.md
 ```
-
 ---
 
 ## 自进化机制
