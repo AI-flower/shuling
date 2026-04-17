@@ -20,6 +20,7 @@ usage() {
   comment  <note_id> <内容>     发表评论
   status                        检查登录状态
   login                         获取登录二维码
+  import-cookie <cookie|@文件>  导入已抓取的 cookie 替代扫码（用户主动给 cookie 时优先用此入口）
   user     <user_id>            获取用户主页
 
 环境变量:
@@ -49,11 +50,24 @@ format_json() {
 
 # ── 查找 start-mcp.sh ────────────────────────────────────
 find_start_mcp() {
+  # 1. Check if xiaohongshu-mcp binary is directly available
+  if [ -x "$HOME/.local/bin/xiaohongshu-mcp" ]; then
+    printf '%s\n' "$HOME/.local/bin/xiaohongshu-mcp"
+    return 0
+  fi
+  local which_mcp
+  which_mcp=$(which xiaohongshu-mcp 2>/dev/null || true)
+  if [ -n "$which_mcp" ] && [ -x "$which_mcp" ]; then
+    printf '%s\n' "$which_mcp"
+    return 0
+  fi
+
+  # 2. Check start-mcp.sh script candidates
   local candidates=(
-    "$HOME/.agents/skills/xiaohongshu/scripts/start-mcp.sh"
-    "$HOME/.claude/skills/xiaohongshu/scripts/start-mcp.sh"
-    "$HOME/.codex/skills/xiaohongshu/scripts/start-mcp.sh"
-    "$HOME/.hermes/skills/social-media/xiaohongshu/scripts/start-mcp.sh"
+    "$HOME/.agents/skills/shuling/scripts/start-mcp.sh"
+    "$HOME/.claude/skills/shuling/scripts/start-mcp.sh"
+    "$HOME/.codex/skills/shuling/scripts/start-mcp.sh"
+    "$HOME/.hermes/skills/social-media/shuling/scripts/start-mcp.sh"
   )
   for path in "${candidates[@]}"; do
     if [ -x "$path" ]; then
@@ -61,6 +75,13 @@ find_start_mcp() {
       return 0
     fi
   done
+
+  # 3. Final fallback: which
+  which_mcp=$(which xiaohongshu-mcp 2>/dev/null || true)
+  if [ -n "$which_mcp" ]; then
+    printf '%s\n' "$which_mcp"
+    return 0
+  fi
   return 1
 }
 
@@ -158,7 +179,12 @@ case "$CMD" in
 
   detail)
     [ -z "$1" ] && { echo "错误: 缺少 note_id"; echo "用法: $(basename "$0") detail <note_id>"; exit 1; }
-    mcp_call "get_feed_detail" "{\"feed_id\": \"$1\", \"xsec_token\": \"\"}"
+    XSEC_TOKEN="${2:-}"
+    if [ -n "$XSEC_TOKEN" ]; then
+      mcp_call "get_feed_detail" "{\"feed_id\": \"$1\", \"xsec_token\": \"$XSEC_TOKEN\"}"
+    else
+      mcp_call "get_feed_detail" "{\"feed_id\": \"$1\"}"
+    fi
     ;;
 
   publish)
@@ -215,7 +241,12 @@ PYEOF
     CONTENT="$2"
     # 对评论内容做 JSON 转义
     ESCAPED=$(printf '%s' "$CONTENT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()), end="")' 2>/dev/null || printf '"%s"' "$CONTENT")
-    mcp_call "post_comment_to_feed" "{\"feed_id\": \"$NOTE_ID\", \"xsec_token\": \"\", \"content\": $ESCAPED}"
+    XSEC_TOKEN="${3:-}"
+    if [ -n "$XSEC_TOKEN" ]; then
+      mcp_call "post_comment_to_feed" "{\"feed_id\": \"$NOTE_ID\", \"xsec_token\": \"$XSEC_TOKEN\", \"content\": $ESCAPED}"
+    else
+      mcp_call "post_comment_to_feed" "{\"feed_id\": \"$NOTE_ID\", \"content\": $ESCAPED}"
+    fi
     ;;
 
   status)
@@ -224,6 +255,19 @@ PYEOF
 
   login)
     mcp_call "get_login_qrcode" "{}"
+    ;;
+
+  import-cookie)
+    [ -z "${1:-}" ] && { echo "错误: 缺少 cookie 字符串或文件路径"; echo "用法: $(basename "$0") import-cookie <cookie字符串|@cookie.txt>"; exit 1; }
+    if [[ "$1" == @* ]]; then
+      COOKIE_FILE="${1#@}"
+      [ ! -f "$COOKIE_FILE" ] && { echo "错误: cookie 文件不存在: $COOKIE_FILE" >&2; exit 1; }
+      COOKIE_RAW=$(cat "$COOKIE_FILE")
+    else
+      COOKIE_RAW="$1"
+    fi
+    ESCAPED=$(printf '%s' "$COOKIE_RAW" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().strip()), end="")')
+    mcp_call "import_cookie" "{\"cookie\": $ESCAPED}"
     ;;
 
   user)

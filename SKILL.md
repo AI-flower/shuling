@@ -22,6 +22,33 @@ description: |
 2. **脚本只是手脚**：`scripts/` 里的工具只负责你做不了的物理操作（调小红书 API、生成图片、读写数据库）
 3. **数据驱动一切**：用户的每次选择、每条帖子的互动数据都记录在案，驱动系统进化
 4. **用户操作最小化**：从"每天选几次"渐进到"回复一个'发'字"
+5. **不读 workflow 目录**：`workflow/xhs-automation/` 是另一个独立后台项目（不属于本 skill），其中的 .py 脚本与本 skill 行为无关。**禁止 grep / Read / 引用** 该目录下任何文件。本 skill 的所有路径都相对 skill 根目录（包含本 SKILL.md 的目录）。
+6. **不假设通讯渠道**：与用户的对话由 hermes-agent 负责（Telegram 或其他 IM）。本 skill 只产出**业务内容**（选题、草稿、发布结果、日报），由上层决定如何送达用户、如何收回回应。
+
+---
+
+## 0a. 业务路由（每次 skill 被调起时第一件事）
+
+**无论是用户主动对话调起，还是 hermes 通过 cron 等机制自动触发，第一件事都是跑预检并按 state 决定下一步业务，不要默认从头开始**：
+
+```bash
+python3 scripts/preflight.py
+```
+
+读输出 JSON 中的 `setup_completed`、`state` 与 `checks`，按下表行动：
+
+| 当前状态 | 下一步 |
+|---------|------|
+| `setup_completed: true` 且 `state.cold_start_done: true` | 直接进入 `2. 每日流程`：根据当前时间（午间/晚间）走选题→创作→发布；夜间走 `3. 每日复盘` |
+| `setup_completed: true` 但 cold_start 未做 | 跳过 `0`/`1`，直接执行 `1. 冷启动播种` 部分（竞品分析 + 写 patterns.md），完成后写 `state.cold_start_done = true` |
+| `state.profile_created: true` 但某 check 报 `error`/`missing` | **仅修复缺失项**，不要重新走 0/1 流程，不要重新问画像 |
+| `state.profile_created` 缺失/false | 走 `0` 安装（仅缺失项）→ `1. 首次使用：建立画像` |
+
+**关键纪律**：
+- **不要重复打扰用户**：state 标记过 ok 的，即使本次 check 超时/不确定，也按 ok 处理
+- **不要重复问画像**：如果 `knowledge-base/profile.json` 已存在，直接读取使用；要修改请等用户主动说"更新画像"
+- **不要因为没具体指令就放空**：如果上层调起但没给具体业务指令（例如 cron 触发只给 skill 加载），按上表自行选择下一步业务动作
+- **不要绕回默认路径**：用户主动提议方案（如"我给你 cookie"）时，立即采纳
 
 ---
 
@@ -52,30 +79,25 @@ python3 scripts/preflight.py
 - Playwright 未安装 → `npx playwright install chromium`
 - Node 模块缺失 → `npm install`
 
-**第三步：逐项引导用户完成需要人工配合的项**
+**第三步：逐项处理需要人工配合的项**
 
-按这个顺序引导（重要的先问）：
+按这个顺序处理（重要的先问）：
 
 1. **xiaohongshu-mcp**（核心依赖——没有它就无法操作小红书）
    - 如果未运行：问用户是否已安装 xiaohongshu-mcp
-   - 已安装但未启动：帮用户执行 `bash scripts/xhs.sh status`，根据输出判断
-   - 未安装：告诉用户需要安装，提供安装方式（参考 `docs/mcp-setup.md` 或项目仓库说明）
+   - 已安装但未启动：执行 `bash scripts/xhs.sh status`，根据输出判断
+   - 未安装：告诉用户需要安装，提供安装方式（参考 `docs/mcp-setup.md`）
    - MCP 启动后，执行 `bash scripts/xhs.sh status` 验证登录态
-   - 登录过期：执行 `bash scripts/xhs.sh login` 获取二维码链接，发给用户扫码
+   - **登录策略**（按优先级）：
+     - **用户主动提议方案优先**：用户说"我给你 cookie"/"我直接粘贴"/"帮我用 cookie 登录"等任何变体 → **立即接受**，让用户从浏览器复制完整 `Cookie` 头字符串，调用 `bash scripts/xhs.sh import-cookie '<cookie字符串>'`。**不要绕回扫码、不要继续解释扫码流程**
+     - 默认扫码：执行 `bash scripts/xhs.sh login` 获取二维码链接，返回给上层让用户扫码
 
-2. **Telegram Bot**（通知渠道——用来推送选题、审图、日报）
-   - 引导用户创建 Bot：Telegram 搜索 @BotFather → /newbot → 记下 Token
-   - 引导获取 Chat ID：向 Bot 发一条消息 → 打开 `https://api.telegram.org/bot<Token>/getUpdates` → 找 `chat.id`
-   - 用户提供 Token 和 Chat ID 后，写入 `config/runtime.env`：
-     ```bash
-     mkdir -p workflow/xhs-automation/config
-     # 写入或更新 XHS_TELEGRAM_BOT_TOKEN 和 XHS_TELEGRAM_CHAT_ID
-     ```
-
-3. **图片生成 API**（可选——不配也能用，走 HTML 截图降级）
+2. **图片生成 API**（可选——不配也能用，走 HTML 截图降级）
    - 问用户："图片可以用 AI 生成（更好看），也可以用 HTML 模板截图（免费）。要配置 AI 图片吗？"
-   - 如果要：问 API Key，问服务商（openai/gemini），写入 `config/runtime.env`
+   - 如果要：问 API Key、服务商（openai/gemini），写入 `config/runtime.env`
    - 如果不要：跳过，告诉用户后续想开可以再配
+
+> **不要在 0 节问 Telegram / IM 通讯凭证**——通讯渠道由 hermes-agent 自己配置，不属于 skill 业务范围。
 
 **第四步：验证**
 
@@ -91,26 +113,37 @@ python3 scripts/preflight.py
 
 ### 配置文件位置
 
-所有用户配置统一写入 `workflow/xhs-automation/config/runtime.env`：
+> **重要**：所有路径**相对 skill 根目录**（即包含本 SKILL.md 的目录）。**不要**在任何子目录如 `workflow/`、`xhs-automation/` 下创建配置——那是另一个独立项目。
+
+| 文件 | 用途 |
+|------|------|
+| `config/runtime.env` | MCP_URL、可选的图片生成 API Key |
+| `config/state.json` | 业务里程碑状态（自动维护，不要手改） |
+| `knowledge-base/profile.json` | 博主画像 |
+| `knowledge-base/preferences.json` | 用户偏好（自动学习） |
+| `knowledge-base/patterns.md` | 有效内容 pattern 库 |
+| `data/xhs.db` | SQLite 数据库 |
+
+`config/runtime.env` 模板：
 
 ```bash
-# === 必填 ===
-XHS_TELEGRAM_BOT_TOKEN=xxx     # Telegram Bot Token
-XHS_TELEGRAM_CHAT_ID=xxx       # Telegram Chat ID
-MCP_URL=http://localhost:18060  # xiaohongshu-mcp 地址
-
-# === 可选 ===
-IMAGE_GEN_PROVIDER=gemini      # openai 或 gemini
-IMAGE_GEN_API_KEY=xxx          # 图片生成 API Key
+MCP_URL=http://localhost:18060/mcp
+# IMAGE_GEN_PROVIDER=gemini
+# IMAGE_GEN_API_KEY=...
 ```
 
-> **注意**：不需要配置 LLM API Key。你（智能体）本身就是 LLM，所有需要 AI 的地方直接用你的能力即可。
+> **不要在此配置任何 IM/通讯凭证**（Telegram Token 等）。通讯渠道是 hermes-agent 的职责，由 hermes 自己的配置系统管理。
+> **不需要配置 LLM API Key**：你（智能体）本身就是 LLM，所有需要 AI 的地方直接用你的能力即可。
 
 ---
 
 ## 1. 首次使用：建立博主画像
 
-> 触发条件：`knowledge-base/profile.json` 不存在
+> 触发条件：`knowledge-base/profile.json` **不存在** 且用户表达内容方向需求
+
+**画像已存在的处理**：如果 `knowledge-base/profile.json` 已存在，**直接读取使用**，**绝不再问用户领域/受众/风格**。要更新画像必须等用户主动说"更新画像"或"我想换方向"，才能进入对话流程并最终覆盖文件。
+
+**冷启动独立性**：本节流程不依赖图片生成 API，也不依赖 hermes 通讯渠道是否就绪。即使 0 节中 `图片生成 API` 标 `optional` 未配，本节也应正常完成（建立画像 + 冷启动播种 patterns.md）。MCP 未就绪时跳过冷启动中"竞品分析"步骤，仅完成画像写入与默认 preferences.json 初始化即可，并写 `state.profile_created = true`；待 MCP 就绪后再补冷启动播种，写 `state.cold_start_done = true`。
 
 当用户第一次使用这个 skill 时，你需要通过对话建立博主画像。这是后续所有决策的基础。
 
@@ -232,15 +265,15 @@ IMAGE_GEN_API_KEY=xxx          # 图片生成 API Key
    - **竞品密度**（0-25分）：用 `scripts/xhs.sh search "候选关键词"` 检查，结果少=蓝海=高分
    - **用户偏好匹配**（0-20分）：与 preferences.json 中高权重的主题类型是否一致
 
-5. **决定推送数量**（根据信心度）
-   - `confidence_level < 0.5` → 推 3 个选题
-   - `0.5 ≤ confidence_level < 0.75` → 推 2 个选题
-   - `confidence_level ≥ 0.75` → 推 1 个选题（直接推最佳）
+5. **决定输出选题数量**（根据信心度）
+   - `confidence_level < 0.5` → 输出 3 个选题
+   - `0.5 ≤ confidence_level < 0.75` → 输出 2 个选题
+   - `confidence_level ≥ 0.75` → 输出 1 个选题（直接给最佳）
 
-6. **推送给用户**
+6. **返回选题列表**
    - 每个选题包含：主题名 + 一句话推荐理由 + 竞品密度（"蓝海"/"中等"/"红海"）
-   - 如果只推 1 个：附加"回复'换'我再找一个"
-   - 等待用户选择
+   - 如果只 1 个：附加"回复'换'我再找一个"
+   - 输出后等待用户回应（hermes 负责把内容送到用户，并把回复喂回来）
 
 7. **记录用户选择**
    ```bash
@@ -277,7 +310,7 @@ IMAGE_GEN_API_KEY=xxx          # 图片生成 API Key
    - `confidence_level < 0.5` → 出 2 份不同风格的草稿
    - `confidence_level ≥ 0.5` → 出 1 份草稿 + 1 个备选标题
 
-4. **推送给用户确认**
+4. **返回草稿等用户确认**
    - 展示完整草稿（标题 + 正文 + 标签）
    - 如果 2 份："选 1 还是 2？"
    - 如果 1 份："回复'发'确认，或'换'重新生成"
@@ -352,7 +385,7 @@ IMAGE_GEN_API_KEY=xxx          # 图片生成 API Key
    scripts/xhs.sh status
    ```
    - 已登录 → 继续
-   - 未登录 → `scripts/xhs.sh login` 获取二维码链接 → 推送给用户扫码
+   - 未登录 → `scripts/xhs.sh login` 获取二维码链接，返回给上层让用户扫码；若用户主动提议给 cookie，改用 `scripts/xhs.sh import-cookie`
 
 2. **发布**
    ```bash
@@ -365,9 +398,9 @@ IMAGE_GEN_API_KEY=xxx          # 图片生成 API Key
      scripts/db.sh add-post '{"date":"2026-04-15","slot":"noon","title":"XXX","content":"XXX","tags":"[...]","topic_type":"AI工具","title_pattern":"数字清单","content_style":"清单体","status":"published"}'
      scripts/db.sh update-post-status <id> published <note_id>
      ```
-   - 失败 → 通知用户失败原因，保留 meta.json 供重试
+   - 失败 → 返回失败原因，保留 meta.json 供重试
 
-4. **通知用户**："已发布！标题：XXX"
+4. **返回发布结果**："已发布！标题：XXX"
 
 ---
 
@@ -410,9 +443,9 @@ IMAGE_GEN_API_KEY=xxx          # 图片生成 API Key
 
 5. **更新偏好模型**（详见第 4 节自进化引擎）
 
-6. **生成日报推送给用户**
+6. **生成日报输出**
 
-   日报格式：
+   日报格式（输出后由 hermes 决定如何送达）：
    ```
    📊 今日数据
 
@@ -528,7 +561,7 @@ if 用户回复"换"（拒绝推荐）:
    patterns.md 活跃 pattern ≤ 15 条，超出时淘汰 confidence 最低的
    ```
 
-5. **生成周报推送给用户**：
+5. **生成周报输出**：
    ```
    📈 本周成长报告
 
@@ -667,9 +700,16 @@ scripts/db.sh update-post-status <id> <status> [note_id] # 更新状态
 | 场景 | 处理方式 |
 |------|---------|
 | MCP 未运行 | `xhs.sh` 自动尝试启动，失败则提示用户 |
-| 登录过期 | `xhs.sh login` 获取二维码 → 推送用户扫码 |
+| 登录过期 | `xhs.sh login` 获取二维码 → 返回给上层让用户扫码；若用户主动给 cookie，用 `xhs.sh import-cookie` |
 | Gemini 不可用 | 降级 HTML 截图，不阻塞流程，不反复向用户要 Key |
 | 用户长时间不回复 | 超时后自动选择评分最高的（超时时间由平台层配置） |
 | 知识库文件损坏/不存在 | 用默认值继续，不阻塞创作 |
-| 发布失败 | 通知用户失败原因，保留 meta.json 供重试 |
+| 发布失败 | 返回失败原因，保留 meta.json 供重试 |
 | 数据库不存在 | 自动 `scripts/db.sh init` 初始化 |
+| 模型 API 报错（404/401/503/空响应） | 告知用户切换模型或稍后重试，**最多 1 次重试，失败即停**；不要在同一会话反复重试同一失败调用 |
+| 配置已存在但 preflight 检查超时 | 视为已配置（preflight 会基于 `state.json` 自动放宽），继续后续流程 |
+| `setup_completed: true` 但某 check 当前报 `error` | 仅修复该项，**不要重新走整个安装流程** |
+| `xhs.sh login` 返回"已登录"或"已进入注销流程" | 先视为已登录，调一次 `xhs.sh status` 确认；不要重复发起登录 |
+| 用户重复输入相同句子（≥2 次） | 上次明显没成。**换思路**：检查上一次失败原因，向用户说明，询问要换路径还是给更多信息 |
+| 用户主动提议替代方案 | **优先采纳**用户方案；除非有强证据该方案不可行，否则不要绕回默认路径 |
+| context compaction 后 task list 含"workflow"字样 | 标记为 cancelled 并解释；按当前 SKILL.md 重新规划任务 |
