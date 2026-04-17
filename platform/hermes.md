@@ -37,37 +37,48 @@ bash "$HERMES_SKILL_DIR/scripts/db.sh" init
 
 ## Cron Job 配置
 
-在 Hermes 中创建以下两个定时任务：
+> **重要原则**：hermes cron 不是"跑 Python 脚本"，而是"定时唤起 AI 助手让它读 SKILL.md 自己决定该做什么"。所有业务逻辑由 SKILL.md 0a 节的"业务路由"决定。
 
-### Job 1: 每日发布（08:00）
+在 Hermes 中创建以下三个定时任务（都通过 `prompt` 唤起助手）：
+
+### Job 1: 每日午间档发布（11:30）
 
 ```yaml
-name: "小红书每日发布"
-schedule: "0 8 * * *"
+name: "薯灵-午间发布"
+schedule: "30 11 * * *"
 prompt: |
-  使用 shuling skill 执行每日发布流程。
-  1. 读取 knowledge-base/ 了解博主画像和偏好
-  2. 如果 profile.json 不存在，先完成首次设置
-  3. 执行选题研究，推送给用户等待选择
-  4. 生成草稿和图片，推送确认后发布
-  5. 午间档和晚间档各一条
+  使用 shuling skill。先跑 scripts/preflight.py 看 setup_completed
+  是否为 true；为 true 直接进入今日午间档创作发布流程
+  （选题 → 草稿 → 图片 → 发布），完成后输出业务结果。
 deliver: "telegram:用户ID"
 ```
 
-### Job 2: 每日复盘（22:00）
+### Job 2: 每日晚间档发布（20:30）
 
 ```yaml
-name: "小红书每日复盘"
+name: "薯灵-晚间发布"
+schedule: "30 20 * * *"
+prompt: |
+  使用 shuling skill。先跑预检，进入今日晚间档创作发布流程。
+deliver: "telegram:用户ID"
+```
+
+### Job 3: 每日复盘（22:00）
+
+```yaml
+name: "薯灵-每日复盘"
 schedule: "0 22 * * *"
 prompt: |
-  使用 shuling skill 执行每日复盘。
-  采集今日帖子互动数据，更新偏好模型，生成日报推送。
-  如果是周日，额外执行周进化分析。
+  使用 shuling skill 执行 SKILL.md 第 3 节"每日复盘"流程：
+  拉今日所有已发帖子的互动数据 + 评论 + NoteRx 诊断，
+  做综合分析，当晚立即更新 patterns.md / preferences.json /
+  evolution-log.md，最后输出日报。
+  如果今天是周日，按 SKILL.md 4.3 节再做一次"周深度回顾"
+  并输出周报。
 deliver: "telegram:用户ID"
 ```
 
-> 将 `用户ID` 替换为你的 Telegram 用户 ID。
-
+> **注意**：cron 任务的 `prompt` 是给助手看的"任务说明"，不是给脚本的命令。助手会自己决定调哪些工具。如果某次 cron 触发后助手返回"setup_completed=false"，说明用户还没完成首次设置，跳过本次即可，不报警。
 ---
 
 ## MCP 配置
