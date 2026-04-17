@@ -21,25 +21,6 @@ knowledge-base/reviews/
 knowledge-base/README.md
 
 # =================================================================
-# workflow/xhs-automation 子项目运行时数据
-# （这是独立后台脚本，与 skill 解耦，但同样含敏感数据）
-# =================================================================
-
-workflow/xhs-automation/config/runtime.env
-workflow/xhs-automation/data/*.db
-workflow/xhs-automation/data/*.db-shm
-workflow/xhs-automation/data/*.db-wal
-workflow/xhs-automation/logs/
-workflow/xhs-automation/data/exports/
-workflow/xhs-automation/knowledge-base/profile.json
-workflow/xhs-automation/knowledge-base/preferences.json
-workflow/xhs-automation/knowledge-base/patterns.md
-workflow/xhs-automation/knowledge-base/anti-patterns.md
-workflow/xhs-automation/knowledge-base/evolution-log.md
-workflow/xhs-automation/knowledge-base/reviews/
-workflow/xhs-automation/knowledge-base/README.md
-
-# =================================================================
 # 临时输出
 # =================================================================
 /tmp/xhs-post/
