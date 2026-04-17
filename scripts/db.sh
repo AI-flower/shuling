@@ -118,8 +118,37 @@ CREATE TABLE IF NOT EXISTS comment_insights (
     content_requests TEXT,
     analyzed_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS note_diagnosis (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER REFERENCES posts(id),
+    diagnosed_at TEXT NOT NULL,
+    source TEXT DEFAULT 'noterx-pre',
+    overall_score REAL,
+    grade TEXT,
+    content_score REAL,
+    visual_score REAL,
+    growth_score REAL,
+    user_reaction_score REAL,
+    issues TEXT,
+    suggestions TEXT,
+    debate_summary TEXT,
+    diagnosis_json TEXT
+);
+
+CREATE TABLE IF NOT EXISTS generated_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER REFERENCES posts(id),
+    image_index INTEGER,
+    prompt TEXT,
+    image_path TEXT,
+    gen_model TEXT,
+    gen_strategy TEXT DEFAULT 'ai',
+    gen_status TEXT DEFAULT 'pending',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 "
-    echo '{"ok": true, "tables": ["posts","post_metrics","user_choices","topic_candidates","comment_insights"]}'
+    echo '{"ok": true, "tables": ["posts","post_metrics","user_choices","topic_candidates","comment_insights","note_diagnosis","generated_images"]}'
 }
 
 cmd_add_post() {
@@ -320,6 +349,71 @@ cmd_update_post_status() {
     echo "{\"ok\": true, \"id\": $id, \"status\": \"$status\"}"
 }
 
+cmd_add_diagnosis() {
+    local json="$1"
+    [ -z "$json" ] && { echo '{"error": "missing JSON argument"}' >&2; exit 1; }
+
+    local post_id source overall grade c v g u issues suggestions
+    post_id="$(json_val "$json" "post_id")"
+    source="$(sql_escape "$(json_val "$json" "source")")"
+    source="${source:-noterx-pre}"
+    overall="$(json_val "$json" "overall_score")"
+    grade="$(sql_escape "$(json_val "$json" "grade")")"
+    c="$(json_val "$json" "content_score")"
+    v="$(json_val "$json" "visual_score")"
+    g="$(json_val "$json" "growth_score")"
+    u="$(json_val "$json" "user_reaction_score")"
+    issues="$(sql_escape "$(json_val "$json" "issues")")"
+    suggestions="$(sql_escape "$(json_val "$json" "suggestions")")"
+
+    local now
+    now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+    local new_id
+    new_id="$(sql "
+INSERT INTO note_diagnosis (post_id, diagnosed_at, source, overall_score, grade,
+    content_score, visual_score, growth_score, user_reaction_score,
+    issues, suggestions)
+VALUES (${post_id:-0}, '$now', '$source', ${overall:-0}, '$grade',
+    ${c:-0}, ${v:-0}, ${g:-0}, ${u:-0},
+    '$issues', '$suggestions');
+SELECT last_insert_rowid();
+")"
+    echo "{\"id\": $new_id}"
+}
+
+cmd_query_diagnosis() {
+    local post_id=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --post-id) shift; post_id="$1"; shift ;;
+            *) shift ;;
+        esac
+    done
+    [ -z "$post_id" ] && { echo '{"error": "missing --post-id"}' >&2; exit 1; }
+    sql_json "SELECT * FROM note_diagnosis WHERE post_id = $post_id ORDER BY diagnosed_at DESC LIMIT 1;"
+}
+
+cmd_query_undiagnosed() {
+    local days=3
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --days) shift; days="${1:-3}"; shift ;;
+            *) shift ;;
+        esac
+    done
+    sql_json "
+SELECT p.id, p.date, p.slot, p.title, p.note_id
+FROM posts p
+LEFT JOIN note_diagnosis nd ON nd.post_id = p.id
+WHERE p.status = 'published'
+  AND p.note_id IS NOT NULL AND p.note_id != ''
+  AND nd.id IS NULL
+  AND p.date >= date('now', '-${days} days')
+ORDER BY p.date DESC, p.id DESC;
+"
+}
+
 # ─── Main dispatch ────────────────────────────────────────────────────
 
 cmd="${1:-}"
@@ -334,6 +428,9 @@ case "$cmd" in
     query-metrics)      cmd_query_metrics "$@" ;;
     query-preferences)  cmd_query_preferences ;;
     update-post-status) cmd_update_post_status "$@" ;;
+    add-diagnosis)      cmd_add_diagnosis "$@" ;;
+    query-diagnosis)    cmd_query_diagnosis "$@" ;;
+    query-undiagnosed)  cmd_query_undiagnosed "$@" ;;
     *)
         echo "Usage: db.sh <command> [args]"
         echo ""
@@ -346,6 +443,9 @@ case "$cmd" in
         echo "  query-metrics --post-id N"
         echo "  query-preferences              Aggregate preference weights"
         echo "  update-post-status <id> <status> [note_id]"
+        echo "  add-diagnosis '<json>'         Insert NoteRx diagnosis result"
+        echo "  query-diagnosis --post-id N    Get latest diagnosis for a post"
+        echo "  query-undiagnosed [--days N]   List published posts without diagnosis"
         exit 1
         ;;
 esac
