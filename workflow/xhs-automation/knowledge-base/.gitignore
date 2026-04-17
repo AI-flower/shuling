@@ -1,6 +1,0 @@
-# Ignore runtime-generated knowledge files, keep directory structure
-*.md
-*.json
-!.gitkeep
-reviews/*.md
-!reviews/.gitkeep
