@@ -9,19 +9,19 @@
 ### 方式一：复制
 
 ```bash
-cp -r /path/to/shuling ~/.claude/skills/xiaohongshu
+cp -r /path/to/shuling ~/.claude/skills/shuling
 ```
 
 ### 方式二：符号链接（推荐，便于更新）
 
 ```bash
-ln -sfn /path/to/shuling ~/.claude/skills/xiaohongshu
+ln -sfn /path/to/shuling ~/.claude/skills/shuling
 ```
 
 安装后初始化数据库：
 
 ```bash
-bash ~/.claude/skills/xiaohongshu/scripts/db.sh init
+bash ~/.claude/skills/shuling/scripts/db.sh init
 ```
 
 ---
@@ -65,7 +65,7 @@ Claude Code 会自动识别 skill 并按 SKILL.md 中的流程执行。
 
 ```bash
 # 确保 xiaohongshu-mcp 已安装
-bash ~/.claude/skills/xiaohongshu/scripts/xhs.sh status
+bash ~/.claude/skills/shuling/scripts/xhs.sh status
 ```
 
 如果 MCP 在远程机器上，设置环境变量后再启动 Claude Code：

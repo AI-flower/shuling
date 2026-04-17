@@ -10,7 +10,7 @@
 
 ```bash
 SKILL_SRC="/path/to/shuling"
-HERMES_SKILL_DIR="$HOME/.hermes/skills/social-media/xiaohongshu"
+HERMES_SKILL_DIR="$HOME/.hermes/skills/social-media/shuling"
 
 mkdir -p "$HERMES_SKILL_DIR"
 cp "$SKILL_SRC/SKILL.md" "$HERMES_SKILL_DIR/"
@@ -45,7 +45,7 @@ bash "$HERMES_SKILL_DIR/scripts/db.sh" init
 name: "小红书每日发布"
 schedule: "0 8 * * *"
 prompt: |
-  使用 xiaohongshu skill 执行每日发布流程。
+  使用 shuling skill 执行每日发布流程。
   1. 读取 knowledge-base/ 了解博主画像和偏好
   2. 如果 profile.json 不存在，先完成首次设置
   3. 执行选题研究，推送给用户等待选择
@@ -60,7 +60,7 @@ deliver: "telegram:用户ID"
 name: "小红书每日复盘"
 schedule: "0 22 * * *"
 prompt: |
-  使用 xiaohongshu skill 执行每日复盘。
+  使用 shuling skill 执行每日复盘。
   采集今日帖子互动数据，更新偏好模型，生成日报推送。
   如果是周日，额外执行周进化分析。
 deliver: "telegram:用户ID"
