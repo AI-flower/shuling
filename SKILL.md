@@ -216,15 +216,25 @@ MCP_URL=http://localhost:18060/mcp
   "topic_preferences": {},
   "style_preferences": {},
   "title_pattern_preferences": {},
+  "choice_log": [],
+  "last_exploration_at": null,
+  "consecutive_rejects": 0,
   "options_config": {
     "topic_options": 3,
     "draft_options": 2,
     "reduce_threshold": 0.75,
-    "expand_on_reject": true
+    "expand_on_reject": true,
+    "exploration_cooldown_days": 7
   },
   "updated_at": "YYYY-MM-DD"
 }
 ```
+
+各字段说明：
+- `topic_preferences` / `style_preferences` / `title_pattern_preferences`：每个维度下按类型记录 `{type_name: {chosen: N, skipped: M}}`
+- `choice_log`：每次选择追加一条 `{date, dimension, chosen, skipped}`，用于时间衰减分析
+- `last_exploration_at`：上次"探索窗口"触发日期（YYYY-MM-DD 或 null），配合 ε-greedy 保底
+- `consecutive_rejects`：连续"换"次数，达到 2 立即降档
 
 6. 告诉用户："我已经分析了你这个领域的爆款帖子，找到了 X 个有效模式。现在可以开始帮你选题和创作了。"
 
@@ -265,10 +275,12 @@ MCP_URL=http://localhost:18060/mcp
    - **竞品密度**（0-25分）：用 `scripts/xhs.sh search "候选关键词"` 检查，结果少=蓝海=高分
    - **用户偏好匹配**（0-20分）：与 preferences.json 中高权重的主题类型是否一致
 
-5. **决定输出选题数量**（根据信心度）
+5. **决定输出选题数量**（根据信心度，详细语义见 4.1 节）
    - `confidence_level < 0.5` → 输出 3 个选题
    - `0.5 ≤ confidence_level < 0.75` → 输出 2 个选题
-   - `confidence_level ≥ 0.75` → 输出 1 个选题（直接给最佳）
+   - `confidence_level ≥ 0.75` → 基础 1 个（最佳）
+     - 若距 `last_exploration_at` ≥ 7 天：额外追加 1 个"探索项"（低 weight 类型），推 1 主推 + 1 探索，避免回音室
+     - 若 `consecutive_rejects ≥ 2`：强制回退到 3 个候选（见 4.1）
 
 6. **返回选题列表**
    - 每个选题包含：主题名 + 一句话推荐理由 + 竞品密度（"蓝海"/"中等"/"红海"）
@@ -452,9 +464,10 @@ cat knowledge-base/profile.json  # 博主画像
 - 2-3 个**精准小众标签**（目标受众）
 - 1 个**长尾标签**（差异化）
 
-**第 4 步：决定输出份数**（根据信心度）
+**第 4 步：决定输出份数**（根据信心度，详细语义见 4.1 节）
 - `confidence_level < 0.5` → 出 2 份不同风格的大纲+文案
 - `confidence_level ≥ 0.5` → 出 1 份大纲 + 1 份文案 + 1 个备选标题
+- 若用户刚刚"换"过（`consecutive_rejects ≥ 1`）：本次强制出 2 份，给用户二选一的余地
 
 **第 5 步：返回给用户**
 
@@ -686,35 +699,77 @@ scripts/db.sh log-choice '{"choice_type":"draft","offered_count":2,"chosen_index
 
 **触发时机**：每次用户做选择时（选题或草稿）
 
-**更新逻辑**：
+**设计目标**：小样本不冒进、口味稳时快收敛、口味飘时能回头、永远留一条探索通道。
+
+#### 更新逻辑
 
 1. 读取 `knowledge-base/preferences.json`
 2. 被选中的选项 → 对应类型的 `chosen + 1`
 3. 被跳过的选项 → 对应类型的 `skipped + 1`
-4. 重新计算每个类型的 `weight = chosen / (chosen + skipped)`
-5. 重新计算整体 `confidence_level`：
-   - 统计所有 weight ≥ 0.7 的类型的 chosen 总数
-   - `confidence_level = 高权重chosen / 总选择次数`
-   - 限制范围 [0, 1.0]
-6. 写回 `knowledge-base/preferences.json`
+4. 追加一条 `choice_log` 记录：`{date: "YYYY-MM-DD", dimension: "topic|style|title_pattern", chosen: "X", skipped: ["Y","Z"]}`
+5. **逐类型权重（Laplace 贝叶斯平滑，避免小样本直接判定）**：
+   ```
+   weight = (chosen + 1) / (chosen + skipped + 2)
+   ```
+   - 0 选 0 跳 → 0.50（中立先验）
+   - 2 选 0 跳 → 0.75（样本少自动保守，而不是裸 1.0）
+   - 10 选 0 跳 → 0.92
+   - 2 选 3 跳 → 0.43
+6. **整体信心度（基于分布集中度 × 样本因子）**：
+   ```
+   top1 = 最高 weight 的类型
+   top2 = 第二高 weight 的类型（若只有 1 个类型则 top2 = 0）
+   concentration = (weight_top1 + weight_top2) / Σ weight_all
+   sample_factor = min(total_choices / 10, 1.0)
+   confidence_level = round(concentration × sample_factor, 2)
+   ```
+   **严正提示**：这里是 **concentration × sample_factor**，**不要** 用 `chosen/(chosen+skipped)` 再算一遍——那是 **weight 的公式**，与 confidence 不是同一维度。混用会导致 N 选 M 永远触不到阈值、收敛机制失效。此处专门列出是因为高水平 agents 实测会踩这个坑。
+7. **时间衰减（可选，降低口味漂移反应延迟）**：
+   计算第 5 步 weight 前，对 `choice_log` 里 **30 天前** 的记录，每超出 14 天对应的 chosen/skipped 贡献乘 0.5。若嫌麻烦可先跳过，30 帖子内影响有限。
+8. 写回 `preferences.json`，同步更新 `updated_at` 与 `total_choices`
 
-**选项递减逻辑**：
+#### 选项递减 + ε-greedy 探索保底
 
 ```
 if confidence_level ≥ 0.75:
-    推 1 个选题 + 1 份草稿
-    → 用户操作：回复"发"或"换"
+    基础：推 1 个选题 + 1 份草稿（"发/换"）
+    若距 last_exploration_at ≥ 7 天（或为 null）:
+        额外追加 1 个"探索项"（从 weight < 0.3 且最近 14 天未推过的类型里抽）
+        → 推 2 个：1 主推 + 1 探索；更新 last_exploration_at = 今天
 elif confidence_level ≥ 0.5:
     推 2 个选题 + 1 份草稿（附备选标题）
-    → 用户操作：选 1/2，然后确认
 else:
     推 3 个选题 + 2 份草稿
-    → 用户操作：选选题，选草稿，然后确认
-
-if 用户回复"换"（拒绝推荐）:
-    本次临时扩展选项（+2 个选题或 +1 份草稿）
-    confidence_level -= 0.05（小幅回调信心）
 ```
+
+#### 用户"换"信号处理
+
+```
+每次"换":
+    consecutive_rejects += 1
+    confidence_level -= 0.10    # 原 0.05 太温柔，回弹慢
+    本次临时扩展选项（+2 个选题或 +1 份草稿）
+
+if consecutive_rejects ≥ 2:
+    confidence_level = min(confidence_level, 0.45)   # 强制回到 3 选档
+    consecutive_rejects = 0
+    在下次日报里提醒用户："连续两次没选中，已帮你展开候选范围"
+
+每次用户"发"（正常采纳）:
+    consecutive_rejects = 0
+```
+
+#### 数值示例（对照校验实现正确）
+
+| 场景（topic 维度：ai_tools / coding / news） | weight_ai_tools | weight_coding | weight_news | confidence_level |
+|---|---|---|---|---|
+| 初始（0/0, 0/0, 0/0） | 0.50 | 0.50 | 0.50 | 0.00（sample=0） |
+| 3 次全选 ai_tools | 0.80 | 0.20 | 0.20 | 0.25（concentration 0.83 × 0.3） |
+| 10 次全选 ai_tools | 0.92 | 0.08 | 0.08 | 0.92 |
+| 10 次：6 ai_tools + 4 coding | 0.58 | 0.42 | 0.08 | 0.92（top1+top2 集中度高） |
+| 10 次：3 / 3 / 4 平均分给 3 类 | 0.33 | 0.33 | 0.42 | 0.69（分散→低信心） |
+
+任何实现如果算出和上表偏差 > 0.03，先回头核对公式，不要上线。
 
 ### 4.2 内容效果分析
 
