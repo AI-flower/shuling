@@ -13,6 +13,7 @@ SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 #   --dry-run                      只打印将要执行的动作，不写任何东西
 #   --check                        只跑预检（依赖 + 平台 + 版本对比），不部署
 #   --target <path>                显式指定部署目标（可重复），覆盖默认自动检测
+#   --mode <new|existing|ask>      创作者模式（v2.2.0+）；existing = 老博主走 §0c 流程
 #   --skip-preflight               跳过部署后的 preflight 运行
 #   -h, --help                     显示此帮助
 #
@@ -20,10 +21,12 @@ SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 #   GEMINI_API_KEY=xxx             预填 Gemini API Key，写入 .env
 #   XHS_MCP_URL=http://...         预填 MCP URL，写入 .env
 #   SHULING_ASSUME_YES=1           等同 --yes
+#   SHULING_CREATOR_MODE=existing  等同 --mode=existing
 #
 # 示例:
 #   bash install.sh --check                            # 只自检不动手
 #   bash install.sh --dry-run                          # 预演一次
+#   bash install.sh --mode=existing-creator            # 老博主接入模式
 #   SHULING_ASSUME_YES=1 GEMINI_API_KEY=xxx bash install.sh   # CI/远程
 #   bash install.sh --target ~/.myagents/skills/shuling       # 自定义目标
 
@@ -31,6 +34,7 @@ ASSUME_YES="${SHULING_ASSUME_YES:-0}"
 DRY_RUN=0
 CHECK_ONLY=0
 SKIP_PREFLIGHT=0
+CREATOR_MODE="${SHULING_CREATOR_MODE:-ask}"
 declare -a EXPLICIT_TARGETS=()
 
 usage() {
@@ -46,6 +50,19 @@ while [ $# -gt 0 ]; do
         --target)
             [ $# -ge 2 ] || { echo "错误: --target 需要一个路径参数" >&2; exit 2; }
             EXPLICIT_TARGETS+=("$2"); shift 2 ;;
+        --mode=*)
+            case "${1#*=}" in
+                new|existing|ask)             CREATOR_MODE="${1#*=}" ;;
+                existing-creator)             CREATOR_MODE="existing" ;;
+                *) echo "错误: --mode 只接受 new / existing / existing-creator / ask" >&2; exit 2 ;;
+            esac; shift ;;
+        --mode)
+            [ $# -ge 2 ] || { echo "错误: --mode 需要一个值" >&2; exit 2; }
+            case "$2" in
+                new|existing|ask)             CREATOR_MODE="$2" ;;
+                existing-creator)             CREATOR_MODE="existing" ;;
+                *) echo "错误: --mode 只接受 new / existing / existing-creator / ask" >&2; exit 2 ;;
+            esac; shift 2 ;;
         -h|--help)                  usage; exit 0 ;;
         *) echo "错误: 未知参数 $1（见 --help）" >&2; exit 2 ;;
     esac
@@ -354,6 +371,59 @@ if [ -f "$RUNTIME_ENV_TEMPLATE" ]; then
     done
 fi
 
+# ─── 7.7 创作者模式（v2.2.0+）─────────────────────────────────────
+printf "\n${BOLD}=== 创作者模式 ===${RESET}\n\n"
+
+if [ "$CREATOR_MODE" = "ask" ]; then
+    if [ "$ASSUME_YES" = "1" ]; then
+        CREATOR_MODE="new"
+        info "非交互模式：默认按新创作者（--mode=existing 可切换）"
+    else
+        printf "你是新创作者还是已有账号？\n"
+        printf "  1) 新创作者（从零起步，对话三问建画像）\n"
+        printf "  2) 已有账号（强烈推荐——你的历史内容就是最精准的画像）\n"
+        prompt "  选择 [1/2，默认 1]: " choice "1"
+        case "$choice" in
+            2|existing) CREATOR_MODE="existing" ;;
+            *)          CREATOR_MODE="new" ;;
+        esac
+    fi
+fi
+
+info "创作者模式: $CREATOR_MODE"
+
+# 写入每个 target 的 state.json
+write_creator_state() {
+    local target="$1" state_file="$target/config/state.json"
+    run "写 state.json creator_mode" mkdir -p "$(dirname "$state_file")"
+    if [ "$DRY_RUN" = "1" ]; then
+        printf "${DIM}[dry]${RESET} 写 %s creator_mode=%s\n" "$state_file" "$CREATOR_MODE"
+        return 0
+    fi
+    local existing='{}'
+    [ -f "$state_file" ] && existing="$(cat "$state_file" 2>/dev/null || echo '{}')"
+    # 不依赖 jq（install.sh 可能在无 jq 环境跑）；用 python3 做 JSON 合并
+    python3 - "$state_file" "$CREATOR_MODE" <<'PY'
+import json, sys, os
+state_file, mode = sys.argv[1], sys.argv[2]
+data = {}
+if os.path.exists(state_file):
+    try: data = json.load(open(state_file))
+    except: data = {}
+data["creator_mode"] = mode
+if mode == "existing":
+    data.setdefault("existing_import_done", False)
+with open(state_file, "w") as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+    f.write("\n")
+PY
+    info "$target: state.json 已写 creator_mode=$CREATOR_MODE"
+}
+
+for entry in "${PLATFORMS[@]}"; do
+    write_creator_state "${entry#*:}"
+done
+
 # ─── 7.6 运行环境预检（按 target 逐个跑）─────────────────────────
 if [ "$SKIP_PREFLIGHT" = "0" ] && [ "$DRY_RUN" = "0" ]; then
     printf "\n${BOLD}=== 环境预检 ===${RESET}\n\n"
@@ -385,6 +455,20 @@ if [ "$DRY_RUN" = "1" ]; then
     exit 0
 fi
 
+if [ "$CREATOR_MODE" = "existing" ]; then
+cat << EOF
+
+下一步（老博主接入路径）：
+  1. 在你的 AI 助手中说"我已经在运营小红书，帮我接入"
+  2. AI 会按 SKILL.md §0c 流程走 5 步：登录 → 批量导入 → 分类 → 画像反推 → 出体检报告
+  3. 体检报告就绪后即进入日常流程，带历史记忆加权
+
+或者手动跑：
+  bash scripts/import-existing.sh --limit 200       # 批量导入历史（耗时约 30 分钟）
+  bash scripts/audit-report.sh --extract-patterns   # 出体检报告 + patterns 候选
+
+EOF
+else
 cat << EOF
 
 下一步：
@@ -392,6 +476,10 @@ cat << EOF
   2. 首次使用会进入博主画像建立流程
   3. 画像建立完成后即可开始选题、创作、发布
 
+EOF
+fi
+
+cat << EOF
 常用自检命令：
   bash install.sh --check                 # 只看依赖+平台+版本对比
   python3 scripts/preflight.py --human    # 人类可读的健康检查

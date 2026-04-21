@@ -10,8 +10,8 @@ description: |
   - "我想做XX方向的博主"
   - "帮我研究一下小红书上XX话题"
   - "复盘一下最近的帖子"
-version: 2.1.3
-codename: Friendly Onboarding
+version: 2.2.0
+codename: Existing Creator Support
 last_updated: 2026-04-21
 ---
 
@@ -43,9 +43,11 @@ python3 scripts/preflight.py
 | 当前状态 | 下一步 |
 |---------|------|
 | `setup_completed: true` 且 `state.cold_start_done: true` | 直接进入 `2. 每日流程`：根据当前时间（午间/晚间）走选题→创作→发布；夜间走 `3. 每日复盘` |
+| `state.creator_mode == 'existing'` 且 `existing_import_done == false` | 走 `0c. 已有账号接入模式`（不要跳回 §1） |
 | `setup_completed: true` 但 cold_start 未做 | 跳过 `0`/`1`，直接执行 `1. 冷启动播种` 部分（竞品分析 + 写 patterns.md），完成后写 `state.cold_start_done = true` |
 | `state.profile_created: true` 但某 check 报 `error`/`missing` | **仅修复缺失项**，不要重新走 0/1 流程，不要重新问画像 |
-| `state.profile_created` 缺失/false | 走 `0` 安装（仅缺失项）→ `1. 首次使用：建立画像` |
+| `state.profile_created` 缺失/false，且用户自述"已在运营小红书" | 走 `0c. 已有账号接入模式` |
+| `state.profile_created` 缺失/false，且用户为新博主 | 走 `0` 安装（仅缺失项）→ `1. 首次使用：建立画像` |
 
 **关键纪律**：
 - **不要重复打扰用户**：state 标记过 ok 的，即使本次 check 超时/不确定，也按 ok 处理
@@ -95,6 +97,113 @@ python3 scripts/preflight.py
 ```bash
 python3 -m jsonschema -i knowledge-base/profile.json schemas/profile.schema.json
 ```
+
+---
+
+## 0c. 已有账号接入模式（existing creator mode，v2.2.0+）
+
+> 跟 §1 "首次使用：建立博主画像" 互斥。老博主进这条路，**不走三问对话**，不走竞品冷启动。
+
+### 触发条件（任一满足）
+
+1. 用户自述"我已经在运营小红书"、"已经有账号了"、"已经发过帖"、"我的号粉丝已经 XXX"
+2. `config/state.json` 中 `creator_mode == 'existing'`
+3. 用户用 `bash install.sh --mode=existing-creator` 装的
+4. `config/state.json` 中 `existing_import_done == false` 但 `creator_mode == 'existing'`（流程未走完）
+
+### 5 步执行流程
+
+**第 1 步 · 确认账号登录**（复用 §0 登录策略）
+- 用户主动提议 cookie → 立即接受
+- 否则 `xhs.sh login` 扫码
+
+**第 2 步 · 批量导入历史**
+```bash
+bash scripts/import-existing.sh --limit 200
+# 耗时：按节流 profile 约 30+ 分钟；可挂后台
+# 中断续跑：bash scripts/import-existing.sh --resume
+```
+- 如果用户帖数少（<30），降级跳过 §0c 改走 §1 三问对话，但提醒用户"历史太少，画像反推置信度低"
+- 如果 MCP list_feeds 集成未完成，必须告诉用户"此功能在 v2.2.0 MVP 阶段仅支持 --mock 路径"，然后回退到 §1
+
+**第 3 步 · 自动分类 imported posts**
+- 读 `posts WHERE source='imported' AND topic_type IS NULL`
+- 小批量（每批 20 条）调 LLM 自己分类：
+  - `topic_type`：从账号整体话题聚类中选（先做聚类，再套枚举）
+  - `title_pattern`：数字清单 / 反差悬念 / 结果导向 / 问句 / 对比 / 其它
+  - `content_style`：口语 / 干货 / 幽默 / 犀利 / 故事 / 教程
+- 分类结果通过 `db.sh update-post-meta '<json>'` 回写
+- 分类不出来的标 `__unclassified__`，不计入偏好 bootstrap
+
+**第 4 步 · 画像反推**
+- 读最近 30 条 `imported` 样本（title + content 前 200 字）
+- AI 做聚类分析，产出 `profile.json` **草案**：
+  ```json
+  {
+    "niche": "<推测的领域，必须从样本中来>",
+    "audience": "<目标受众的具体描述>",
+    "tone": "<口语/干货/幽默/犀利/...>",
+    "goals": "<如有线索，留空也行>",
+    "created_at": "<今日>",
+    "updated_at": "<今日>"
+  }
+  ```
+- **必须展示给用户确认**：
+  > "基于你 30 条历史帖，我推测你是 `<niche>` 方向，面向 `<audience>`，风格 `<tone>`。对吗？"
+- 用户确认 / 微调 / 推翻后才写入 `knowledge-base/profile.json`（先按 `schemas/profile.schema.json` 校验字段）
+- 如果样本跨多领域：展示多个候选方向，**让用户决策主攻**，不擅自合并
+
+**第 5 步 · 挖 patterns 种子 + 出体检报告**
+```bash
+bash scripts/audit-report.sh --extract-patterns
+# 产出:
+#   knowledge-base/audit-<YYYY-MM-DD>.json   机器可读
+#   knowledge-base/audit-<YYYY-MM-DD>.md     人类可读骨架
+```
+- AI 读 JSON → 对 `extract_patterns.pattern_candidates` 做二次抽象（标题结构 / 情绪钩子 / 核心结构），**重复 ≥ 3 次的模式**写入 `patterns.md`（**confidence=medium**，因为是用户自己的历史验证）
+- `anti_pattern_candidates` 同样抽象 → `anti-patterns.md`（confidence=medium）
+- AI 对 JSON 做归因分析（为什么 Top/Bottom 这样）→ 填 `ai_narrative` 字段并追加到配套 `.md` 文件
+- AI 的 `ai_narrative` 必须按 `schemas/audit-report.schema.json` 的 `ai_narrative` 子 schema 写（`written_at / top_reasoning / bottom_reasoning / action_items[] / watch_signals[]`）
+
+**流程结束后写 state.json**：
+```json
+{
+  "creator_mode": "existing",
+  "existing_import_done": true,
+  "profile_created": true,
+  "cold_start_done": true,
+  "setup_completed": true,
+  "setup_date": "<今日>"
+}
+```
+注意：`cold_start_done=true` 是因为 patterns.md 已经从用户自己历史挖到了种子，不必再跑竞品冷启动。
+
+### 偏好 bootstrap（§0c 自动做）
+
+- 对每条分类后的 imported post 写一条"隐式选择"记录：
+  - `choice_type` = `topic` / `title_pattern` / `content_style` 三次
+  - 虚拟 `offered_count = 3`，`chosen_label = <本帖的分类值>`，`skipped_labels = ["__implicit_unknown__", "__implicit_unknown__"]`
+  - 通过 `db.sh log-choice '<json>'` 写入 `user_choices` 表
+- `preferences.json` 由 §4.1 常规逻辑从 `user_choices` 聚合，**强制 total_choices 封顶 50**（避免 170 条历史让 sample_factor 直接 =1.0 → 立即进 1 选档；预留后续真实用户选择的学习空间）
+
+### 关键纪律
+
+- **不要走 §1 三问对话**：用户已经用行为回答了所有问题
+- **不要让用户从零填画像**：AI 反推 + 用户确认 / 微调
+- **多方向账号不擅自合并**：展示给用户让他决策主攻方向
+- **import 中断必可续**：`--resume`，不重来
+- **失败单条跳过**：不让 1 条脏数据中断 199 条好数据
+- **imported posts 不纳入每日复盘**：§3 复盘只看 `source='shuling'`（不然老博主历史帖会被当成"今日新发"反复分析）；需要时用 `audit-report.sh --include-organic`
+
+### 与 §0a 业务路由的协同
+
+`§0a` 业务路由表扩展为：
+
+| 当前状态 | 下一步 |
+|---------|------|
+| `creator_mode=existing` 且 `existing_import_done=true` 且 `setup_completed=true` | 直接进 §2 每日流程（imported 历史已生效） |
+| `creator_mode=existing` 且 `existing_import_done=false` | 进入本节 §0c 继续未完成步骤（不要跳回 §1） |
+| `creator_mode=new` 或 `unset` | 走原路径（§0 → §1 → 每日流程） |
 
 ---
 

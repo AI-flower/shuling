@@ -2,11 +2,11 @@
 
 > 小红书博主成长助手 — 帮你选题、写稿、发布、复盘，越用越懂你。
 
-[![Version](https://img.shields.io/badge/version-2.1.3-blue)](VERSION)
-[![Codename](https://img.shields.io/badge/codename-Friendly%20Onboarding-green)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.2.0-blue)](VERSION)
+[![Codename](https://img.shields.io/badge/codename-Existing%20Creator%20Support-green)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](#许可)
 
-**当前版本**：`v2.1.3 "Friendly Onboarding"`（2026-04-21）
+**当前版本**：`v2.2.0 "Existing Creator Support"`（2026-04-21）
 **完整变更**：[CHANGELOG.md](CHANGELOG.md) ｜ **升级指南**：[UPGRADE.md](UPGRADE.md) ｜ **发版流程**：[RELEASING.md](RELEASING.md)
 
 ---
@@ -56,6 +56,33 @@ bash install.sh
 #    "今天发什么"       → 选题研究
 #    "看看昨天的数据"   → 数据复盘
 ```
+
+### 已经在运营小红书？老博主接入（v2.2.0+）
+
+```bash
+# 方式一：装的时候选老博主模式
+bash install.sh --mode=existing-creator
+
+# 方式二：已装过，直接跟 AI 说
+#    "我已经在运营小红书，帮我接入"
+#
+# AI 会走 SKILL.md §0c 的 5 步流程：
+#   1. 确认账号登录
+#   2. 批量导入最近 200 条历史帖（约 30 分钟，带节流保护）
+#   3. AI 自动给每条分类（topic_type / title_pattern / content_style）
+#   4. 从最近 30 条反推画像（领域/受众/风格），展示给你确认/微调
+#   5. 出账号体检报告 + 挖 patterns 种子写入 patterns.md
+#
+# 完成后系统已具备你 6 个月以上的历史记忆，第一条薯灵发帖即达历史 P50 水平
+```
+
+也可手动跑：
+
+```bash
+bash scripts/import-existing.sh --limit 200           # 批量导入（可 --resume 续跑）
+bash scripts/audit-report.sh --extract-patterns       # 出体检报告 + patterns 候选
+```
+详细设计：[docs/features/existing-creator-onboarding.md](docs/features/existing-creator-onboarding.md)
 
 > **首次安装后**：`config/runtime.env`、`config/state.json`、`knowledge-base/profile.json`、`data/xhs.db` 等都是你的私人数据，已被 `.gitignore` 屏蔽。不要 `git add -f` 这些文件。
 

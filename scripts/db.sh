@@ -71,8 +71,11 @@ CREATE TABLE IF NOT EXISTS posts (
     content_style TEXT,
     status TEXT DEFAULT 'draft',
     published_at TEXT,
+    source TEXT DEFAULT 'shuling',          -- v2.2.0: shuling|imported|manual
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_posts_source ON posts(source);
+CREATE INDEX IF NOT EXISTS idx_posts_note_id ON posts(note_id);
 
 CREATE TABLE IF NOT EXISTS post_metrics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -163,15 +166,29 @@ CREATE TABLE IF NOT EXISTS request_log (
 CREATE INDEX IF NOT EXISTS idx_request_log_called ON request_log(called_at);
 CREATE INDEX IF NOT EXISTS idx_request_log_tool ON request_log(tool, called_at);
 CREATE INDEX IF NOT EXISTS idx_request_log_status ON request_log(status);
+
+-- v2.2.0: 账号历史快照（给老博主接入 + audit-report 纵向趋势用）
+CREATE TABLE IF NOT EXISTS historical_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshotted_at TEXT NOT NULL,
+    followers INTEGER,
+    total_likes INTEGER,
+    total_posts INTEGER,
+    imported_posts_count INTEGER,
+    earliest_post_at TEXT,
+    latest_post_at TEXT,
+    meta_json TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_hstats_snapshotted_at ON historical_stats(snapshotted_at DESC);
 "
-    echo '{"ok": true, "tables": ["posts","post_metrics","user_choices","topic_candidates","comment_insights","note_diagnosis","generated_images","request_log"]}'
+    echo '{"ok": true, "tables": ["posts","post_metrics","user_choices","topic_candidates","comment_insights","note_diagnosis","generated_images","request_log","historical_stats"]}'
 }
 
 cmd_add_post() {
     local json="$1"
     [ -z "$json" ] && { echo '{"error": "missing JSON argument"}' >&2; exit 1; }
 
-    local date slot title content tags note_id topic_type title_pattern content_style status
+    local date slot title content tags note_id topic_type title_pattern content_style status source published_at
     date="$(sql_escape "$(json_val "$json" "date")")"
     slot="$(sql_escape "$(json_val "$json" "slot")")"
     title="$(sql_escape "$(json_val "$json" "title")")"
@@ -184,14 +201,35 @@ cmd_add_post() {
     status="$(json_val "$json" "status")"
     status="${status:-draft}"
     status="$(sql_escape "$status")"
+    source="$(json_val "$json" "source")"
+    source="${source:-shuling}"
+    source="$(sql_escape "$source")"
+    published_at="$(sql_escape "$(json_val "$json" "published_at")")"
+
+    # 对 imported source 且带 note_id 的行做幂等 upsert（note_id 唯一）
+    if [ "$source" = "imported" ] && [ -n "$note_id" ]; then
+        local existing_id
+        existing_id="$(sql "SELECT id FROM posts WHERE note_id='$note_id' AND source='imported' LIMIT 1;")"
+        if [ -n "$existing_id" ]; then
+            sql "
+UPDATE posts SET
+    title='$title', content='$content', tags='$tags',
+    topic_type='$topic_type', title_pattern='$title_pattern', content_style='$content_style',
+    status='$status', published_at='$published_at'
+WHERE id=$existing_id;
+"
+            echo "{\"id\": $existing_id, \"mode\": \"updated\"}"
+            return 0
+        fi
+    fi
 
     local new_id
     new_id="$(sql "
-INSERT INTO posts (date, slot, title, content, tags, note_id, topic_type, title_pattern, content_style, status)
-VALUES ('$date','$slot','$title','$content','$tags','$note_id','$topic_type','$title_pattern','$content_style','$status');
+INSERT INTO posts (date, slot, title, content, tags, note_id, topic_type, title_pattern, content_style, status, published_at, source)
+VALUES ('$date','$slot','$title','$content','$tags','$note_id','$topic_type','$title_pattern','$content_style','$status','$published_at','$source');
 SELECT last_insert_rowid();
 ")"
-    echo "{\"id\": $new_id}"
+    echo "{\"id\": $new_id, \"mode\": \"inserted\"}"
 }
 
 cmd_add_metrics() {
@@ -239,24 +277,27 @@ SELECT last_insert_rowid();
 }
 
 cmd_query_posts() {
-    local where=""
+    local -a clauses=()
     while [ $# -gt 0 ]; do
         case "$1" in
             --today)
-                where="WHERE date = date('now')"
+                clauses+=("date = date('now')")
                 shift
                 ;;
             --days)
                 shift
                 local n="${1:-7}"
-                where="WHERE date >= date('now', '-${n} days')"
+                clauses+=("date >= date('now', '-${n} days')")
                 shift
                 ;;
             --status)
                 shift
-                local st
-                st="$(sql_escape "$1")"
-                where="WHERE status = '$st'"
+                clauses+=("status = '$(sql_escape "$1")'")
+                shift
+                ;;
+            --source)
+                shift
+                clauses+=("source = '$(sql_escape "$1")'")
                 shift
                 ;;
             *)
@@ -264,7 +305,73 @@ cmd_query_posts() {
                 ;;
         esac
     done
+    local where=""
+    if [ ${#clauses[@]} -gt 0 ]; then
+        where="WHERE $(IFS=' AND '; echo "${clauses[*]}")"
+    fi
     sql_json "SELECT * FROM posts $where ORDER BY created_at DESC;"
+}
+
+# v2.2.0: 给已有帖补分类字段（AI 分类 imported 帖子后回写）
+cmd_update_post_meta() {
+    local json="$1"
+    [ -z "$json" ] && { echo '{"error": "missing JSON argument"}' >&2; exit 1; }
+
+    local id topic_type title_pattern content_style
+    id="$(json_val "$json" "id")"
+    topic_type="$(sql_escape "$(json_val "$json" "topic_type")")"
+    title_pattern="$(sql_escape "$(json_val "$json" "title_pattern")")"
+    content_style="$(sql_escape "$(json_val "$json" "content_style")")"
+
+    [ -z "$id" ] && { echo '{"error": "id required"}' >&2; exit 1; }
+
+    sql "UPDATE posts SET
+        topic_type = COALESCE(NULLIF('$topic_type',''), topic_type),
+        title_pattern = COALESCE(NULLIF('$title_pattern',''), title_pattern),
+        content_style = COALESCE(NULLIF('$content_style',''), content_style)
+        WHERE id = $id;"
+    echo "{\"ok\": true, \"id\": $id}"
+}
+
+# v2.2.0: 写一条账号快照
+cmd_add_historical_stat() {
+    local json="$1"
+    [ -z "$json" ] && { echo '{"error": "missing JSON argument"}' >&2; exit 1; }
+
+    local snapshotted_at followers total_likes total_posts imported_posts_count earliest_post_at latest_post_at meta_json
+    snapshotted_at="$(json_val "$json" "snapshotted_at")"
+    snapshotted_at="${snapshotted_at:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}"
+    snapshotted_at="$(sql_escape "$snapshotted_at")"
+    followers="$(json_val "$json" "followers")"
+    followers="${followers:-0}"
+    total_likes="$(json_val "$json" "total_likes")"
+    total_likes="${total_likes:-0}"
+    total_posts="$(json_val "$json" "total_posts")"
+    total_posts="${total_posts:-0}"
+    imported_posts_count="$(json_val "$json" "imported_posts_count")"
+    imported_posts_count="${imported_posts_count:-0}"
+    earliest_post_at="$(sql_escape "$(json_val "$json" "earliest_post_at")")"
+    latest_post_at="$(sql_escape "$(json_val "$json" "latest_post_at")")"
+    meta_json="$(sql_escape "$(json_val "$json" "meta_json")")"
+
+    local new_id
+    new_id="$(sql "
+INSERT INTO historical_stats (snapshotted_at, followers, total_likes, total_posts, imported_posts_count, earliest_post_at, latest_post_at, meta_json)
+VALUES ('$snapshotted_at', $followers, $total_likes, $total_posts, $imported_posts_count, '$earliest_post_at', '$latest_post_at', '$meta_json');
+SELECT last_insert_rowid();
+")"
+    echo "{\"id\": $new_id}"
+}
+
+cmd_query_historical_stats() {
+    local limit=30
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --limit) shift; limit="${1:-30}"; shift ;;
+            *) shift ;;
+        esac
+    done
+    sql_json "SELECT * FROM historical_stats ORDER BY snapshotted_at DESC LIMIT $limit;"
 }
 
 cmd_query_metrics() {
@@ -515,23 +622,29 @@ case "$cmd" in
     query-undiagnosed)  cmd_query_undiagnosed "$@" ;;
     add-request-log)    cmd_add_request_log "$@" ;;
     query-request-log)  cmd_query_request_log "$@" ;;
+    add-historical-stat)   cmd_add_historical_stat "$@" ;;
+    query-historical-stats) cmd_query_historical_stats "$@" ;;
+    update-post-meta)   cmd_update_post_meta "$@" ;;
     *)
         echo "Usage: db.sh <command> [args]"
         echo ""
         echo "Commands:"
         echo "  init                           Create all tables"
-        echo "  add-post '<json>'              Insert a post"
+        echo "  add-post '<json>'              Insert/upsert a post (upsert iff source=imported & note_id given)"
         echo "  add-metrics '<json>'           Insert metrics"
         echo "  log-choice '<json>'            Log a user choice"
-        echo "  query-posts [--today|--days N|--status S]"
+        echo "  query-posts [--today|--days N|--status S|--source S]"
         echo "  query-metrics --post-id N"
         echo "  query-preferences              Aggregate preference weights"
         echo "  update-post-status <id> <status> [note_id]"
+        echo "  update-post-meta '<json>'      Update topic_type/title_pattern/content_style by id"
         echo "  add-diagnosis '<json>'         Insert NoteRx diagnosis result"
         echo "  query-diagnosis --post-id N    Get latest diagnosis for a post"
         echo "  query-undiagnosed [--days N]   List published posts without diagnosis"
-        echo "  add-request-log '<json>'       Record one MCP call (tool, status, latency_ms, ...)"
+        echo "  add-request-log '<json>'       Record one MCP call"
         echo "  query-request-log [--days N --tool T --status S --limit N --summary]"
+        echo "  add-historical-stat '<json>'   Snapshot account stats (for audit trend)"
+        echo "  query-historical-stats [--limit N]"
         exit 1
         ;;
 esac
