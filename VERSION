@@ -1,11 +1,30 @@
-version: "2.1.1"
-codename: "Anti-Ban Shield"  # ← 继承 2.1.0 族系
-released: "2026-04-21"  # 2.1.1 同日小版本
+version: "2.1.2"
+codename: "Release Polish"
+released: "2026-04-21"
 
-# 版本号语义: BRAIN.HANDS.CALIB
-#   BRAIN: SKILL.md 核心流程重构 / 自进化算法换代 / 业务能力跃迁
-#   HANDS: scripts/ 新增或重写 / DB schema 迁移 / MCP 接口替换
-#   CALIB: 阈值/关键词/节流参数调整 / bugfix / prompt 微调
+# ─── 版本号语义: BRAIN.HANDS.CALIB ──────────────────────────────────
+#
+# 升级 SOP: 详见 RELEASING.md
+# 用户升级步骤: 详见 UPGRADE.md
+# 变更历史:       详见 CHANGELOG.md
+#
+# BRAIN: SKILL.md 核心流程重构 / 自进化算法换代 / 业务能力跃迁
+# HANDS: scripts/ 新增或重写 / DB schema 迁移 / MCP 接口替换
+# CALIB: 阈值/关键词/节流参数调整 / bugfix / prompt 微调
+
+breaking_change_policy:
+  brain:
+    breaking: true
+    description: "BRAIN +1 视为 major，可能改变 AI 行为方式。UPGRADE.md 必须给出迁移步骤；老用户需显式迁移。"
+    requires_migration: true
+  hands:
+    breaking: false
+    description: "HANDS +1 视为 minor，脚本/DB/接口扩展。一般向后兼容；如有 DB schema 变化需跑 install.sh 或 db.sh init。"
+    requires_migration: maybe
+  calib:
+    breaking: false
+    description: "CALIB +1 视为 patch，阈值/文档/bugfix。无 breaking，用户可无感升级。"
+    requires_migration: false
 
 brain:
   skill_md_sections: [0a, 0, 1, 2, 3, 4, 5, 6, 7, 8]
@@ -50,6 +69,9 @@ hands:
     - noterx-diagnose.sh
     - preflight.py
     - screenshot.cjs
+  installer:
+    mode: "install + upgrade"    # v2.1.2 起 install.sh 支持版本对比 + migrations 调度
+    migrations_dir: "migrations"
 
 calib:
   observability: "request-log-v1"
@@ -58,3 +80,4 @@ calib:
   content_rules: "2026-04-17"
   emoji_dict_version: "v1"
   spam_keywords_version: "v1"
+  docs_format: "keep-a-changelog + upgrade-guide + releasing-sop"
