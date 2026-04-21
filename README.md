@@ -11,80 +11,247 @@
 
 ---
 
-## 核心理念
+## 目录
 
-**Skill-as-Brain** — 业务逻辑全部在 `SKILL.md` 里，AI 助手读了它就是大脑；`scripts/` 里的工具只是手脚，负责调 API、读写数据库、生成图片这些 AI 做不了的物理操作。
-
-这意味着：
-- 换一个 AI 平台？只要它能读 SKILL.md，就能无缝迁移
-- 想改流程？改 SKILL.md 就行，不用动代码
-- 系统越用越聪明：每次选择、每条数据都记录在案，驱动偏好进化
+- [项目说明](#项目说明)
+- [核心理念](#核心理念skill-as-brain)
+- [能力全景](#能力全景)
+- [前置依赖](#前置依赖)
+- [快速开始](#快速开始)
+  - [我是新博主](#路径-a新博主从零起步)
+  - [我已经在运营小红书](#路径-b老博主存量接入v220)
+- [日常使用](#日常使用)
+- [支持平台](#支持平台)
+- [升级已有安装](#升级已有安装)
+- [架构](#架构)
+- [文件结构](#文件结构)
+- [环境变量参考](#环境变量参考)
+- [文档地图](#文档地图)
+- [版本管理与路线图](#版本管理与路线图)
+- [贡献 / 许可](#贡献--借鉴)
 
 ---
 
-## 前置依赖（先备好）
+## 项目说明
+
+**一句话**：把你的 AI 助手变成懂小红书的博主搭档——帮你从选题、创作、发布到复盘形成完整闭环，历史数据自动驱动自进化，系统越用越懂你。
+
+### 给谁用
+
+| 你是谁 | 薯灵能帮到你什么 | 入口 |
+|---|---|---|
+| 🆕 **新博主**（还没发或刚开始） | 通过三问对话建立画像 → 竞品冷启动 → 每日选题/起稿/发布/复盘全流程 | [路径 A](#路径-a新博主从零起步) |
+| 📈 **老博主**（已发 30~1000+ 条） | 批量导入历史 → AI 反推画像 → 挖掘你自己验证有效的 patterns → 出账号体检报告 → 历史加权的日常优化 | [路径 B](#路径-b老博主存量接入v220) |
+| 🤖 **AI 智能体开发者** | 可借鉴的 Skill-as-Brain 架构、业务路由 §0a、JSON Schema 契约、反模式禁令工程化实践 | [SKILL.md](SKILL.md) |
+
+### 不是什么
+
+- ❌ **不是**小红书自动化工具（没有批量发布、没有刷量、不绕开风控）
+- ❌ **不是**内容农场（不做标题党、不写同质化内容，有 §5 合规规则兜底）
+- ❌ **不是**独立运行的机器人（必须搭一个 AI 助手；对话由 AI 平台负责，薯灵只产内容）
+- ❌ **不假设通讯渠道**（Telegram / 微信等由 hermes-agent 或你自己配，不在 skill 职责内）
+
+---
+
+## 核心理念：Skill-as-Brain
+
+> **业务逻辑全部在 `SKILL.md` 里，AI 助手读了它就是大脑；`scripts/` 里的工具只是手脚，负责调 API、读写数据库、生成图片这些 AI 做不了的物理操作。**
+
+这意味着：
+- **换一个 AI 平台零成本**：只要它能读 SKILL.md，hermes / Claude Code / Codex / OpenClaw 都行
+- **改流程不用改代码**：改 SKILL.md 即可，版本号 BRAIN+1
+- **越用越聪明**：每次选择、每条数据都记录到 DB，驱动偏好进化
+- **AI 自律有工程保障**：§0a 业务路由 + §0b 写入校验 + schemas/ JSON Schema + 反模式禁令
+
+---
+
+## 能力全景
+
+### 1️⃣ 核心业务流程（7 条主线）
+
+| # | 流程 | 触发 | 产出 |
+|---|---|---|---|
+| 1 | **新手引导** | 第一次对话 / preflight 未通过 | `profile.json` + 环境就绪 |
+| 2 | **老博主接入**（v2.2.0） | 用户自述"已在运营" / `--mode=existing-creator` | 历史导入 + 画像反推 + patterns 种子 + 体检报告 |
+| 3 | **选题研究** | "今天发什么" / cron 午间触发 | 带偏好加权的候选话题 |
+| 4 | **内容创作**（RedInk 双阶段） | "帮我写一条" / cron 午/晚间触发 | 6-9 页大纲 + 正文（≤1000 字）+ 5-8 标签 |
+| 5 | **图片生成**（两阶段封面参考） | 起稿后 | 封面 + 内容页图（Gemini → OpenAI → HTML 三路降级） |
+| 6 | **发布** | 起稿完成 | 小红书已发帖 + 本地 `posts` 记录 |
+| 7 | **每日复盘 + 周回顾** | 夜间 cron / 每周日加餐 | 日报/周报 + patterns/anti-patterns 进化 + NoteRx 五维诊断 |
+
+### 2️⃣ 自进化引擎
+
+| 机制 | 算法 | 效果 |
+|---|---|---|
+| **偏好学习** | `bayesian-laplace-v1`（Laplace 平滑 + 集中度 × 样本因子 confidence） | 小样本不冒进，口味稳时快收敛 |
+| **选项递减** | `confidence ≥ 0.75 → 1 选` / `≥ 0.5 → 2 选` / `< 0.5 → 3 选` | 用户操作最小化，最终回一个"发"字 |
+| **ε-greedy 探索** | 距上次探索 ≥ 7 天时追加 1 个低 weight 类型 | 防过拟合，保持口味演进能力 |
+| **"换"信号回弹** | 连续 2 次"换" → confidence 强制回 0.45 | 防单方向钻牛角尖 |
+| **Pattern 生命周期** | experimental → medium → high / deprecated | 标题/结构/图片 prompt 都遵循此生命周期 |
+| **收藏率驱动** | `≥5% → patterns.md 晋升 + weight +0.1` / `< 2% → anti-patterns.md + weight -0.1` | 数据真实反馈，无人为干预 |
+
+### 3️⃣ 运维与工程纪律
+
+| 能力 | 细节 |
+|---|---|
+| **install.sh 六模式** | 默认 / `--check` / `--dry-run` / `--yes` / `--target <path>` / `--mode=<new\|existing>` |
+| **preflight.py 双模式** | 给 AI 的结构化 JSON + 给人的 `--human` 彩色表（退出码分级 0/1/2） |
+| **版本管理** | BRAIN.HANDS.CALIB 三段语义，breaking 仅发生在 BRAIN+1 |
+| **文档四件套** | CHANGELOG（📦用户可见+⬆️如何升级 双栏）/ UPGRADE（逐版本步骤）/ RELEASING（发版 SOP）/ docs/features/（新特性 spec） |
+| **Migrations** | `migrations/vX.Y.Z.sh` 按版本顺序幂等执行，失败可重试 |
+| **JSON Schema 契约** | `schemas/` 约束 state / profile / preferences / audit-report 四份 JSON，AI 写入前自校验 |
+| **Request Log** | v2.1.1+ MCP 调用全量落表（`tool × status × latency_ms × error_hint`） |
+| **账号风控** | 分级节流 + 日限额 profile `v1-conservative`，触顶自动拒绝 |
+
+### 4️⃣ AI 智能体协作（Brain 的工程纪律）
+
+| 机制 | 位置 | 作用 |
+|---|---|---|
+| **§0a 业务路由** | SKILL.md | AI 进入项目第一动作：跑 preflight → 读 state → 查表选下一步 |
+| **§0b 平台识别 + 写入校验** | SKILL.md（v2.1.3+） | 按路径识别 hermes/claude/codex，写入 JSON 前按 schema 核对 |
+| **§0c 老博主接入** | SKILL.md（v2.2.0+） | 5 步流程的 additive 分支 |
+| **反模式禁令** | §0a / §0c | "不重复问画像 / 不放空 / 不绕回默认路径 / 用户主动方案优先"等明文纪律 |
+| **异常处理矩阵** | §8 | 12 种异常场景 × 标准处理（含"模型 API 报错最多 1 次重试" / "用户重复输入视为失败换思路"等） |
+
+---
+
+## 前置依赖
 
 | 依赖 | 用途 | 安装 |
 |------|------|------|
-| **AI 助手** | 大脑，读 SKILL.md 后驱动整个流程 | 装 hermes、[claude code](https://claude.com/claude-code) 或 [codex](https://github.com/openai/codex) 任一 |
-| **xiaohongshu-mcp** | 操作小红书的 MCP 服务（搜索/发布/详情） | [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)，按其 README 装好并用自己的小红书账号登录 |
-| Node.js / Python 3 / sqlite3 / Playwright | 截图、数据库、生图 | macOS：`brew install node sqlite`，然后 `npx playwright install chromium`<br>Linux：`apt install nodejs sqlite3`，然后 `npx playwright install chromium` |
-| 图片生成 API（可选） | AI 生图（不配则走 HTML 截图，效果也不错） | Gemini Key（推荐，有免费额度）或 OpenAI Key |
+| **AI 助手** | 大脑，读 SKILL.md 驱动全部流程 | [hermes](https://github.com/anthropics/hermes) / [Claude Code](https://claude.com/claude-code) / [Codex](https://github.com/openai/codex) / OpenClaw 任选 |
+| **xiaohongshu-mcp** | 小红书操作 MCP（搜索/详情/发布/评论/登录） | [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)；详细指南 → [docs/mcp-setup.md](docs/mcp-setup.md) |
+| **Node.js / Python 3 / sqlite3 / Playwright / jq** | 截图、DB、生图、JSON 处理 | macOS: `brew install node sqlite jq`；Linux: `apt install nodejs sqlite3 jq`；`npx playwright install chromium` |
+| **图片生成 API**（可选） | AI 生图（不配则走 HTML 截图） | Gemini Key（推荐，有免费额度）/ OpenAI Key |
+| **NoteRx API**（可选） | 五维诊断 | 配 `NOTERX_API_KEY` 才启用 |
 
-> **本 skill 不假设也不配置任何 IM 通讯渠道**（Telegram 等）。与用户对话由 AI 助手平台（如 hermes）自己负责。
+> ❌ **不在本 skill 范围**：Telegram / 微信等 IM 通讯凭证——由 hermes-agent 或你的 AI 平台自己管理。
 
 ---
 
 ## 快速开始
 
+### 安装
+
 ```bash
-# 1. 克隆并安装
 git clone git@github.com:AI-flower/shuling.git && cd shuling
-bash install.sh
-# install.sh 会自动检测 hermes/claude/codex/agents 各平台目录并部署到对应位置
-
-# 2. 在你的 AI 助手中说一句
-#    "我想做小红书博主"  →  助手通过对话了解你的方向、受众和风格
-
-# 3. 登录小红书（两种方式任选）
-#    - 默认扫码：助手会调 scripts/xhs.sh login 拿二维码链接给你扫
-#    - 直接给 cookie：从浏览器 F12 复制完整 Cookie 头字符串，告诉助手
-#      "我给你 cookie：<贴在这里>"  →  助手会自动调 scripts/xhs.sh import-cookie
-
-# 4. 进入日常使用
-#    "帮我发小红书"     → 完整发布流程
-#    "今天发什么"       → 选题研究
-#    "看看昨天的数据"   → 数据复盘
+bash install.sh                  # 自动检测平台 + 跑依赖预检 + init DB + 生成配置
+# 如需自检不动手:      bash install.sh --check
+# 如需先预演再执行:    bash install.sh --dry-run
+# CI/远程非交互:       SHULING_ASSUME_YES=1 bash install.sh
 ```
 
-### 已经在运营小红书？老博主接入（v2.2.0+）
+### 路径 A：新博主（从零起步）
 
 ```bash
-# 方式一：装的时候选老博主模式
+# 1. 安装
+bash install.sh                 # 装的时候选 1 或直接回车（默认 new）
+
+# 2. 登录小红书
+# 方式一：扫码
+#    AI 会调 scripts/xhs.sh login 给你二维码链接
+# 方式二：Cookie 粘贴
+#    在 AI 对话里说："我给你 cookie：<从浏览器 F12 复制的完整 cookie 字符串>"
+#    详细图文指引 → docs/mcp-setup.md
+
+# 3. 建立画像（AI 通过三问对话）
+# 在 AI 助手中说："我想做小红书博主"
+# AI 会问：做什么方向 / 目标受众 / 风格偏好
+
+# 4. 进入日常
+# "帮我发小红书"   → 完整发布流程
+# "今天发什么"     → 选题研究
+# "看看昨天的数据" → 数据复盘
+```
+
+### 路径 B：老博主（存量接入，v2.2.0+）
+
+```bash
+# 1. 安装时选老博主模式
 bash install.sh --mode=existing-creator
 
-# 方式二：已装过，直接跟 AI 说
-#    "我已经在运营小红书，帮我接入"
+# 2. 登录（同上，扫码或 Cookie 粘贴）
+
+# 3. 触发接入流程
+# 在 AI 对话里说："我已经在运营小红书，帮我接入"
 #
-# AI 会走 SKILL.md §0c 的 5 步流程：
+# AI 按 SKILL.md §0c 自动走 5 步：
 #   1. 确认账号登录
 #   2. 批量导入最近 200 条历史帖（约 30 分钟，带节流保护）
-#   3. AI 自动给每条分类（topic_type / title_pattern / content_style）
-#   4. 从最近 30 条反推画像（领域/受众/风格），展示给你确认/微调
-#   5. 出账号体检报告 + 挖 patterns 种子写入 patterns.md
-#
-# 完成后系统已具备你 6 个月以上的历史记忆，第一条薯灵发帖即达历史 P50 水平
+#   3. 给每条自动分类（topic_type / title_pattern / content_style）
+#   4. 读 30 条样本反推画像 → 展示给你确认/微调
+#   5. 出账号体检报告 audit-YYYY-MM-DD.md + 挖 patterns 种子
+
+# 完成后系统已具备你 6 个月+ 的历史记忆，第一条薯灵发帖即达历史 P50 水平
+# 后续日常流程（路径 A 第 4 步）天然带历史偏好加权
 ```
 
-也可手动跑：
+也可以手动跑：
+```bash
+bash scripts/import-existing.sh --limit 200            # 批量导入（可 --resume 断点续跑）
+bash scripts/audit-report.sh --extract-patterns        # 出体检报告 + patterns 候选
+```
+详细设计 → [docs/features/existing-creator-onboarding.md](docs/features/existing-creator-onboarding.md)
+
+> **首次安装后**：`config/runtime.env`、`config/state.json`、`knowledge-base/profile.json`、`data/xhs.db` 等都是你的私人数据，已被 `.gitignore` 屏蔽。**不要 `git add -f` 这些文件**。
+
+---
+
+## 日常使用
+
+### 常用对话（触发 AI 业务）
+
+| 说这句 | 做什么 |
+|---|---|
+| "帮我发小红书" | 完整发布流程（选题 → 创作 → 图片 → 发布） |
+| "今天发什么" | 只跑选题研究 |
+| "起个稿子" | 只跑创作 |
+| "看看昨天的数据" / "复盘" | 手动触发复盘 |
+| "最近怎么样" | 出一份近期小结 |
+| "我想换方向" | 更新画像 |
+| "我给你 cookie：..." | 用 Cookie 粘贴登录（绕过扫码） |
+
+### 常用命令行（手动工具）
 
 ```bash
-bash scripts/import-existing.sh --limit 200           # 批量导入（可 --resume 续跑）
-bash scripts/audit-report.sh --extract-patterns       # 出体检报告 + patterns 候选
-```
-详细设计：[docs/features/existing-creator-onboarding.md](docs/features/existing-creator-onboarding.md)
+# 健康检查
+bash install.sh --check                             # 依赖 + 平台 + 版本对比
+python3 scripts/preflight.py --human                # 人类可读彩色自检
 
-> **首次安装后**：`config/runtime.env`、`config/state.json`、`knowledge-base/profile.json`、`data/xhs.db` 等都是你的私人数据，已被 `.gitignore` 屏蔽。不要 `git add -f` 这些文件。
+# 小红书 MCP 操作（scripts/xhs.sh 统一入口）
+bash scripts/xhs.sh status                          # 登录态
+bash scripts/xhs.sh login                           # 获取二维码
+bash scripts/xhs.sh import-cookie '<cookie 串>'     # Cookie 登录
+bash scripts/xhs.sh quota                           # 当日调用计数
+bash scripts/xhs.sh log --summary                   # 请求日志聚合（v2.1.1+）
+
+# 数据库操作（scripts/db.sh 统一入口）
+bash scripts/db.sh init                             # 初始化/补建表（幂等）
+bash scripts/db.sh query-posts --today              # 今日帖
+bash scripts/db.sh query-posts --source imported    # 老博主导入的帖（v2.2.0+）
+bash scripts/db.sh query-preferences                # 当前偏好权重快照
+bash scripts/db.sh query-undiagnosed --days 7       # 近 7 天未诊断的帖
+
+# 老博主专用（v2.2.0+）
+bash scripts/import-existing.sh --limit 200         # 批量导入历史
+bash scripts/import-existing.sh --resume            # 断点续跑
+bash scripts/audit-report.sh                        # 账号体检报告
+bash scripts/audit-report.sh --extract-patterns     # 附带 patterns 候选
+bash scripts/audit-report.sh --include-organic      # 含薯灵自己发的帖
+```
+
+---
+
+## 支持平台
+
+| 平台 | 状态 | 触发方式 | 说明 |
+|------|------|---|------|
+| [Hermes](platform/hermes.md) | ✅ | cron job + `prompt: 使用 shuling skill` | 全自动每日发布 + 复盘（推荐） |
+| [Claude Code](platform/claude-code.md) | ✅ | 对话 + `/loop 8h ...` | VS Code 集成，支持定时 |
+| [Codex](platform/codex.md) | ✅ | 对话 | 手动触发 |
+| OpenClaw | ✅ | 兼容 `agents/` 目录规范 | 通用 agents 兜底 |
+
+一份 SKILL.md 在所有平台产生相同业务行为；§0b 识别平台用于调用各自特有能力（如 hermes cron、claude /loop）。
 
 ---
 
@@ -94,7 +261,7 @@ bash scripts/audit-report.sh --extract-patterns       # 出体检报告 + patter
 cd /path/to/shuling
 git fetch --tags origin
 git checkout main && git pull
-bash install.sh              # v2.1.2+ 自动识别已部署版本、按需运行 migration
+bash install.sh                                     # v2.1.2+ 自动识别部署版本并跑所需 migration
 ```
 
 `install.sh` 升级模式会：
@@ -102,77 +269,162 @@ bash install.sh              # v2.1.2+ 自动识别已部署版本、按需运�
 2. 按需运行 `migrations/vX.Y.Z.sh`（幂等）
 3. 保留你的私人数据（`.env` / `config/runtime.env` / `data/*.db` / `knowledge-base/*`）
 
-### v2.1.3 新增的非交互模式
+### v2.1.3+ 的非交互 / 预演模式
 
 ```bash
-bash install.sh --check                             # 只自检：依赖 + 平台 + 版本对比，不写文件
-bash install.sh --dry-run                           # 预演：列出将要执行的全部动作，不真跑
-bash install.sh --yes                               # 跳过所有交互，用默认值（cron/CI）
+bash install.sh --check                             # 只自检，不写文件
+bash install.sh --dry-run                           # 预演：列出将做的所有动作
+bash install.sh --yes                               # 跳过交互用默认值
 bash install.sh --target ~/.myagents/skills/shuling # 显式指定部署目标（可重复）
-SHULING_ASSUME_YES=1 GEMINI_API_KEY=xxx bash install.sh  # 远程/自动化一键部署
-
-python3 scripts/preflight.py --human                # 人类可读的彩色健康检查
+bash install.sh --mode=existing-creator             # 老博主模式（v2.2.0+）
+SHULING_ASSUME_YES=1 GEMINI_API_KEY=xxx bash install.sh   # 远程/自动化一键部署
 ```
 
-逐版本升级注意事项 → [UPGRADE.md](UPGRADE.md)
+逐版本升级步骤 → [UPGRADE.md](UPGRADE.md)
 
-## 支持平台
+---
 
-| 平台 | 状态 | 说明 |
-|------|------|------|
-| [Hermes](platform/hermes.md) | ✅ | 支持 cron job 全自动发布 + 复盘 |
-| [Claude Code](platform/claude-code.md) | ✅ | 对话式使用，支持 /loop 定时 |
-| [Codex](platform/codex.md) | ✅ | 对话式使用 |
-| OpenClaw | ✅ | 兼容 agents 目录规范 |
+## 架构
+
+```
+┌──────────────────────────────────────────────────────────┐
+│           AI 助手（大脑 / Skill-as-Brain）                │
+│                                                            │
+│   §0a 业务路由 → §0b 识别平台/校验 schema                  │
+│   ├─→ §0c 老博主接入（v2.2.0+ 可选）                       │
+│   └─→ §0/§1 新博主流程                                     │
+│   → §2/§3/§4 日常（选题/创作/发布/复盘/自进化）            │
+└─┬──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┘
+  │      │      │      │      │      │      │      │
+┌─▼────┐┌▼────┐┌▼───┐┌─▼───┐┌▼─────┐┌▼────┐┌▼───┐┌─▼─────┐
+│xhs.sh││db.sh││image││fetch││noterx││pre- ││imp-││audit- │
+│MCP   ││SQL  ││.py  ││-*.sh││-diag ││flight│ort-││report │
+│9 工具 ││8 表 ││生图 ││拉数据││5 维  ││自检  ││exst││8 维  │
+└──────┘└─────┘└─────┘└─────┘└─────┘└─────┘└────┘└──────┘
+                                                  ↑ v2.2.0
+
+knowledge-base/                    schemas/（AI 写入契约）
+├── profile.json                   ├── state.schema.json
+├── preferences.json               ├── profile.schema.json
+├── patterns.md / anti-*.md        ├── preferences.schema.json
+├── image-patterns.md / anti-*     └── audit-report.schema.json
+├── evolution-log.md
+├── reviews/<YYYY-W##>.md          data/
+└── audit-<YYYY-MM-DD>.md / json   ├── xhs.db          ← 8 张表
+  ↑ v2.2.0                        └── content-rules.md
+```
+
+**一条主线**：AI → SKILL.md（业务路由）→ scripts/（物理操作）→ DB + knowledge-base（持久化）→ 下次路由读 state。所有自动化（午间/晚间发布 + 夜间复盘 + 周日深度回顾）全部走这条，由 hermes cron 定时唤起助手实现。
+
+---
+
+## 文件结构
+
+```
+shuling/
+├── SKILL.md                             # 大脑剧本（核心，AI 读这个）
+├── VERSION                               # 版本号 + BRAIN/HANDS/CALIB 清单
+├── CHANGELOG.md                          # 版本历史（📦用户可见 + ⬆️如何升级 双栏）
+├── UPGRADE.md                            # 逐版本迁移步骤
+├── RELEASING.md                          # 发版 SOP（版本号决策树 + 检查清单）
+├── README.md                             # 本文件
+├── install.sh                            # 安装脚本（v2.1.3+ 支持 --check/--dry-run/--yes/--target）
+├── config/
+│   └── runtime.env.example               # 配置模板（MCP_URL / IMAGE_GEN_* / NOTERX_*）
+├── scripts/                              # ───────────── Hands 层 ─────────────
+│   ├── preflight.py                      # 环境预检（JSON + --human 双模式，v2.1.3+）
+│   ├── db.sh                             # SQLite CRUD（8 表）
+│   ├── xhs.sh                            # 小红书 MCP 统一入口（9 工具 + 节流 + 限额 + 日志）
+│   ├── image.py                          # Gemini / OpenAI 生图
+│   ├── screenshot.cjs                    # HTML 模板截图（Playwright 降级）
+│   ├── fetch-metrics.sh / fetch-comments.sh    # 旧（v2.1.0 前）
+│   ├── fetch-post-data.sh                # 合并拉 metrics+comments（v2.1.0+）
+│   ├── noterx-diagnose.sh                # NoteRx 五维诊断
+│   ├── import-existing.sh                # 老博主批量导入（v2.2.0+）
+│   └── audit-report.sh                   # 账号体检报告（v2.2.0+）
+├── schemas/                              # ──────── AI 写入契约（v2.1.3+）────────
+│   ├── state.schema.json                 # config/state.json 约束
+│   ├── profile.schema.json               # knowledge-base/profile.json 约束
+│   ├── preferences.schema.json           # knowledge-base/preferences.json 约束
+│   └── audit-report.schema.json          # 账号体检报告结构（v2.2.0+）
+├── migrations/                           # ──────── DB schema 迁移 ────────
+│   ├── v2.1.1.sh                         # 补建 request_log 表
+│   ├── v2.1.2.sh                         # 纯文档版本留痕
+│   ├── v2.1.3.sh                         # 文档 + 脚本增强
+│   └── v2.2.0.sh                         # ALTER posts add source + CREATE historical_stats
+├── knowledge-base/                       # ──────── 运行时生成（私有） ────────
+│   ├── profile.json                      # 博主画像
+│   ├── preferences.json                  # 偏好权重（自进化）
+│   ├── patterns.md / anti-patterns.md    # 文字 pattern 库
+│   ├── image-patterns.md / anti-*        # 图片 prompt 库
+│   ├── evolution-log.md                  # 每日进化日志
+│   ├── reviews/<YYYY-W##>.md             # 周快照
+│   └── audit-<YYYY-MM-DD>.(md|json)      # 老博主体检报告（v2.2.0+）
+├── data/
+│   ├── xhs.db                            # SQLite（8 张表，运行时生成）
+│   └── content-rules.md                  # 内容规则与平台限制
+├── templates/
+│   └── post.html                         # 小红书风格 HTML 模板（截图降级路径）
+├── docs/
+│   ├── mcp-setup.md                      # xiaohongshu-mcp 完整安装指南（含 cookie 图文）
+│   └── features/
+│       └── existing-creator-onboarding.md    # 老博主接入完整 spec（v2.2.0+）
+└── platform/
+    ├── hermes.md                         # Hermes 定时任务配置
+    ├── claude-code.md                    # Claude Code 使用指南
+    └── codex.md                          # Codex 使用指南
+```
 
 ---
 
 ## 环境变量参考
 
-所有 `XHS_*` 变量可在 `.env` 或进程环境中设置。
+所有 `XHS_*` / `SHULING_*` 变量可在 `.env`、`config/runtime.env` 或进程环境中设置。
 
 ### MCP 服务 & 缓存
 
 | 变量 | 默认 | 作用 |
 |---|---|---|
 | `MCP_URL` | `http://localhost:18060/mcp` | xiaohongshu-mcp 服务地址 |
-| `XHS_CACHE_DIR` | `~/.cache/shuling` | 节流戳文件 + quota 状态目录 |
+| `XHS_CACHE_DIR` | `~/.cache/shuling` | 节流戳 + quota + session + import-state 文件目录 |
 
-### 节流与限额（v2.1.0+）
+### install.sh 非交互（v2.1.3+）
 
 | 变量 | 默认 | 作用 |
 |---|---|---|
-| `XHS_DISABLE_THROTTLE` | `0` | 设 `1` 跳过节流（仅调试，**慎用**） |
-| `XHS_DISABLE_QUOTA` | `0` | 设 `1` 跳过日限额（仅调试，**慎用**） |
+| `SHULING_ASSUME_YES` | `0` | 设 `1` 等同 `--yes`，所有交互用默认值 |
+| `SHULING_CREATOR_MODE` | 空 | 设 `existing` 等同 `--mode=existing-creator`（v2.2.0+） |
+| `GEMINI_API_KEY` | 空 | 预填 Gemini Key（避免 prompt 卡住） |
+| `XHS_MCP_URL` | 空 | 预填 MCP URL |
 
-**默认节流 profile `v1-conservative`**（见 `scripts/xhs.sh` 可自行调整）：
+### 节流与限额（v2.1.0+ 默认 profile `v1-conservative`）
 
 | 接口 | MIN_GAP | 日上限 |
 |---|---|---|
 | `search_feeds` | 20s | 15/日 |
 | `get_feed_detail` | 10s | 50/日 |
 | `list_feeds` | 15s | 20/日 |
-| `publish_content` | 300s | 2/日 |
+| `publish_content` | 300s | **2/日** |
 | `post_comment_to_feed` | 180s | 5/日 |
 | `user_profile` | 30s | 20/日 |
 
-### Session 复用（v2.1.0+，opt-in）
-
 | 变量 | 默认 | 作用 |
 |---|---|---|
-| `XHS_REUSE_SESSION` | `0` | 设 `1` 启用 session 复用（上游服务端 2-3 次后会失效，谨慎） |
+| `XHS_DISABLE_THROTTLE` | `0` | 设 `1` 跳过节流（**账号安全自理**） |
+| `XHS_DISABLE_QUOTA` | `0` | 设 `1` 跳过日限额（**账号安全自理**） |
+| `XHS_REUSE_SESSION` | `0` | 设 `1` 启用 session 复用（opt-in，上游 2-3 次后失效） |
 | `XHS_SESSION_TTL` | `120` | session 复用 TTL 秒数 |
 
 ### 请求日志（v2.1.1+）
 
 | 变量 | 默认 | 作用 |
 |---|---|---|
-| `XHS_DISABLE_LOG` | `0`（开启）| 设 `1` 跳过写 `request_log` 表 |
+| `XHS_DISABLE_LOG` | `0`（开启） | 设 `1` 跳过写 `request_log` 表 |
 
-查询日志：
+查询：
 ```bash
-bash scripts/xhs.sh log --limit 10         # 最近 10 条
-bash scripts/xhs.sh log --summary           # 按 tool × status 聚合
+bash scripts/xhs.sh log --limit 10            # 最近 10 条
+bash scripts/xhs.sh log --summary              # 按 tool × status 聚合
 bash scripts/xhs.sh log --tool search_feeds --days 7
 ```
 
@@ -181,105 +433,78 @@ bash scripts/xhs.sh log --tool search_feeds --days 7
 | 变量 | 默认 | 作用 |
 |---|---|---|
 | `GEMINI_API_KEY` | 空 | Gemini 生图 Key（推荐） |
-| `IMAGE_GEN_MODEL` | `gemini-3-pro-image-preview` | 图像模型 |
+| `IMAGE_GEN_MODEL` | `gemini-3-pro-image-preview` | 图像模型（Nano Banana Pro，中文渲染更稳） |
+| `IMAGE_GEN_PROVIDER` | `gemini` | 设 `openai` 走 OpenAI；未配置则降级 HTML 截图 |
 
 ### NoteRx 诊断
 
 | 变量 | 默认 | 作用 |
 |---|---|---|
-| `NOTERX_API_KEY` | 空 | NoteRx 五维诊断 Key |
-
-## 架构
-
-```
-┌─────────────────────────────────────────────────────┐
-│              AI 助手（大脑 / Skill-as-Brain）         │
-│                                                       │
-│   读 SKILL.md → 业务路由 → 决策 → 调脚本 → 写知识库   │
-└─┬─────────┬─────────┬─────────┬──────────┬──────────┘
-  │         │         │         │          │
-┌─▼──────┐┌─▼──────┐┌─▼─────┐┌─▼────────┐┌─▼─────────┐
-│xhs.sh  ││db.sh   ││image  ││fetch-*   ││noterx-    │
-│小红书  ││数据库  ││.py    ││.sh       ││diagnose.sh│
-│MCP     ││SQLite  ││Gemini ││metrics + ││NoteRx API │
-│        ││xhs.db  ││/HTML  ││comments  ││5 维评分    │
-└────────┘└────────┘└───────┘└──────────┘└───────────┘
-
-knowledge-base/                data/
-├── profile.json               ├── xhs.db          ← 7 张表
-├── preferences.json           └── content-rules.md
-├── patterns.md
-├── anti-patterns.md
-├── evolution-log.md           templates/
-└── reviews/<YYYY-W##>.md      └── post.html       ← HTML 截图模板
-```
-
-**只有一条路线**：智能体 → SKILL.md → scripts/。所有自动化（每日发布 + 每日复盘 + NoteRx 诊断 + 知识库进化）全部走这条路，由 hermes cron 定时唤起助手实现。
----
-
-## 文件结构
-
-```
-shuling/
-├── SKILL.md                  # 大脑剧本（核心）
-├── install.sh                # 安装脚本
-├── README.md                 # 本文件
-├── config/
-│   └── runtime.env.example   # 配置模板（MCP_URL / IMAGE_GEN_* / NOTERX_*）
-├── scripts/
-│   ├── preflight.py          # 环境预检
-│   ├── db.sh                 # SQLite 增删改查
-│   ├── xhs.sh                # 小红书 MCP 入口
-│   ├── image.py              # Gemini 图片生成
-│   ├── screenshot.cjs        # HTML → PNG 截图
-│   ├── fetch-metrics.sh      # 拉互动数据写 DB
-│   ├── fetch-comments.sh     # 拉评论原文 + 过滤 spam
-│   └── noterx-diagnose.sh    # NoteRx 5 维诊断
-├── data/
-│   ├── xhs.db                # SQLite（7 张表，运行时生成）
-│   └── content-rules.md      # 内容规则与平台限制
-├── knowledge-base/           # 博主画像与偏好（运行时生成）
-├── templates/
-│   └── post.html             # 小红书风格 HTML 模板
-└── platform/
-    ├── hermes.md
-    ├── claude-code.md
-    └── codex.md
-```
----
-
-## 自进化机制
-
-系统通过三层机制越来越懂你：
-
-1. **偏好学习** — 记录你每次在选题、标题、风格上的选择，构建偏好权重模型。下次推荐时优先考虑你喜欢的方向。
-
-2. **数据驱动** — 每条帖子的点赞、收藏、评论数据都会回流。系统会分析"什么选题表现好"、"什么时间段发效果好"、"什么风格更受欢迎"，自动调整策略。
-
-3. **选项递减** — 从最初每天让你选 5 个选题，逐步减少到 3 个、2 个，直到系统自信到只推 1 个让你确认。最终目标：你回复一个"发"字就完成一天的内容。
-
+| `NOTERX_API_KEY` | 空 | NoteRx 五维诊断 Key（不配则跳过 §3 诊断步骤） |
 
 ---
 
-## 版本管理
+## 文档地图
 
-- 版本号遵循 **BRAIN.HANDS.CALIB** 三段语义（见 [`VERSION`](VERSION)）
-- 所有改动必经 [CHANGELOG.md](CHANGELOG.md)，含「📦 用户可见改动」「⬆️ 如何升级」两栏
-- 发版流程标准化在 [RELEASING.md](RELEASING.md)
-- Breaking change 仅在 BRAIN 位升级时发生（如 v1.x → v2.0.0）
+| 你想做什么 | 去读 |
+|---|---|
+| 我是 AI / 想知道整个业务怎么运行 | [SKILL.md](SKILL.md)（必读） |
+| 我是用户 / 每次发版有什么变化 | [CHANGELOG.md](CHANGELOG.md) |
+| 我要从 vX.Y.Z 升级到新版 | [UPGRADE.md](UPGRADE.md) |
+| 我要自己发版 | [RELEASING.md](RELEASING.md) |
+| xiaohongshu-mcp 装不上 / cookie 怎么拿 | [docs/mcp-setup.md](docs/mcp-setup.md) |
+| 老博主接入流程的完整设计 | [docs/features/existing-creator-onboarding.md](docs/features/existing-creator-onboarding.md) |
+| AI 写入 JSON 时要遵守什么契约 | [schemas/](schemas/) + [schemas/README.md](schemas/README.md) |
+| 我的平台（hermes / claude / codex）怎么配 | [platform/](platform/) |
+| 知道有哪些表、字段是什么 | `scripts/db.sh init` 看 SQL；或 SKILL.md §7 |
 
-### 如何贡献 / 借鉴
+---
+
+## 版本管理与路线图
+
+### 版本号语义：BRAIN.HANDS.CALIB
+
+- **BRAIN** +1：SKILL.md 核心流程 / 自进化算法 / AI 行为方式变化 → **major**，breaking
+- **HANDS** +1：scripts/ 扩展 / DB schema 变化 / MCP 接口变化 → **minor**，一般非 breaking
+- **CALIB** +1：阈值 / 文档 / bugfix / prompt 微调 → **patch**，用户无感升级
+
+版本号决策树见 [RELEASING.md](RELEASING.md#版本号决策树brainhandscalib)。
+
+### 路线图
+
+| 版本 | 主题 | 状态 |
+|---|---|---|
+| v1.x | OpenClaw + Python workflow 双线架构 | 已归档 |
+| v2.0.0 | Skill-as-Brain 重构 | ✅ 已发布 |
+| v2.1.0 | Anti-Ban Shield（节流 + 限额 + session + 合并脚本） | ✅ 已发布 |
+| v2.1.1 | Request Log（MCP 调用全量落表） | ✅ 已发布 |
+| v2.1.2 | Release Polish（CHANGELOG/UPGRADE/RELEASING 三件套 + migrations） | ✅ 已发布 |
+| v2.1.3 | Friendly Onboarding（install.sh 六模式 + preflight --human + schemas + §0b） | ✅ 已发布 |
+| **v2.2.0** | **Existing Creator Support（老博主接入 + 账号体检 + patterns 种子挖掘）** | ✅ **当前** |
+| v2.2.1 | `xhs.sh list-user-feeds` 子命令 / AI 分类 prompt 模板 | 规划中 |
+| v2.3.0 | Human Rhythm（行为节奏模拟 + 话题窗口冷却 + 冷启动重构） | 规划中 |
+| v2.3.x | 历史帖改写重发建议 / 评论回复助手（Layer 2） | 规划中 |
+| v3.0.0 | 视频笔记 / 多账号灰度 / 竞品对标（Layer 3） | 远期 |
+
+---
+
+## 贡献 / 借鉴
 
 这是个人项目，但代码开源借鉴欢迎：
 
-- **Fork + 本地改 + 测试**（至少跑通一次 `install.sh` + 一次 `xhs.sh search`）
+- **Fork + 本地改 + 测试**（至少跑通一次 `install.sh --check` + 一次 `xhs.sh search`）
 - **遵守 [RELEASING.md](RELEASING.md) 的版本号决策树**
 - **CHANGELOG 写给用户看**，不是给开发者看（参考已有条目格式）
 - 发 PR 时附上 smoke test 结果（截图或命令输出）
+
+如果你在做类似"AI Skill + MCP + 自进化知识库"的项目，可以直接借鉴以下设计：
+- `SKILL.md §0a` 业务路由 + 反模式禁令
+- `schemas/` + AI 写入前自校验协议
+- BRAIN.HANDS.CALIB 版本号语义
+- CHANGELOG 📦/⬆️ 双栏 + UPGRADE 逐版本步骤 + RELEASING SOP
 
 ---
 
 ## 许可
 
 MIT
-
