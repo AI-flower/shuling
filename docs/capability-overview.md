@@ -23,7 +23,6 @@
 │                     Skill 层（智能体工具内）                    │
 │                                                               │
 │  skills/xiaohongshu/     小红书 MCP 操作 Skill（12 个 API）    │
-│  skills/xhs-content-generator/   内容图生成 Skill              │
 │  SKILL.md 中的自进化段落   冷启动播种 + 创作知识读取            │
 └───────────────────────────┬───────────────────────────────────┘
                             │ 文件系统共享 knowledge-base/
@@ -73,25 +72,6 @@
 | 服务管理 | `start-mcp.sh` / `stop-mcp.sh` | 启动/停止 MCP 服务 |
 | 依赖检查 | `install-check.sh` | 检查运行环境 |
 
-### 3.2 内容图生成 Skill（skills/xhs-content-generator/）
-
-根据主题自动生成多页小红书风格内容图（封面+内容页）。
-
-| 能力 | 说明 |
-|------|------|
-| **自动搜索资料** | WebSearch 中英文搜索 + WebFetch 官方文档 |
-| **规划内容结构** | 封面→概念介绍→核心内容→总结/CTA，每页 2-4 个信息模块 |
-| **生成 HTML** | 1080x1440px（3:4 竖版），Google Fonts，3 种风格可选 |
-| **Playwright 截图** | 逐页截图输出独立 PNG 文件 |
-
-**三种视觉风格：**
-
-| 风格 | 特征 |
-|------|------|
-| `warm`（默认） | 暖橙渐变封面，白色卡片，emoji 装饰 |
-| `dark` | 深紫渐变背景，金色高亮，玻璃态卡片 |
-| `minimal` | 纯白背景，细线边框，极简线条 |
-
 ### 3.3 自进化知识库（Skill 层）
 
 | 能力 | 触发条件 | 说明 |
@@ -131,7 +111,7 @@
 | **三维验证评分** | 平台数据（蓝海指数）+ 内容质量（Claude 评审 5 维度）+ 历史对标（同 angle+style 对比）|
 | **Telegram 推送草稿报告** | 发送排名+评分+亮点+风险给博主 |
 | **博主选择等待** | 轮询 Telegram 消息（110 分钟超时），支持 10 种指令 |
-| **AI/截图图片生成** | 四种策略：cover_ai / ai / html / auto |
+| **图片生成（Gemini 强制）** | 两阶段：封面 → 带封面作参考图生内容页 |
 | **Telegram 审图** | 推送生成的图片供博主确认（30 分钟超时） |
 | **写入 DB** | 帖子+草稿+评分+图片记录入库 |
 | **完整降级链** | 编排失败→单次生成→兜底模板→Telegram 告警 |
@@ -161,10 +141,9 @@
 
 | 子能力 | 说明 |
 |--------|------|
-| **cover_ai 策略** | 封面用 AI（OpenAI gpt-image-1）+ 内容页用 Playwright 截图 |
+| **主流程** | Gemini 3 Pro Image Preview（Nano Banana Pro）生图 |
 | **ai 策略** | 全部页面用 AI 生成 |
-| **html 策略** | 全部页面用 HTML 截图 |
-| **auto 策略** | AI 优先，失败降级为截图 |
+
 | **品牌风格注入** | IMAGE_BRAND_STYLE 配置注入所有图片 prompt |
 | **零依赖 API 调用** | urllib 直接调 OpenAI Images API，不依赖 SDK |
 | **asyncio 并行** | 多图并行生成 |
@@ -376,10 +355,10 @@ review.py 每周日导出数据 → LLM 归因分析
 
 | 策略 | 封面 | 内容页 | 依赖 |
 |------|------|--------|------|
-| **cover_ai** | OpenAI gpt-image-1 | Playwright 截图 | IMAGE_GEN_API_KEY |
+
 | **ai** | OpenAI gpt-image-1 | OpenAI gpt-image-1 | IMAGE_GEN_API_KEY |
-| **html** | Playwright 截图 | Playwright 截图 | Node.js + Playwright |
-| **auto** | AI 优先，失败降级截图 | AI 优先，失败降级截图 | 两者都需 |
+
+| **默认** | Gemini 3 Pro Image | Gemini 3 Pro Image | IMAGE_GEN_API_KEY |
 
 **图片规格：** 1080x1440px（3:4 竖版，小红书标准）
 
@@ -419,18 +398,18 @@ bash install.sh [安装目录]
 |------|------|------|
 | xiaohongshu-mcp | 是 | 小红书所有操作 |
 | Claude CLI | 是 | 内容生成/质量评估 |
-| Node.js + Playwright | 是 | HTML 截图 |
+
 | Python 3 | 是 | 所有自动化脚本 |
 | Telegram Bot | 是 | 通知+双向交互 |
-| OpenAI API | 否 | AI 图片生成（可选，无则全走截图） |
+| Gemini API | **是** | AI 图片生成（强制，无降级） |
 | Anthropic/OpenAI SDK | 否 | llm.py 统一调用（仅周进化分析需要） |
 
 ### 异常处理策略
 
 | 场景 | 处理 |
 |------|------|
-| Claude CLI 生成失败 | 本地 HTML 兜底模板（generate_html_fallback） |
-| AI 图片生成失败 | 降级为 Playwright 截图 |
+
+| AI 图片生成失败 | 硬报错（已移除 HTML 截图降级） |
 | MCP 服务未运行 | keepalive 自动启动 |
 | 登录过期 | Telegram 推送二维码 |
 | Telegram 超时 | 自动选择最高分草稿 |

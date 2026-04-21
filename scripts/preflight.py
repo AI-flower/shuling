@@ -73,23 +73,6 @@ def check_python():
     }
 
 
-def check_node():
-    node = find_node()
-    if not node:
-        return {
-            "name": "Node.js",
-            "status": "missing",
-            "detail": "截图功能需要 Node.js（已尝试 PATH 与 ~/.nvm 常见路径）",
-            "action": "auto_install",
-            "install_hint": "brew install node（macOS）或 apt install nodejs（Linux）",
-        }
-    try:
-        ver = subprocess.check_output([node, "-v"], text=True, timeout=5).strip()
-    except Exception:
-        ver = "unknown"
-    return {"name": "Node.js", "status": "ok", "version": ver, "detail": node, "action": None}
-
-
 def check_sqlite():
     s = shutil.which("sqlite3")
     if not s:
@@ -100,35 +83,6 @@ def check_sqlite():
             "install_hint": "brew install sqlite（macOS）或 apt install sqlite3（Linux）",
         }
     return {"name": "sqlite3", "status": "ok", "action": None}
-
-
-def check_playwright():
-    node = find_node()
-    if not node:
-        return {
-            "name": "Playwright",
-            "status": "skip",
-            "detail": "Node.js 未安装，无法检查 Playwright",
-            "action": None,
-        }
-    env = os.environ.copy()
-    env["PATH"] = f"{Path(node).parent}:{env.get('PATH', '')}"
-    try:
-        result = subprocess.run(
-            ["npx", "playwright", "--version"],
-            capture_output=True, text=True, timeout=15, env=env,
-        )
-        if result.returncode == 0:
-            return {"name": "Playwright", "status": "ok", "version": result.stdout.strip(), "action": None}
-    except Exception:
-        pass
-    return {
-        "name": "Playwright",
-        "status": "missing",
-        "detail": "HTML 截图功能需要 Playwright",
-        "action": "auto_install",
-        "install_cmd": "npx playwright install chromium",
-    }
 
 
 def check_mcp():
@@ -194,7 +148,7 @@ def check_mcp():
 
 
 def check_image_gen():
-    """检查图片生成能力（仅看 config/runtime.env）。"""
+    """检查图片生成能力 —— Gemini 图片 API 是强依赖。"""
     api_key = os.environ.get("IMAGE_GEN_API_KEY", "")
 
     if not api_key and RUNTIME_ENV.exists():
@@ -211,15 +165,15 @@ def check_image_gen():
 
     return {
         "name": "图片生成 API",
-        "status": "not_configured",
-        "detail": "未配置图片生成 API Key（可选，不影响核心功能）",
-        "action": "optional",
+        "status": "missing",
+        "detail": "未配置 Gemini 图片生成 API Key（必需，无降级）",
+        "action": "ask_user",
         "ask": (
-            "图片生成 API 未配置。\n"
-            "- 不配置：所有图片走 HTML 模板截图（效果也不错）\n"
-            "- 配置 OpenAI：高质量 AI 图片（需要 API Key + 费用）\n"
-            "- 配置 Gemini：免费额度的 AI 图片（推荐）\n"
-            "\n要配置吗？如果要，告诉我你的 API Key 和服务商（openai/gemini）。"
+            "图片生成 API 未配置 —— 薯灵强制使用 Gemini 模型生图，没有 Key 无法继续。\n"
+            "请提供 Google AI Studio 的 API Key：\n"
+            "  获取地址: https://aistudio.google.com/app/apikey\n"
+            "  推荐模型: gemini-3-pro-image-preview（Nano Banana Pro，中文准 + 支持参考图）\n"
+            "\n拿到 Key 后告诉我，我会写到 config/runtime.env。"
         ),
     }
 
@@ -270,9 +224,7 @@ def check_profile():
 def run_preflight():
     checks = [
         check_python(),
-        check_node(),
         check_sqlite(),
-        check_playwright(),
         check_mcp(),
         check_image_gen(),
         check_database(),

@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
-"""AI image generation script with multi-protocol support.
+"""AI image generation script with multi-protocol support + 中文模板.
 
 支持两种协议（通过 IMAGE_GEN_PROTOCOL 切换）：
   - gemini-native（默认）：Google 官方 / 透明代理 Gemini
-      鉴权：?key=xxx
-      端点：{BASE_URL}/v1beta/models/{model}:generateContent
   - openai-chat：OpenAI 兼容代理（newapi/oneapi 等）
-      鉴权：Authorization: Bearer xxx
-      端点：{BASE_URL}/v1/chat/completions
-      payload：{messages, modalities:["text","image"]}
-      响应：从 message.images 或 message.content 中抓 base64
 
-Usage:
+支持两种 CLI 模式：
+  - 结构化模式（推荐，RedInk 范式）：加载 prompts/image_prompt.txt 中文模板
+      --page-type 封面|内容|总结
+      --page-content "该页完整原文（含 配图建议 那一行）"
+      --outline-file /tmp/xhs-post/outline.txt   # 整篇大纲原文
+      --topic "用户原始主题"
+      --output /tmp/xhs-post/page-1.png
+      [--reference /tmp/xhs-post/page-1.png]     # 封面回流
+      [--short]                                   # 用 image_prompt_short.txt
+
+  - 兼容模式（旧，直接给 prompt 文本）：
+      image.py "<prompt>" <output_path> [--reference path]
+
+控制命令：
     python3 scripts/image.py --check
     python3 scripts/image.py --set-key "KEY"
-    python3 scripts/image.py "prompt" output.png
-    python3 scripts/image.py "prompt" page-2.png --reference page-1.png  # 封面回流
 
 Exit codes:
     0 - Success
@@ -43,8 +48,11 @@ def get_data_dir():
     return os.path.join(_skill_dir(), "data")
 
 
+def get_prompts_dir():
+    return os.path.join(_skill_dir(), "prompts")
+
+
 def get_env_files():
-    """按优先级返回配置文件路径列表（先到先得）。"""
     return [
         os.path.join(_skill_dir(), "config", "runtime.env"),
         os.path.join(get_data_dir(), ".env"),
@@ -52,7 +60,6 @@ def get_env_files():
 
 
 def load_env():
-    """合并所有 env 文件，先出现的优先。"""
     env_vars = {}
     for path in get_env_files():
         if not os.path.isfile(path):
@@ -96,9 +103,34 @@ def get_model():
     m = _resolve("IMAGE_GEN_MODEL")
     if m:
         return m
-    if get_protocol() == "openai-chat":
-        return "gemini-2.5-flash-image"
-    return "gemini-2.0-flash-preview-image-generation"
+    return "gemini-3-pro-image-preview"
+
+
+# ── 模板加载 ─────────────────────────────────────────────────────────────────
+
+def load_prompt_template(short=False):
+    filename = "image_prompt_short.txt" if short else "image_prompt.txt"
+    path = os.path.join(get_prompts_dir(), filename)
+    if not os.path.isfile(path):
+        return None
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def render_prompt(page_type, page_content, full_outline="", user_topic="", short=False):
+    tpl = load_prompt_template(short=short)
+    if tpl is None:
+        return (
+            "生成小红书风格竖版 3:4 图片。\n"
+            f"页面类型：{page_type}\n"
+            f"页面内容：\n{page_content}"
+        )
+    return tpl.format(
+        page_type=page_type or "内容",
+        page_content=page_content or "",
+        full_outline=full_outline or "（未提供）",
+        user_topic=user_topic or "（未提供）",
+    )
 
 
 # ── --check ──────────────────────────────────────────────────────────────────
@@ -113,15 +145,18 @@ def cmd_check():
     if proto == "openai-chat" and not get_base_url():
         print("[image] openai-chat 模式必须配置 IMAGE_GEN_BASE_URL", file=sys.stderr)
         sys.exit(2)
-    print(f"[image] OK — protocol={proto} model={get_model()} base_url={get_base_url() or '(default)'}",
-          file=sys.stderr)
+    tpl_state = "loaded" if load_prompt_template() is not None else "MISSING"
+    base_url = get_base_url() or "(default)"
+    print(
+        f"[image] OK — protocol={proto} model={get_model()} base_url={base_url} template={tpl_state}",
+        file=sys.stderr,
+    )
     sys.exit(0)
 
 
 # ── --set-key ────────────────────────────────────────────────────────────────
 
 def cmd_set_key(api_key):
-    """写入 config/runtime.env（优先），不存在则创建。"""
     cfg_dir = os.path.join(_skill_dir(), "config")
     os.makedirs(cfg_dir, exist_ok=True)
     env_path = os.path.join(cfg_dir, "runtime.env")
@@ -148,17 +183,53 @@ def cmd_set_key(api_key):
     sys.exit(0)
 
 
-# ── 协议 1: gemini-native ────────────────────────────────────────────────────
+# ── 参考图增强说明（RedInk 4 要素：配色/排版/字体/装饰元素） ────────────────
 
-def _gen_gemini_native(prompt, output_path):
+REF_ENHANCE_HEAD = (
+    "请参考上面这张图片的视觉风格（包括配色、排版风格、字体风格、装饰元素风格），"
+    "生成一张风格一致的新图片。\n\n新图片的内容要求：\n"
+)
+
+REF_ENHANCE_TAIL = (
+    "\n\n重要：\n"
+    "1. 必须保持与参考图相同的视觉风格和设计语言\n"
+    "2. 配色方案要与参考图协调一致\n"
+    "3. 排版和装饰元素的风格要统一\n"
+    "4. 但内容要按照新的要求来生成"
+)
+
+
+# ── 协议 1: gemini-native（REST，含参考图支持） ──────────────────────────────
+
+def _gen_gemini_native(prompt, output_path, reference_paths=None):
     api_key = get_api_key()
     base = get_base_url()
     model = get_model()
     url = f"{base}/v1beta/models/{model}:generateContent?key={api_key}"
 
+    parts = []
+    if reference_paths:
+        ref_bytes = _load_reference_image(reference_paths[0])
+        ref_b64 = base64.b64encode(ref_bytes).decode("ascii")
+        parts.append({
+            "inlineData": {
+                "mimeType": "image/png",
+                "data": ref_b64,
+            }
+        })
+        enhanced = REF_ENHANCE_HEAD + prompt + REF_ENHANCE_TAIL
+        parts.append({"text": enhanced})
+        print("[image] reference: 1 image attached (gemini-native)", file=sys.stderr)
+    else:
+        parts.append({"text": prompt})
+
     payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"responseModalities": ["IMAGE"]},
+        "contents": [{"role": "user", "parts": parts}],
+        "generationConfig": {
+            "temperature": 1.0,
+            "topP": 0.95,
+            "responseModalities": ["IMAGE"],
+        },
     }
     body = _http_post(url, payload, headers={"Content-Type": "application/json"})
 
@@ -166,11 +237,14 @@ def _gen_gemini_native(prompt, output_path):
     if not candidates:
         _fail_with_response("No candidates in response", body)
 
-    parts = candidates[0].get("content", {}).get("parts", [])
+    out_parts = candidates[0].get("content", {}).get("parts", [])
     image_data = None
-    for p in parts:
+    for p in out_parts:
         if "inlineData" in p:
             image_data = p["inlineData"].get("data")
+            break
+        if "inline_data" in p:
+            image_data = p["inline_data"].get("data")
             break
     if not image_data:
         _fail_with_response("No image data in response", body)
@@ -188,19 +262,18 @@ def _gen_openai_chat(prompt, output_path, reference_paths=None):
         print("[image] ERROR: openai-chat 模式必须配置 IMAGE_GEN_BASE_URL", file=sys.stderr)
         sys.exit(2)
 
-    # ── 拼装 multimodal content：有参考图时把它们作为视觉锚点喂回去 ──
     user_content = prompt
     if reference_paths:
         ref_bytes_list = [_load_reference_image(p) for p in reference_paths]
         n = len(ref_bytes_list)
         enhanced = (
-            f"参考提供的 {n} 张图片的风格（色彩、光影、构图、字体、留白），生成一张新图片。\n"
-            f"\n新图片内容：{prompt}\n"
-            f"\n要求：\n"
-            f"1. 严格保持相似的色调和氛围\n"
-            f"2. 使用相似的字体风格和排版\n"
-            f"3. 保持一致的画面质感和留白\n"
-            f"4. 视觉风格必须与参考图统一"
+            f"请参考提供的 {n} 张图片的视觉风格（配色、排版风格、字体风格、装饰元素风格），生成一张风格一致的新图片。\n"
+            f"\n新图片的内容要求：{prompt}\n"
+            "\n重要：\n"
+            "1. 必须保持与参考图相同的视觉风格和设计语言\n"
+            "2. 配色方案要与参考图协调一致\n"
+            "3. 排版和装饰元素的风格要统一\n"
+            "4. 但内容要按照新的要求来生成"
         )
         content_parts = [{"type": "text", "text": enhanced}]
         for ref_bytes in ref_bytes_list:
@@ -210,7 +283,7 @@ def _gen_openai_chat(prompt, output_path, reference_paths=None):
                 "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
             })
         user_content = content_parts
-        print(f"[image] reference: {n} image(s) attached", file=sys.stderr)
+        print(f"[image] reference: {n} image(s) attached (openai-chat)", file=sys.stderr)
 
     url = f"{base}/v1/chat/completions"
     payload = {
@@ -229,7 +302,6 @@ def _gen_openai_chat(prompt, output_path, reference_paths=None):
         _fail_with_response("No choices in response", body)
     msg = choices[0].get("message", {}) or {}
 
-    # 1. 优先 message.images（部分代理直接给结构化）
     if "images" in msg and msg["images"]:
         first = msg["images"][0]
         url_or_data = (first.get("image_url") or {}).get("url") or first.get("url") or ""
@@ -243,10 +315,8 @@ def _gen_openai_chat(prompt, output_path, reference_paths=None):
                 _save_url(url_or_data, output_path)
                 return
 
-    # 2. 从 message.content 里 regex 抓 markdown / data url
     content = msg.get("content", "") or ""
     if isinstance(content, list):
-        # 部分代理把 content 拆成 parts 数组
         for p in content:
             if isinstance(p, dict):
                 if p.get("type") == "image_url":
@@ -277,8 +347,7 @@ def _gen_openai_chat(prompt, output_path, reference_paths=None):
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-def _load_reference_image(path, max_kb=300):
-    """读参考图，>max_kb 时尝试 PIL 压缩；PIL 不可用则原样返回（warn）。"""
+def _load_reference_image(path, max_kb=200):
     with open(path, "rb") as f:
         data = f.read()
     if len(data) <= max_kb * 1024:
@@ -361,17 +430,20 @@ def cmd_generate(prompt, output_path, reference_paths=None):
         sys.exit(2)
     proto = get_protocol()
     print(f"[image] protocol={proto} model={get_model()}", file=sys.stderr)
-    print(f"[image] prompt={prompt[:80]}...", file=sys.stderr)
+    preview = prompt[:100].replace("\n", " ")
+    print(f"[image] prompt={preview}... ({len(prompt)} chars)", file=sys.stderr)
     if proto == "openai-chat":
         _gen_openai_chat(prompt, output_path, reference_paths=reference_paths)
     else:
-        if reference_paths:
-            print("[image] WARN: gemini-native protocol does not support --reference yet, ignored",
-                  file=sys.stderr)
-        _gen_gemini_native(prompt, output_path)
+        _gen_gemini_native(prompt, output_path, reference_paths=reference_paths)
 
 
 # ── main ─────────────────────────────────────────────────────────────────────
+
+def _read_file(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
 
 def main():
     if len(sys.argv) < 2:
@@ -381,30 +453,73 @@ def main():
     arg = sys.argv[1]
     if arg == "--check":
         cmd_check()
-    elif arg == "--set-key":
+        return
+    if arg == "--set-key":
         if len(sys.argv) < 3:
             print("ERROR: --set-key requires KEY argument", file=sys.stderr)
             sys.exit(1)
         cmd_set_key(sys.argv[2])
-    else:
-        # 解析: image.py <prompt> <output_path> [--reference path]...
-        positional = []
-        references = []
-        i = 1
-        while i < len(sys.argv):
-            a = sys.argv[i]
-            if a == "--reference":
-                if i + 1 >= len(sys.argv):
-                    print("ERROR: --reference requires a path", file=sys.stderr); sys.exit(1)
-                references.append(sys.argv[i + 1])
-                i += 2
-            else:
-                positional.append(a)
-                i += 1
-        if len(positional) < 2:
-            print("ERROR: usage: image.py <prompt> <output_path> [--reference path]...",
-                  file=sys.stderr); sys.exit(1)
-        cmd_generate(positional[0], positional[1], reference_paths=references or None)
+        return
+
+    page_type = None
+    page_content = None
+    outline_file = None
+    topic = None
+    output = None
+    references = []
+    use_short = False
+    positional = []
+
+    i = 1
+    while i < len(sys.argv):
+        a = sys.argv[i]
+        if a == "--page-type":
+            page_type = sys.argv[i + 1]; i += 2
+        elif a == "--page-content":
+            page_content = sys.argv[i + 1]; i += 2
+        elif a == "--outline-file":
+            outline_file = sys.argv[i + 1]; i += 2
+        elif a == "--topic":
+            topic = sys.argv[i + 1]; i += 2
+        elif a == "--output":
+            output = sys.argv[i + 1]; i += 2
+        elif a == "--reference":
+            references.append(sys.argv[i + 1]); i += 2
+        elif a == "--short":
+            use_short = True; i += 1
+        else:
+            positional.append(a); i += 1
+
+    # 结构化模式：走中文模板
+    if page_type is not None or page_content is not None or output is not None:
+        if not output:
+            print("ERROR: structured mode requires --output", file=sys.stderr); sys.exit(1)
+        if not page_content:
+            print("ERROR: structured mode requires --page-content", file=sys.stderr); sys.exit(1)
+        full_outline = ""
+        if outline_file and os.path.isfile(outline_file):
+            full_outline = _read_file(outline_file)
+        prompt = render_prompt(
+            page_type=page_type or "内容",
+            page_content=page_content,
+            full_outline=full_outline,
+            user_topic=topic or "",
+            short=use_short,
+        )
+        cmd_generate(prompt, output, reference_paths=references or None)
+        return
+
+    # 兼容模式：旧的 image.py <prompt> <output>
+    if len(positional) < 2:
+        print(
+            "ERROR: usage:\n"
+            "  structured: image.py --page-type TYPE --page-content TEXT --output PATH "
+            "[--outline-file F] [--topic T] [--reference P] [--short]\n"
+            "  legacy:     image.py <prompt> <output_path> [--reference path]...",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    cmd_generate(positional[0], positional[1], reference_paths=references or None)
 
 
 if __name__ == "__main__":
