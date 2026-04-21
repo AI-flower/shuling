@@ -3,6 +3,59 @@ set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# ─── 版本工具（v2.1.2+） ─────────────────────────────────────────────
+read_version() {
+    # 从 VERSION 文件第一行读 version: "x.y.z"
+    local vfile="$1"
+    [ -f "$vfile" ] || { echo "0.0.0"; return; }
+    awk -F'"' '/^version:/ {print $2; exit}' "$vfile" 2>/dev/null || echo "0.0.0"
+}
+
+version_le() {
+    # 返回 0 如果 $1 <= $2（语义：X.Y.Z）
+    python3 -c "
+import sys
+a = tuple(int(x) for x in sys.argv[1].split('.'))
+b = tuple(int(x) for x in sys.argv[2].split('.'))
+sys.exit(0 if a <= b else 1)
+" "$1" "$2"
+}
+
+version_lt() {
+    python3 -c "
+import sys
+a = tuple(int(x) for x in sys.argv[1].split('.'))
+b = tuple(int(x) for x in sys.argv[2].split('.'))
+sys.exit(0 if a < b else 1)
+" "$1" "$2"
+}
+
+SRC_VERSION="$(read_version "$SKILL_DIR/VERSION")"
+
+run_migrations() {
+    local from_ver="$1" to_ver="$2" target="$3"
+    local migrations_dir="$SKILL_DIR/migrations"
+    [ -d "$migrations_dir" ] || return 0
+
+    local ran=0
+    # 按版本号排序遍历
+    for m in $(ls "$migrations_dir"/v*.sh 2>/dev/null | sort -V); do
+        local fname v
+        fname="$(basename "$m")"
+        v="${fname#v}"; v="${v%.sh}"
+        # 只跑 from_ver < v <= to_ver
+        if version_lt "$from_ver" "$v" && version_le "$v" "$to_ver"; then
+            printf "  执行 migration %s (target: %s)\n" "$fname" "$target"
+            # 用目标目录作为 SKILL_DIR，保证 migration 作用于部署目录
+            (SKILL_DIR="$target" bash "$m")
+            ran=$((ran + 1))
+        fi
+    done
+    if [ "$ran" = "0" ]; then
+        printf "  无需 migration（已是 %s）\n" "$to_ver"
+    fi
+}
+
 # ─── 颜色 ───────────────────────────────────────────────────────────
 GREEN="\033[32m"
 YELLOW="\033[33m"
@@ -55,24 +108,38 @@ printf "\n${BOLD}=== 检测平台 ===${RESET}\n\n"
 
 PLATFORMS=()
 
+check_deployed() {
+    local name="$1" path="$2"
+    PLATFORMS+=("$name:$path")
+    if [ -f "$path/VERSION" ]; then
+        local deployed_v
+        deployed_v="$(read_version "$path/VERSION")"
+        if [ "$deployed_v" = "$SRC_VERSION" ]; then
+            info "$name → $path (v$deployed_v, 已是最新)"
+        elif version_lt "$deployed_v" "$SRC_VERSION"; then
+            warn "$name → $path (v$deployed_v → v$SRC_VERSION, 将升级)"
+        else
+            warn "$name → $path (v$deployed_v > v$SRC_VERSION, 降级将覆盖！)"
+        fi
+    else
+        info "$name → $path (新安装 → v$SRC_VERSION)"
+    fi
+}
+
 if [ -d "$HOME/.hermes" ]; then
-    PLATFORMS+=("hermes:$HOME/.hermes/skills/social-media/shuling")
-    info "Hermes  → ~/.hermes/skills/social-media/shuling/"
+    check_deployed "Hermes" "$HOME/.hermes/skills/social-media/shuling"
 fi
 
 if [ -d "$HOME/.claude" ]; then
-    PLATFORMS+=("claude:$HOME/.claude/skills/shuling")
-    info "Claude Code → ~/.claude/skills/shuling/"
+    check_deployed "Claude Code" "$HOME/.claude/skills/shuling"
 fi
 
 if [ -d "$HOME/.codex" ]; then
-    PLATFORMS+=("codex:$HOME/.codex/skills/shuling")
-    info "Codex   → ~/.codex/skills/shuling/"
+    check_deployed "Codex" "$HOME/.codex/skills/shuling"
 fi
 
 if [ -d "$HOME/.agents" ]; then
-    PLATFORMS+=("agents:$HOME/.agents/skills/shuling")
-    info "Agents  → ~/.agents/skills/shuling/"
+    check_deployed "Agents" "$HOME/.agents/skills/shuling"
 fi
 
 if [ ${#PLATFORMS[@]} -eq 0 ]; then
@@ -85,6 +152,7 @@ printf "\n${BOLD}=== 安装 Skill ===${RESET}\n\n"
 for entry in "${PLATFORMS[@]}"; do
     platform="${entry%%:*}"
     target="${entry#*:}"
+    OLD_VER="$(read_version "$target/VERSION")"
     mkdir -p "$target"
     rsync -a --exclude=.git --exclude=.DS_Store --exclude=.idea \
         --exclude=skills --exclude=docs \
@@ -94,9 +162,17 @@ for entry in "${PLATFORMS[@]}"; do
         --exclude=knowledge-base/preferences.json --exclude=knowledge-base/patterns.md \
         --exclude=data/xhs.db --exclude=data/xhs.db-shm --exclude=data/xhs.db-wal \
         "$SKILL_DIR/" "$target/"
-    # 单独复制需要的 md 文件
-    cp "$SKILL_DIR/SKILL.md" "$target/"
-    info "$platform: 已复制到 $target"
+    # 单独复制需要的 md 文件（发版/升级相关）
+    for doc in SKILL.md README.md CHANGELOG.md UPGRADE.md RELEASING.md VERSION; do
+        [ -f "$SKILL_DIR/$doc" ] && cp "$SKILL_DIR/$doc" "$target/"
+    done
+    info "$platform: 已复制到 $target (v$OLD_VER → v$SRC_VERSION)"
+
+    # 跑 migrations（针对该 target 的 data/ 目录）
+    if version_lt "$OLD_VER" "$SRC_VERSION"; then
+        printf "  → migration:\n"
+        run_migrations "$OLD_VER" "$SRC_VERSION" "$target"
+    fi
 done
 
 # ─── 4. 初始化 SQLite 数据库 ────────────────────────────────────────
@@ -182,6 +258,7 @@ done
 # ─── 8. 验证 & 输出下一步 ───────────────────────────────────────────
 printf "\n${BOLD}=== 安装完成 ===${RESET}\n\n"
 
+printf "当前版本: ${BOLD}v%s${RESET} (%s)\n" "$SRC_VERSION" "$(awk -F'"' '/^codename:/ {print $2; exit}' "$SKILL_DIR/VERSION" 2>/dev/null)"
 printf "已安装到以下位置：\n"
 for entry in "${PLATFORMS[@]}"; do
     target="${entry#*:}"

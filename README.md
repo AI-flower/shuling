@@ -2,6 +2,13 @@
 
 > 小红书博主成长助手 — 帮你选题、写稿、发布、复盘，越用越懂你。
 
+[![Version](https://img.shields.io/badge/version-2.1.2-blue)](VERSION)
+[![Codename](https://img.shields.io/badge/codename-Release%20Polish-green)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-MIT-lightgrey)](#许可)
+
+**当前版本**：`v2.1.2 "Release Polish"`（2026-04-21）
+**完整变更**：[CHANGELOG.md](CHANGELOG.md) ｜ **升级指南**：[UPGRADE.md](UPGRADE.md) ｜ **发版流程**：[RELEASING.md](RELEASING.md)
+
 ---
 
 ## 核心理念
@@ -54,6 +61,22 @@ bash install.sh
 
 ---
 
+## 升级已有安装
+
+```bash
+cd /path/to/shuling
+git fetch --tags origin
+git checkout main && git pull
+bash install.sh   # v2.1.2+ 自动识别已部署版本、按需运行 migration
+```
+
+`install.sh` 升级模式会：
+1. 对比每个部署目录的 `VERSION` 与源版本
+2. 按需运行 `migrations/vX.Y.Z.sh`（幂等）
+3. 保留你的私人数据（`.env` / `config/runtime.env` / `data/*.db` / `knowledge-base/*`）
+
+逐版本升级注意事项 → [UPGRADE.md](UPGRADE.md)
+
 ## 支持平台
 
 | 平台 | 状态 | 说明 |
@@ -64,6 +87,68 @@ bash install.sh
 | OpenClaw | ✅ | 兼容 agents 目录规范 |
 
 ---
+
+## 环境变量参考
+
+所有 `XHS_*` 变量可在 `.env` 或进程环境中设置。
+
+### MCP 服务 & 缓存
+
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `MCP_URL` | `http://localhost:18060/mcp` | xiaohongshu-mcp 服务地址 |
+| `XHS_CACHE_DIR` | `~/.cache/shuling` | 节流戳文件 + quota 状态目录 |
+
+### 节流与限额（v2.1.0+）
+
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `XHS_DISABLE_THROTTLE` | `0` | 设 `1` 跳过节流（仅调试，**慎用**） |
+| `XHS_DISABLE_QUOTA` | `0` | 设 `1` 跳过日限额（仅调试，**慎用**） |
+
+**默认节流 profile `v1-conservative`**（见 `scripts/xhs.sh` 可自行调整）：
+
+| 接口 | MIN_GAP | 日上限 |
+|---|---|---|
+| `search_feeds` | 20s | 15/日 |
+| `get_feed_detail` | 10s | 50/日 |
+| `list_feeds` | 15s | 20/日 |
+| `publish_content` | 300s | 2/日 |
+| `post_comment_to_feed` | 180s | 5/日 |
+| `user_profile` | 30s | 20/日 |
+
+### Session 复用（v2.1.0+，opt-in）
+
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `XHS_REUSE_SESSION` | `0` | 设 `1` 启用 session 复用（上游服务端 2-3 次后会失效，谨慎） |
+| `XHS_SESSION_TTL` | `120` | session 复用 TTL 秒数 |
+
+### 请求日志（v2.1.1+）
+
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `XHS_DISABLE_LOG` | `0`（开启）| 设 `1` 跳过写 `request_log` 表 |
+
+查询日志：
+```bash
+bash scripts/xhs.sh log --limit 10         # 最近 10 条
+bash scripts/xhs.sh log --summary           # 按 tool × status 聚合
+bash scripts/xhs.sh log --tool search_feeds --days 7
+```
+
+### 图片生成
+
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `GEMINI_API_KEY` | 空 | Gemini 生图 Key（推荐） |
+| `IMAGE_GEN_MODEL` | `gemini-3-pro-image-preview` | 图像模型 |
+
+### NoteRx 诊断
+
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `NOTERX_API_KEY` | 空 | NoteRx 五维诊断 Key |
 
 ## 架构
 
@@ -134,8 +219,28 @@ shuling/
 
 3. **选项递减** — 从最初每天让你选 5 个选题，逐步减少到 3 个、2 个，直到系统自信到只推 1 个让你确认。最终目标：你回复一个"发"字就完成一天的内容。
 
+
+---
+
+## 版本管理
+
+- 版本号遵循 **BRAIN.HANDS.CALIB** 三段语义（见 [`VERSION`](VERSION)）
+- 所有改动必经 [CHANGELOG.md](CHANGELOG.md)，含「📦 用户可见改动」「⬆️ 如何升级」两栏
+- 发版流程标准化在 [RELEASING.md](RELEASING.md)
+- Breaking change 仅在 BRAIN 位升级时发生（如 v1.x → v2.0.0）
+
+### 如何贡献 / 借鉴
+
+这是个人项目，但代码开源借鉴欢迎：
+
+- **Fork + 本地改 + 测试**（至少跑通一次 `install.sh` + 一次 `xhs.sh search`）
+- **遵守 [RELEASING.md](RELEASING.md) 的版本号决策树**
+- **CHANGELOG 写给用户看**，不是给开发者看（参考已有条目格式）
+- 发 PR 时附上 smoke test 结果（截图或命令输出）
+
 ---
 
 ## 许可
 
 MIT
+

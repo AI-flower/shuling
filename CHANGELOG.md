@@ -1,30 +1,76 @@
 # Changelog
 
 本项目版本号遵循 **BRAIN.HANDS.CALIB** 三段语义（见 `VERSION`）。
+升级步骤集中在 [`UPGRADE.md`](UPGRADE.md)；发版流程见 [`RELEASING.md`](RELEASING.md)。
+
 变更按以下类别归档：
 
-- **Brain**: SKILL.md 核心流程重构、自进化算法换代、业务能力跃迁
-- **Hands**: scripts/ 新增或重写、DB schema 迁移、MCP 接口替换、平台适配器
-- **Calib**: 阈值/关键词/节流参数调整、bugfix、prompt 微调
+- 🧠 **Brain**: SKILL.md 核心流程重构、自进化算法换代、业务能力跃迁
+- ✋ **Hands**: scripts/ 新增或重写、DB schema 迁移、MCP 接口替换、平台适配器
+- 🎛 **Calib**: 阈值/关键词/节流参数调整、bugfix、prompt 微调
+
+每个版本同时给出：
+- 📦 **用户可见改动**：实际使用体验的变化
+- ⬆️ **如何升级**：从上一版升到这一版需要做什么
+
+---
+
+## [2.1.2] - 2026-04-21 "Release Polish"
+
+版本管理与用户文档专项，让升级/借鉴/贡献有据可依。
+
+### 📦 用户可见改动
+- 新增 `UPGRADE.md`：每版本升级步骤、新增环境变量、是否有 breaking
+- 新增 `RELEASING.md`：未来发版 SOP（版本号决策树、commit/tag/release 模板）
+- `README.md` 顶部露出当前版本、升级入口、环境变量参考表
+- `install.sh` 升级模式：自动识别已部署版本，按需跑 `migrations/vX.Y.Z.sh`
+- `VERSION` 新增 `breaking_change_policy` 字段，明文说明三段版本号的破坏性承诺
+
+### ✋ Hands
+- `install.sh` 新增版本对比 + migration 调度逻辑（幂等）
+- 新增 `migrations/` 目录及 `v2.1.1.sh`（补建 `request_log` 表）
+
+### 🎛 Calib
+- 文档工程规范固化：所有未来发版必经 RELEASING.md SOP
+- README 加版本徽章占位（从 VERSION 读取）
+
+### ⬆️ 如何升级
+```bash
+cd /path/to/shuling && git pull
+bash install.sh   # 自动检测并补齐 request_log 表（如还没建）
+```
+无 breaking。无需手动动作。
 
 ---
 
 ## [2.1.1] - 2026-04-21 "Request Log"
 
-观测先行。为后续节奏模拟 + 话题冷却铺路，先把 MCP 调用完整落表以便量化效果。
+观测先行，为 v2.2.0 Human Rhythm 量化效果提供数据基础。
 
-### Hands
+### 📦 用户可见改动
+- 每次调用小红书（搜索/详情/发布等）会自动留下一条日志记录
+- 新命令 `bash scripts/xhs.sh log` 随时查看最近调用（含耗时、状态、错误提示）
+- 可以用 `bash scripts/xhs.sh log --summary` 看每个接口的成功率和平均延迟
+- 默认开启，不想记录可设 `XHS_DISABLE_LOG=1`
+
+### ✋ Hands
 - `scripts/db.sh` 新增 `request_log` 表（called_at / tool / status / latency_ms / error_hint / session_tag / args_preview），附三个常用索引
 - `scripts/db.sh` 新增 `add-request-log` / `query-request-log` 子命令（支持 `--summary` 聚合，按 tool × status × 平均/最大延迟）
 - `scripts/xhs.sh` 注入请求日志：每次 MCP 调用异步写入一条记录，覆盖状态 `ok / error / quota_block / session_refresh / mcp_unavailable`；DB 故障时静默忽略，不影响主流程
-- `scripts/xhs.sh` 新增 `log [--summary] [--days N] [--tool T] [--status S] [--limit N]` 子命令，一步查日志
+- `scripts/xhs.sh` 新增 `log [--summary] [--days N] [--tool T] [--status S] [--limit N]` 子命令
 - `check_quota` 改为 `return` 而非 `exit`，使 quota_block 事件可被日志捕获
 
-### Calib
-- 新增环境变量 `XHS_DISABLE_LOG=1` 提供临时关闭开关（默认开启）
+### 🎛 Calib
+- 新增环境变量 `XHS_DISABLE_LOG=1`（默认开启）
 - observability profile: `request-log-v1`
 
-### 为什么先出这个
+### ⬆️ 如何升级
+```bash
+cd /path/to/shuling && git pull
+bash scripts/db.sh init       # 补建 request_log 表（幂等）
+```
+
+### 💡 为什么先出这个
 下个版本 v2.2.0 (Human Rhythm) 计划加行为节奏模拟 + 话题窗口冷却 + 冷启动重构。没有这张 `request_log` 表，这些优化的效果**不可量化**，相当于盲飞。此版本是 2.2.0 的必要前置。
 
 ---
@@ -33,7 +79,14 @@
 
 风控加固版本，堵上 xhs.sh 零节流的最大血口。
 
-### Hands
+### 📦 用户可见改动
+- **每次调小红书接口不再瞬发**：接口之间自动拉开时间间隔（最短 10s，发布类 300s）
+- **每天调用次数有上限**：搜索 15 次/日、详情 50 次/日、发布 2 次/日、评论 5 次/日（触顶自动拒绝）
+- 新命令 `bash scripts/xhs.sh quota` 查看当日各接口调用计数
+- 新脚本 `scripts/fetch-post-data.sh`：一次调用同时拿数据+评论，替代原来的两次调用
+- 预期收益：日均 HTTP 请求 **-75%**，选题窗口调用 **-85%**
+
+### ✋ Hands
 - `scripts/xhs.sh` 注入分级节流：每接口独立 MIN_GAP + ±30% 抖动
 - `scripts/xhs.sh` 注入日限额保险丝：按接口设当日硬上限，触顶退出
 - `scripts/xhs.sh` 新增 `quota` 子命令：查看当日调用计数
@@ -41,7 +94,7 @@
 - 新增 `scripts/fetch-post-data.sh`：合并 fetch-metrics + fetch-comments，单次 detail 调用同时提取 metrics 和 comments，HTTP 请求减半
 - 保留 `fetch-metrics.sh` / `fetch-comments.sh` 向后兼容，自动继承节流+限额
 
-### Calib
+### 🎛 Calib
 - 节流 profile `v1-conservative`:
   - search_feeds: 20s / get_feed_detail: 10s / list_feeds: 15s
   - publish_content: 300s / post_comment_to_feed: 180s / user_profile: 30s
@@ -51,10 +104,17 @@
   - publish_content: 2/日 / post_comment_to_feed: 5/日 / user_profile: 20/日
 - 新增环境变量开关：`XHS_DISABLE_THROTTLE` / `XHS_DISABLE_QUOTA` / `XHS_REUSE_SESSION` / `XHS_SESSION_TTL` / `XHS_CACHE_DIR`
 
-### Notes
+### ⬆️ 如何升级
+```bash
+cd /path/to/shuling && git pull
+# 无 DB 迁移，无需手动动作；节流/限额立即生效
+```
+
+**提醒**：本版本**默认开启**节流和限额。嫌慢可设 `XHS_DISABLE_THROTTLE=1`，但**账号安全自理**。
+
+### 📝 Notes
 - 状态文件存于 `$HOME/.cache/shuling/`（mcp-session、mcp-quota.json、last-<tool>）
-- 预期收益：日均 HTTP 请求 -75%，选题窗口调用 -85%，冷启动 -70%
-- 回滚：`cp scripts/xhs.sh.bak.20260421_023540 scripts/xhs.sh`
+- 回滚：`cp scripts/xhs.sh.bak.<timestamp> scripts/xhs.sh`
 
 ---
 
@@ -62,7 +122,16 @@
 
 架构级重构：从 OpenClaw + Python workflow 双线架构 → SKILL.md 单线架构。
 
-### Brain
+### 📦 用户可见改动
+- **换 AI 平台无需改代码**：只要平台能读 SKILL.md，就能无缝迁移（Hermes / Claude Code / Codex）
+- **流程修改门槛降至零**：改 SKILL.md 即可，不用碰 Python
+- 选题、起稿、复盘、自进化全部由 AI 推理完成，不再依赖 Python "思考"
+- 首次接入两阶段封面参考出图（先封面 → 内容页参考封面）
+- 首次接入 RedInk 风格创作流程（先大纲 6-9 页 → 后文案）
+- 首次接入贝叶斯 + ε-greedy 的偏好学习
+- 首次接入 NoteRx 第三方五维诊断 API
+
+### 🧠 Brain
 - 核心定位改写：SKILL.md 即大脑（1040 行），承载全部业务逻辑
 - 选题/起稿/复盘/自进化全部由 LLM 推理，不再依赖 Python 脚本做决策
 - 第 2.2 节升级到 RedInk 风格：先大纲（6-9 页，每页配图提示）后文案
@@ -71,16 +140,31 @@
 - 新增模式生命周期：experimental → medium → high / deprecated（与 anti-patterns.md 联动）
 - 接入 NoteRx 第三方五维诊断 API
 
-### Hands
+### ✋ Hands
 - scripts/ 重写：db.sh 结构化 CLI、xhs.sh 统一 MCP 入口
 - DB 扩展到 7 张表（posts / post_metrics / user_choices / topic_candidates / comment_insights / note_diagnosis / generated_images）
 - 图像生成默认切到 gemini-3-pro-image-preview（Nano Banana Pro，中文渲染更稳）
 - 平台适配器抽象：hermes（cron）/ claude-code（/loop）/ codex
 
-### Calib
+### 🎛 Calib
 - 合规规则初版（`data/content-rules.md`）
 - emoji 词典 v1
 - 废弃 `docs/capability-overview.md`（单线架构下不再适用）
+
+### ⬆️ 如何升级
+**这是 breaking change**。v1.x → v2.0.0 是一次性硬切：
+
+```bash
+# 备份
+cp -r data/xhs.db data/xhs.db.bak.$(date +%Y%m%d)
+cp -r knowledge-base knowledge-base.bak.$(date +%Y%m%d)
+
+# 切换
+git checkout v2.0.0
+bash install.sh
+```
+
+后续 v2.x 保持兼容。
 
 ---
 
