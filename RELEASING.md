@@ -59,6 +59,9 @@
 - [ ] 如有新环境变量：README 的环境变量表已更新
 - [ ] `git status` 干净，只剩要 commit 的文件
 - [ ] `bash -n scripts/*.sh` 全部语法通过
+- [ ] **清理遗留备份**：`ls scripts/*.bak.* 2>/dev/null` 应为空；非空说明上一次改脚本留下的 `.bak.<timestamp>` 没删，先手动 `rm` 掉再 commit（否则会被打包进 skill 目录）
+- [ ] `bash install.sh --check` 跑通（v2.1.3+ 自检模式，不写任何文件）
+- [ ] `bash install.sh --dry-run --yes` 列出的动作清单符合预期
 
 ---
 

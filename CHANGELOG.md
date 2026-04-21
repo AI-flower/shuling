@@ -15,6 +15,52 @@
 
 ---
 
+## [2.1.3] - 2026-04-21 "Friendly Onboarding"
+
+降低新手门槛 + 拓宽非交互场景 + 给智能体写入协议。
+
+### 📦 用户可见改动
+- **`install.sh` 新增 4 个模式**：
+  - `--check`：只跑依赖/平台/版本对比，不写任何文件（日常自检）
+  - `--dry-run`：列出将要执行的全部动作，不真正执行（升级前预演）
+  - `--yes` / `--non-interactive`：跳过所有 prompt，用默认值（CI/远程/cron 场景）
+  - `--target <path>`：显式指定部署目标路径（可重复），覆盖默认自动检测
+- **`preflight.py --human`**：人类可读的彩色自检输出（依赖状态 + 修复建议 + 下一步）；退出码按严重度分级（0=就绪 / 1=可自修 / 2=需人工）
+- **`docs/mcp-setup.md` 重写**：
+  - 补源码编译（Go）+ Release 二进制 + Docker 三种安装路径
+  - 加 macOS launchd / Linux systemd 常驻服务配置
+  - Cookie 提取图文指引（哪个面板、哪个请求、复制哪段）
+  - 常见错误自检对照表
+- **README 顶部版本徽章升级到 v2.1.3**
+
+### 🧠 Brain
+- **SKILL.md 新增 §0b**："识别运行平台 + 写入前校验 schema"——AI 进入项目后先识别平台来源（路径/触发方式），再在写入 state/profile/preferences 前按 schema 核对字段名与类型，杜绝 `created_at`/`createdAt` 漂移、`weight` 越界等退化
+
+### ✋ Hands
+- `install.sh` 全面重构：参数解析、run/prompt 包装器、非 TTY 自动 non-interactive、dry-run 全流程覆盖
+- `scripts/preflight.py` 新增 `--human` / `--json` / `--no-color` 参数，带退出码
+- 新增 `schemas/` 目录：`state.schema.json` / `profile.schema.json` / `preferences.schema.json`（JSON Schema 2020-12），供 AI 智能体写入前自校验
+- 新增 `migrations/v2.1.3.sh`（空 migration，纯文档版本留痕）
+- 修掉 `install.sh` 依赖检查里 Python 版本显示 bug（曾显示 `Python Python`）
+- `RELEASING.md` 检查清单加三项：清理 `scripts/*.bak.*`、跑 `install.sh --check`、跑 `install.sh --dry-run`
+
+### 🎛 Calib
+- 非 TTY 环境（cron/ssh 管道/CI）自动进入 non-interactive，不再因 `read -r` 卡死
+- install.sh 中 Python 版本显示修复（`awk '{print $2}'`）
+
+### ⬆️ 如何升级
+```bash
+cd /path/to/shuling && git pull
+bash install.sh           # 会识别出 v2.1.2 → v2.1.3 并跑 v2.1.3.sh（无实际 DB 操作）
+
+# 新能力体验
+bash install.sh --check                 # 纯自检
+python3 scripts/preflight.py --human    # 彩色健康检查
+```
+无 breaking。**自动化/CI 用户现在可以安全地跑** `SHULING_ASSUME_YES=1 bash install.sh`。
+
+---
+
 ## [2.1.2] - 2026-04-21 "Release Polish"
 
 版本管理与用户文档专项，让升级/借鉴/贡献有据可依。

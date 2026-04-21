@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
 """
-环境预检工具 — 供智能体安装 skill 时调用。
-输出 JSON，告诉智能体哪些依赖就绪、哪些需要用户配合。
+环境预检工具 — 供智能体安装 skill 时调用，也可给人看。
 
-用法：python3 scripts/preflight.py
+默认：stdout 输出 JSON（智能体用），stderr 输出简要中文摘要。
+--human：只输出彩色表格 + 修复建议（人类自检用，不打 JSON）。
+--json：只输出 JSON，无 stderr 噪声（脚本管道用）。
+
+退出码：
+  0  环境就绪（ready=True）
+  1  只差可自动修复项（auto_fixable）
+  2  存在需用户配合项（ask_user）
+
+用法：
+  python3 scripts/preflight.py             # 默认混合输出
+  python3 scripts/preflight.py --human     # 人类彩色自检
+  python3 scripts/preflight.py --json      # 纯 JSON（管道/CI 用）
 """
+import argparse
 import json
 import os
 import shutil
@@ -303,25 +315,125 @@ def run_preflight():
     return result
 
 
-if __name__ == "__main__":
-    result = run_preflight()
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+# ─── 人类可读输出 ─────────────────────────────────────────────────
+def _color(text: str, code: str, use_color: bool) -> str:
+    return f"\033[{code}m{text}\033[0m" if use_color else text
 
-    print("\n" + "=" * 50, file=sys.stderr)
+
+def _status_icon(status: str, use_color: bool) -> str:
+    table = {
+        "ok": ("✅", "32"),
+        "missing": ("❌", "31"),
+        "not_running": ("⚠️ ", "33"),
+        "not_initialized": ("🔧", "33"),
+        "not_configured": ("💡", "36"),
+        "not_created": ("💡", "36"),
+        "error": ("❌", "31"),
+        "unknown": ("❓", "33"),
+        "skip": ("⏭ ", "2"),
+    }
+    icon, color = table.get(status, ("·", "0"))
+    return _color(icon, color, use_color)
+
+
+def print_human(result: dict, use_color: bool = True) -> None:
+    bold = lambda s: _color(s, "1", use_color)
+    dim = lambda s: _color(s, "2", use_color)
+
+    print()
+    print(bold("薯灵 (ShuLing) 环境自检"))
+    print(dim("─" * 54))
+
+    for c in result["checks"]:
+        icon = _status_icon(c["status"], use_color)
+        line = f"{icon} {c['name']:<20} {dim(c['status'])}"
+        if c.get("version"):
+            line += f"  {c['version']}"
+        if c.get("detail"):
+            line += f"  {dim('— ' + str(c['detail']))}"
+        print(line)
+
     s = result["summary"]
-    if s["ok"]:
-        print(f"✅ 就绪: {', '.join(s['ok'])}", file=sys.stderr)
+    print()
+    print(dim("─" * 54))
+
     if s["auto_fixable"]:
-        names = [c["name"] for c in s["auto_fixable"]]
-        print(f"🔧 可自动修复: {', '.join(names)}", file=sys.stderr)
+        print(bold("🔧 可自动修复（照命令跑即可）:"))
+        for c in s["auto_fixable"]:
+            cmd = c.get("fix_cmd") or c.get("install_cmd") or c.get("install_hint") or "(见 detail)"
+            print(f"   • {c['name']}: {cmd}")
+        print()
+
     if s["need_user"]:
-        names = [c["name"] for c in s["need_user"]]
-        print(f"❗ 需要用户配合: {', '.join(names)}", file=sys.stderr)
+        print(bold("❗ 需要你配合:"))
+        for c in s["need_user"]:
+            print(f"   • {c['name']}: {c.get('detail', '')}")
+            ask = c.get("ask", "")
+            if ask:
+                for ln in ask.splitlines():
+                    print(f"     {dim(ln)}")
+        print()
+
     if s["optional"]:
-        names = [c["name"] for c in s["optional"]]
-        print(f"💡 可选配置: {', '.join(names)}", file=sys.stderr)
-    print("=" * 50, file=sys.stderr)
-    if result["ready"]:
-        print("🎉 环境就绪，可以开始使用！", file=sys.stderr)
+        print(bold("💡 可选配置（不配也能用）:"))
+        for c in s["optional"]:
+            print(f"   • {c['name']}: {c.get('detail', '')}")
+        print()
+
+    if result.get("ready"):
+        print(bold(_color("🎉 环境就绪，可以开始使用！", "32", use_color)))
     else:
-        print("⚠️  部分依赖需要处理后才能使用", file=sys.stderr)
+        print(bold(_color("⚠️  部分依赖需要处理后才能使用", "33", use_color)))
+
+    state = result.get("state") or {}
+    if state:
+        print()
+        print(dim("业务状态: " + ", ".join(f"{k}={v}" for k, v in state.items())))
+
+
+def _exit_code(result: dict) -> int:
+    s = result["summary"]
+    if s["need_user"]:
+        return 2
+    if s["auto_fixable"]:
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(add_help=False, description="薯灵环境预检")
+    parser.add_argument("--human", action="store_true", help="人类彩色输出")
+    parser.add_argument("--json", dest="json_only", action="store_true", help="纯 JSON 输出")
+    parser.add_argument("--no-color", action="store_true", help="关闭 ANSI 颜色")
+    parser.add_argument("-h", "--help", action="help")
+    args = parser.parse_args()
+
+    result = run_preflight()
+
+    if args.human:
+        use_color = (not args.no_color) and sys.stdout.isatty()
+        print_human(result, use_color=use_color)
+    elif args.json_only:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        print("\n" + "=" * 50, file=sys.stderr)
+        s = result["summary"]
+        if s["ok"]:
+            print(f"✅ 就绪: {', '.join(s['ok'])}", file=sys.stderr)
+        if s["auto_fixable"]:
+            names = [c["name"] for c in s["auto_fixable"]]
+            print(f"🔧 可自动修复: {', '.join(names)}", file=sys.stderr)
+        if s["need_user"]:
+            names = [c["name"] for c in s["need_user"]]
+            print(f"❗ 需要用户配合: {', '.join(names)}", file=sys.stderr)
+        if s["optional"]:
+            names = [c["name"] for c in s["optional"]]
+            print(f"💡 可选配置: {', '.join(names)}", file=sys.stderr)
+        print("=" * 50, file=sys.stderr)
+        if result["ready"]:
+            print("🎉 环境就绪，可以开始使用！", file=sys.stderr)
+        else:
+            print("⚠️  部分依赖需要处理后才能使用", file=sys.stderr)
+
+    sys.exit(_exit_code(result))

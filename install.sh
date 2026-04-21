@@ -3,16 +3,104 @@ set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# ─── 参数解析（v2.1.3+） ─────────────────────────────────────────────
+#
+# 用法:
+#   bash install.sh [选项]
+#
+# 选项:
+#   -y, --yes, --non-interactive   不问任何问题，交互项用默认值跳过
+#   --dry-run                      只打印将要执行的动作，不写任何东西
+#   --check                        只跑预检（依赖 + 平台 + 版本对比），不部署
+#   --target <path>                显式指定部署目标（可重复），覆盖默认自动检测
+#   --skip-preflight               跳过部署后的 preflight 运行
+#   -h, --help                     显示此帮助
+#
+# 环境变量（非交互模式下替代 prompt）:
+#   GEMINI_API_KEY=xxx             预填 Gemini API Key，写入 .env
+#   XHS_MCP_URL=http://...         预填 MCP URL，写入 .env
+#   SHULING_ASSUME_YES=1           等同 --yes
+#
+# 示例:
+#   bash install.sh --check                            # 只自检不动手
+#   bash install.sh --dry-run                          # 预演一次
+#   SHULING_ASSUME_YES=1 GEMINI_API_KEY=xxx bash install.sh   # CI/远程
+#   bash install.sh --target ~/.myagents/skills/shuling       # 自定义目标
+
+ASSUME_YES="${SHULING_ASSUME_YES:-0}"
+DRY_RUN=0
+CHECK_ONLY=0
+SKIP_PREFLIGHT=0
+declare -a EXPLICIT_TARGETS=()
+
+usage() {
+    sed -n '/^# ─── 参数解析/,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -y|--yes|--non-interactive) ASSUME_YES=1; shift ;;
+        --dry-run)                  DRY_RUN=1; shift ;;
+        --check)                    CHECK_ONLY=1; shift ;;
+        --skip-preflight)           SKIP_PREFLIGHT=1; shift ;;
+        --target)
+            [ $# -ge 2 ] || { echo "错误: --target 需要一个路径参数" >&2; exit 2; }
+            EXPLICIT_TARGETS+=("$2"); shift 2 ;;
+        -h|--help)                  usage; exit 0 ;;
+        *) echo "错误: 未知参数 $1（见 --help）" >&2; exit 2 ;;
+    esac
+done
+
+# 非 TTY 环境自动进入非交互模式（cron/ssh/CI）
+if [ ! -t 0 ] && [ "$ASSUME_YES" = "0" ]; then
+    ASSUME_YES=1
+fi
+
+# ─── 颜色 ───────────────────────────────────────────────────────────
+GREEN="\033[32m"
+YELLOW="\033[33m"
+RED="\033[31m"
+BOLD="\033[1m"
+DIM="\033[2m"
+RESET="\033[0m"
+
+info()  { printf "${GREEN}[OK]${RESET}  %s\n" "$1"; }
+warn()  { printf "${YELLOW}[!]${RESET}   %s\n" "$1"; }
+fail()  { printf "${RED}[ERR]${RESET} %s\n" "$1"; }
+step()  { printf "${DIM}[..] %s${RESET}\n" "$1"; }
+
+# run <描述> <命令...> — dry-run 模式下只打印不执行
+run() {
+    local desc="$1"; shift
+    if [ "$DRY_RUN" = "1" ]; then
+        printf "${DIM}[dry]${RESET} %s ${DIM}→ %s${RESET}\n" "$desc" "$*"
+    else
+        "$@"
+    fi
+}
+
+# prompt <提示语> <变量名> [默认值] — 非交互模式返回默认值
+prompt() {
+    local label="$1" varname="$2" default="${3:-}"
+    if [ "$ASSUME_YES" = "1" ]; then
+        printf -v "$varname" '%s' "$default"
+        return 0
+    fi
+    printf "%s" "$label"
+    read -r "$varname"
+    if [ -z "${!varname}" ] && [ -n "$default" ]; then
+        printf -v "$varname" '%s' "$default"
+    fi
+}
+
 # ─── 版本工具（v2.1.2+） ─────────────────────────────────────────────
 read_version() {
-    # 从 VERSION 文件第一行读 version: "x.y.z"
     local vfile="$1"
     [ -f "$vfile" ] || { echo "0.0.0"; return; }
     awk -F'"' '/^version:/ {print $2; exit}' "$vfile" 2>/dev/null || echo "0.0.0"
 }
 
 version_le() {
-    # 返回 0 如果 $1 <= $2（语义：X.Y.Z）
     python3 -c "
 import sys
 a = tuple(int(x) for x in sys.argv[1].split('.'))
@@ -38,16 +126,17 @@ run_migrations() {
     [ -d "$migrations_dir" ] || return 0
 
     local ran=0
-    # 按版本号排序遍历
     for m in $(ls "$migrations_dir"/v*.sh 2>/dev/null | sort -V); do
         local fname v
         fname="$(basename "$m")"
         v="${fname#v}"; v="${v%.sh}"
-        # 只跑 from_ver < v <= to_ver
         if version_lt "$from_ver" "$v" && version_le "$v" "$to_ver"; then
-            printf "  执行 migration %s (target: %s)\n" "$fname" "$target"
-            # 用目标目录作为 SKILL_DIR，保证 migration 作用于部署目录
-            (SKILL_DIR="$target" bash "$m")
+            if [ "$DRY_RUN" = "1" ]; then
+                printf "${DIM}[dry]${RESET} migration %s → target %s\n" "$fname" "$target"
+            else
+                printf "  执行 migration %s (target: %s)\n" "$fname" "$target"
+                (SKILL_DIR="$target" bash "$m")
+            fi
             ran=$((ran + 1))
         fi
     done
@@ -56,16 +145,12 @@ run_migrations() {
     fi
 }
 
-# ─── 颜色 ───────────────────────────────────────────────────────────
-GREEN="\033[32m"
-YELLOW="\033[33m"
-RED="\033[31m"
-BOLD="\033[1m"
-RESET="\033[0m"
-
-info()  { printf "${GREEN}[OK]${RESET}  %s\n" "$1"; }
-warn()  { printf "${YELLOW}[!]${RESET}   %s\n" "$1"; }
-fail()  { printf "${RED}[ERR]${RESET} %s\n" "$1"; }
+# ─── 模式提示 ───────────────────────────────────────────────────────
+MODE_BANNER=""
+[ "$ASSUME_YES" = "1" ]    && MODE_BANNER="$MODE_BANNER [non-interactive]"
+[ "$DRY_RUN" = "1" ]       && MODE_BANNER="$MODE_BANNER [dry-run]"
+[ "$CHECK_ONLY" = "1" ]    && MODE_BANNER="$MODE_BANNER [check-only]"
+[ -n "$MODE_BANNER" ]      && printf "${BOLD}模式:${RESET}${YELLOW}%s${RESET}\n" "$MODE_BANNER"
 
 # ─── 1. 检查依赖 ────────────────────────────────────────────────────
 printf "\n${BOLD}=== 检查依赖 ===${RESET}\n\n"
@@ -80,7 +165,7 @@ else
 fi
 
 if command -v python3 >/dev/null 2>&1; then
-    info "Python $(python3 --version 2>&1 | awk '{print $1}')"
+    info "Python $(python3 --version 2>&1 | awk '{print $2}')"
 else
     fail "Python 3 未安装（图片生成需要）"
     MISSING=1
@@ -95,11 +180,14 @@ fi
 
 if [ "$MISSING" -eq 1 ]; then
     warn "部分依赖缺失，安装后部分功能可能不可用"
-    printf "  继续安装？[Y/n] "
-    read -r ans
-    if [ "${ans:-Y}" = "n" ] || [ "${ans:-Y}" = "N" ]; then
-        printf "已取消\n"
-        exit 1
+    if [ "$ASSUME_YES" = "1" ]; then
+        warn "非交互模式：继续安装（缺失依赖按需后补）"
+    else
+        prompt "  继续安装？[Y/n] " ans "Y"
+        if [ "${ans}" = "n" ] || [ "${ans}" = "N" ]; then
+            printf "已取消\n"
+            exit 1
+        fi
     fi
 fi
 
@@ -126,24 +214,41 @@ check_deployed() {
     fi
 }
 
-if [ -d "$HOME/.hermes" ]; then
-    check_deployed "Hermes" "$HOME/.hermes/skills/social-media/shuling"
-fi
-
-if [ -d "$HOME/.claude" ]; then
-    check_deployed "Claude Code" "$HOME/.claude/skills/shuling"
-fi
-
-if [ -d "$HOME/.codex" ]; then
-    check_deployed "Codex" "$HOME/.codex/skills/shuling"
-fi
-
-if [ -d "$HOME/.agents" ]; then
-    check_deployed "Agents" "$HOME/.agents/skills/shuling"
+if [ ${#EXPLICIT_TARGETS[@]} -gt 0 ]; then
+    for t in "${EXPLICIT_TARGETS[@]}"; do
+        check_deployed "Custom" "$t"
+    done
+else
+    if [ -d "$HOME/.hermes" ]; then
+        check_deployed "Hermes" "$HOME/.hermes/skills/social-media/shuling"
+    fi
+    if [ -d "$HOME/.claude" ]; then
+        check_deployed "Claude Code" "$HOME/.claude/skills/shuling"
+    fi
+    if [ -d "$HOME/.codex" ]; then
+        check_deployed "Codex" "$HOME/.codex/skills/shuling"
+    fi
+    if [ -d "$HOME/.agents" ]; then
+        check_deployed "Agents" "$HOME/.agents/skills/shuling"
+    fi
 fi
 
 if [ ${#PLATFORMS[@]} -eq 0 ]; then
     warn "未检测到已知平台目录，将只初始化本地数据"
+fi
+
+# ─── check-only: 到此结束 ───────────────────────────────────────────
+if [ "$CHECK_ONLY" = "1" ]; then
+    printf "\n${BOLD}=== 自检完成 ===${RESET}\n\n"
+    printf "源版本: v%s\n" "$SRC_VERSION"
+    if [ ${#PLATFORMS[@]} -gt 0 ]; then
+        printf "候选目标:\n"
+        for entry in "${PLATFORMS[@]}"; do
+            printf "  %s\n" "${entry#*:}"
+        done
+    fi
+    printf "\n运行 ${BOLD}bash install.sh${RESET} 或 ${BOLD}bash install.sh --dry-run${RESET} 执行部署。\n"
+    exit 0
 fi
 
 # ─── 3. 复制 skill 文件 ─────────────────────────────────────────────
@@ -153,8 +258,8 @@ for entry in "${PLATFORMS[@]}"; do
     platform="${entry%%:*}"
     target="${entry#*:}"
     OLD_VER="$(read_version "$target/VERSION")"
-    mkdir -p "$target"
-    rsync -a --exclude=.git --exclude=.DS_Store --exclude=.idea \
+    run "确保目录" mkdir -p "$target"
+    run "同步 skill 文件" rsync -a --exclude=.git --exclude=.DS_Store --exclude=.idea \
         --exclude=skills --exclude=docs \
         --exclude=.session-recorder --exclude=*.md \
         --exclude=config/runtime.env --exclude=config/state.json \
@@ -162,13 +267,13 @@ for entry in "${PLATFORMS[@]}"; do
         --exclude=knowledge-base/preferences.json --exclude=knowledge-base/patterns.md \
         --exclude=data/xhs.db --exclude=data/xhs.db-shm --exclude=data/xhs.db-wal \
         "$SKILL_DIR/" "$target/"
-    # 单独复制需要的 md 文件（发版/升级相关）
     for doc in SKILL.md README.md CHANGELOG.md UPGRADE.md RELEASING.md VERSION; do
-        [ -f "$SKILL_DIR/$doc" ] && cp "$SKILL_DIR/$doc" "$target/"
+        if [ -f "$SKILL_DIR/$doc" ]; then
+            run "复制 $doc" cp "$SKILL_DIR/$doc" "$target/"
+        fi
     done
     info "$platform: 已复制到 $target (v$OLD_VER → v$SRC_VERSION)"
 
-    # 跑 migrations（针对该 target 的 data/ 目录）
     if version_lt "$OLD_VER" "$SRC_VERSION"; then
         printf "  → migration:\n"
         run_migrations "$OLD_VER" "$SRC_VERSION" "$target"
@@ -179,14 +284,14 @@ done
 printf "\n${BOLD}=== 初始化数据库 ===${RESET}\n\n"
 
 if [ -x "$SKILL_DIR/scripts/db.sh" ]; then
-    bash "$SKILL_DIR/scripts/db.sh" init
+    run "db.sh init" bash "$SKILL_DIR/scripts/db.sh" init
     info "数据库已初始化: $SKILL_DIR/data/xhs.db"
 else
     warn "scripts/db.sh 不存在或不可执行，跳过数据库初始化"
 fi
 
 # ─── 5. 确保 knowledge-base 目录存在 ────────────────────────────────
-mkdir -p "$SKILL_DIR/knowledge-base"
+run "建 knowledge-base/" mkdir -p "$SKILL_DIR/knowledge-base"
 info "knowledge-base/ 目录就绪"
 
 # ─── 6. 可选：配置 Gemini API Key ───────────────────────────────────
@@ -197,15 +302,18 @@ ENV_FILE="$SKILL_DIR/.env"
 if [ -f "$ENV_FILE" ] && grep -q "GEMINI_API_KEY" "$ENV_FILE"; then
     info "Gemini API Key 已配置"
 else
-    printf "配置 Gemini API Key？（用于 AI 图片生成，留空跳过）\n"
-    printf "  获取地址: https://aistudio.google.com/api-keys\n"
-    printf "  API Key: "
-    read -r gemini_key
+    # 优先读 env var（非交互模式下唯一通道）
+    gemini_key="${GEMINI_API_KEY:-}"
+    if [ -z "$gemini_key" ] && [ "$ASSUME_YES" = "0" ]; then
+        printf "配置 Gemini API Key？（用于 AI 图片生成，留空跳过）\n"
+        printf "  获取地址: https://aistudio.google.com/api-keys\n"
+        prompt "  API Key: " gemini_key ""
+    fi
     if [ -n "$gemini_key" ]; then
-        echo "GEMINI_API_KEY=$gemini_key" >> "$ENV_FILE"
+        run "写入 GEMINI_API_KEY" bash -c "echo 'GEMINI_API_KEY=$gemini_key' >> '$ENV_FILE'"
         info "Gemini API Key 已保存到 .env"
     else
-        warn "跳过，将使用 HTML 截图模式生成图片"
+        warn "未配置 Gemini Key，将使用 HTML 截图模式生成图片"
     fi
 fi
 
@@ -213,11 +321,13 @@ fi
 if [ -f "$ENV_FILE" ] && grep -q "XHS_MCP_URL" "$ENV_FILE"; then
     info "MCP URL 已配置"
 else
-    printf "\n配置 MCP URL？（留空使用本机默认地址）\n"
-    printf "  MCP URL: "
-    read -r mcp_url
+    mcp_url="${XHS_MCP_URL:-}"
+    if [ -z "$mcp_url" ] && [ "$ASSUME_YES" = "0" ]; then
+        printf "\n配置 MCP URL？（留空使用本机默认地址）\n"
+        prompt "  MCP URL: " mcp_url ""
+    fi
     if [ -n "$mcp_url" ]; then
-        echo "XHS_MCP_URL=$mcp_url" >> "$ENV_FILE"
+        run "写入 XHS_MCP_URL" bash -c "echo 'XHS_MCP_URL=$mcp_url' >> '$ENV_FILE'"
         info "MCP URL 已保存到 .env"
     else
         info "使用本机默认 MCP 地址"
@@ -234,9 +344,9 @@ if [ -f "$RUNTIME_ENV_TEMPLATE" ]; then
         target="${entry#*:}"
         cfg_dir="$target/config"
         runtime_env="$cfg_dir/runtime.env"
-        mkdir -p "$cfg_dir"
+        run "确保 $cfg_dir" mkdir -p "$cfg_dir"
         if [ ! -f "$runtime_env" ]; then
-            cp "$RUNTIME_ENV_TEMPLATE" "$runtime_env"
+            run "拷贝 runtime.env 模板" cp "$RUNTIME_ENV_TEMPLATE" "$runtime_env"
             info "$target: 已创建 config/runtime.env（来自模板）"
         else
             info "$target: config/runtime.env 已存在，保留"
@@ -245,15 +355,19 @@ if [ -f "$RUNTIME_ENV_TEMPLATE" ]; then
 fi
 
 # ─── 7.6 运行环境预检（按 target 逐个跑）─────────────────────────
-printf "\n${BOLD}=== 环境预检 ===${RESET}\n\n"
+if [ "$SKIP_PREFLIGHT" = "0" ] && [ "$DRY_RUN" = "0" ]; then
+    printf "\n${BOLD}=== 环境预检 ===${RESET}\n\n"
 
-for entry in "${PLATFORMS[@]}"; do
-    target="${entry#*:}"
-    if [ -f "$target/scripts/preflight.py" ]; then
-        printf "${BOLD}-- %s --${RESET}\n" "$target"
-        python3 "$target/scripts/preflight.py" 2>&1 >/dev/null || true
-    fi
-done
+    for entry in "${PLATFORMS[@]}"; do
+        target="${entry#*:}"
+        if [ -f "$target/scripts/preflight.py" ]; then
+            printf "${BOLD}-- %s --${RESET}\n" "$target"
+            python3 "$target/scripts/preflight.py" 2>&1 >/dev/null || true
+        fi
+    done
+elif [ "$SKIP_PREFLIGHT" = "1" ]; then
+    warn "已跳过 preflight（--skip-preflight）"
+fi
 
 # ─── 8. 验证 & 输出下一步 ───────────────────────────────────────────
 printf "\n${BOLD}=== 安装完成 ===${RESET}\n\n"
@@ -266,6 +380,11 @@ for entry in "${PLATFORMS[@]}"; do
 done
 printf "  %s （源目录）\n" "$SKILL_DIR"
 
+if [ "$DRY_RUN" = "1" ]; then
+    printf "\n${YELLOW}[dry-run]${RESET} 没有实际写入任何文件。去掉 --dry-run 再跑一次即可真正部署。\n"
+    exit 0
+fi
+
 cat << EOF
 
 下一步：
@@ -273,8 +392,12 @@ cat << EOF
   2. 首次使用会进入博主画像建立流程
   3. 画像建立完成后即可开始选题、创作、发布
 
+常用自检命令：
+  bash install.sh --check                 # 只看依赖+平台+版本对比
+  python3 scripts/preflight.py --human    # 人类可读的健康检查
+
 详细的平台适配说明见 platform/ 目录：
-  - platform/hermes.md      — Hermes 定时任务配置
+  - platform/hermes.md       — Hermes 定时任务配置
   - platform/claude-code.md  — Claude Code 使用指南
   - platform/codex.md        — Codex 使用指南
 

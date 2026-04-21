@@ -1,5 +1,5 @@
-version: "2.1.2"
-codename: "Release Polish"
+version: "2.1.3"
+codename: "Friendly Onboarding"
 released: "2026-04-21"
 
 # ─── 版本号语义: BRAIN.HANDS.CALIB ──────────────────────────────────
@@ -27,7 +27,7 @@ breaking_change_policy:
     requires_migration: false
 
 brain:
-  skill_md_sections: [0a, 0, 1, 2, 3, 4, 5, 6, 7, 8]
+  skill_md_sections: [0a, 0b, 0, 1, 2, 3, 4, 5, 6, 7, 8]
   algorithms:
     preference_learning: "bayesian-laplace-v1"
     exploration: "epsilon-greedy-7day"
@@ -70,8 +70,12 @@ hands:
     - preflight.py
     - screenshot.cjs
   installer:
-    mode: "install + upgrade"    # v2.1.2 起 install.sh 支持版本对比 + migrations 调度
+    mode: "install + upgrade + check + dry-run"   # v2.1.3 起 install.sh 支持 --check/--dry-run/--yes/--target
     migrations_dir: "migrations"
+  schemas:                                         # v2.1.3 新增：AI 写入前自校验
+    - state.schema.json
+    - profile.schema.json
+    - preferences.schema.json
 
 calib:
   observability: "request-log-v1"
@@ -81,3 +85,4 @@ calib:
   emoji_dict_version: "v1"
   spam_keywords_version: "v1"
   docs_format: "keep-a-changelog + upgrade-guide + releasing-sop"
+  onboarding_polish: "v2.1.3"                      # mcp-setup 重写 + cookie 图文指引 + preflight --human
