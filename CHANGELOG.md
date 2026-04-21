@@ -9,6 +9,26 @@
 
 ---
 
+## [2.1.1] - 2026-04-21 "Request Log"
+
+观测先行。为后续节奏模拟 + 话题冷却铺路，先把 MCP 调用完整落表以便量化效果。
+
+### Hands
+- `scripts/db.sh` 新增 `request_log` 表（called_at / tool / status / latency_ms / error_hint / session_tag / args_preview），附三个常用索引
+- `scripts/db.sh` 新增 `add-request-log` / `query-request-log` 子命令（支持 `--summary` 聚合，按 tool × status × 平均/最大延迟）
+- `scripts/xhs.sh` 注入请求日志：每次 MCP 调用异步写入一条记录，覆盖状态 `ok / error / quota_block / session_refresh / mcp_unavailable`；DB 故障时静默忽略，不影响主流程
+- `scripts/xhs.sh` 新增 `log [--summary] [--days N] [--tool T] [--status S] [--limit N]` 子命令，一步查日志
+- `check_quota` 改为 `return` 而非 `exit`，使 quota_block 事件可被日志捕获
+
+### Calib
+- 新增环境变量 `XHS_DISABLE_LOG=1` 提供临时关闭开关（默认开启）
+- observability profile: `request-log-v1`
+
+### 为什么先出这个
+下个版本 v2.2.0 (Human Rhythm) 计划加行为节奏模拟 + 话题窗口冷却 + 冷启动重构。没有这张 `request_log` 表，这些优化的效果**不可量化**，相当于盲飞。此版本是 2.2.0 的必要前置。
+
+---
+
 ## [2.1.0] - 2026-04-21 "Anti-Ban Shield"
 
 风控加固版本，堵上 xhs.sh 零节流的最大血口。
@@ -66,6 +86,6 @@
 
 ## 版本路线图（参考）
 
-- **v2.2.x**（规划中）：行为节奏拟真化、选题窗口批处理缓存、异常信号监听+自动熔断
-- **v2.3.x**（规划中）：MCP session 持久化（等上游 xpzouying 修复）
+- **v2.2.0**（下一版，codename 候选 "Human Rhythm"）：行为节奏模拟（昼夜节律 + burst/break）、话题窗口批处理 + 冷却、冷启动路径重构；全部走 opt-in 开关，默认关闭
+- **v2.3.x**（规划中）：异常信号监听 + 自动熔断；MCP session 持久化（等上游 xpzouying 修复）
 - **v3.0.0**（远期）：接入视频笔记能力 / 多账号灰度架构

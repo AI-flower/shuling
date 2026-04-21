@@ -15,6 +15,7 @@
 #   XHS_SESSION_TTL       session 复用 TTL 秒数（默认 120）
 #   XHS_DISABLE_THROTTLE  设为 1 跳过节流（仅调试）
 #   XHS_DISABLE_QUOTA     设为 1 跳过日限额（仅调试）
+#   XHS_DISABLE_LOG       设为 1 跳过请求日志（仅调试）
 
 set -e
 
@@ -27,6 +28,7 @@ SESSION_FILE="$CACHE_DIR/mcp-session"
 QUOTA_FILE="$CACHE_DIR/mcp-quota.json"
 SESSION_TTL="${XHS_SESSION_TTL:-120}"
 REUSE_SESSION="${XHS_REUSE_SESSION:-0}"
+LOG_ENABLED="${XHS_DISABLE_LOG:-0}"   # 1 表示禁用（变量名取反便于 env set 1 生效）
 
 # ── 帮助信息 ──────────────────────────────────────────────
 usage() {
@@ -44,6 +46,7 @@ usage() {
   import-cookie <cookie|@文件>  导入已抓取的 cookie 替代扫码
   user     <user_id>            获取用户主页
   quota                         查看当日调用计数
+  log [--summary] [--days N]    查看请求日志（默认 1 天明细）
 
 环境变量:
   MCP_URL   MCP 服务地址（默认 http://localhost:18060/mcp）
@@ -132,7 +135,7 @@ check_quota() {
   cap=$(daily_cap_for "$tool")
   [ "$cap" -le 0 ] && return 0
 
-  python3 - "$tool" "$cap" "$QUOTA_FILE" << 'PYEOF' || exit $?
+  python3 - "$tool" "$cap" "$QUOTA_FILE" << 'PYEOF'
 import json, os, sys, datetime
 tool, cap_s, path = sys.argv[1], sys.argv[2], sys.argv[3]
 cap = int(cap_s)
@@ -156,6 +159,7 @@ data["counts"][tool] = cnt + 1
 with open(path, "w") as f:
     json.dump(data, f)
 PYEOF
+  return $?
 }
 
 # ── Session 复用 ──────────────────────────────────────────
@@ -197,6 +201,33 @@ get_session() {
 
 invalidate_session() {
   rm -f "$SESSION_FILE"
+}
+
+# ── 请求日志（v2.1.1） ────────────────────────────────────
+# 异步写入 request_log 表。永不阻塞主流程；DB 故障时静默忽略。
+log_request() {
+  [ "${XHS_DISABLE_LOG:-0}" = "1" ] && return 0
+  local tool="$1" status="$2" latency_ms="${3:-}" args_preview="${4:-}" error_hint="${5:-}" session_tag="${6:-}"
+  local payload
+  payload=$(python3 -c '
+import json, sys
+print(json.dumps({
+  "tool": sys.argv[1],
+  "status": sys.argv[2],
+  "latency_ms": int(sys.argv[3]) if sys.argv[3] else None,
+  "args_preview": sys.argv[4][:120],
+  "error_hint": sys.argv[5][:200],
+  "session_tag": sys.argv[6],
+}, ensure_ascii=False))
+' "$tool" "$status" "$latency_ms" "$args_preview" "$error_hint" "$session_tag" 2>/dev/null) || return 0
+  (bash "$(dirname "$0")/db.sh" add-request-log "$payload" >/dev/null 2>&1) &
+  return 0
+}
+
+# 辅助：裁剪字符串
+_preview() {
+  local s="$1" n="${2:-80}"
+  printf '%s' "${s:0:$n}"
 }
 
 # ── 查找 start-mcp.sh ────────────────────────────────────
@@ -275,28 +306,61 @@ _invoke_tool() {
 mcp_call() {
   local tool_name="$1"
   local tool_args="$2"
+  local args_preview
+  args_preview=$(_preview "$tool_args" 100)
 
   throttle "$tool_name"
-  check_quota "$tool_name"
 
-  local session_id result
+  # 限额检查（不再直接 exit，以便记录日志）
+  if ! check_quota "$tool_name"; then
+    log_request "$tool_name" "quota_block" "" "$args_preview" "daily cap reached" ""
+    exit 3
+  fi
+
+  local session_id result start_ts end_ts latency_ms session_tag status="ok" error_hint=""
   session_id=$(get_session) || {
+    log_request "$tool_name" "mcp_unavailable" "" "$args_preview" "get_session failed" ""
     echo '{"error": "无法获取 MCP Session ID，请确保 MCP 服务正在运行"}' | format_json
     exit 1
   }
+  session_tag="${session_id: -8}"
 
+  start_ts=$(python3 -c "import time; print(int(time.time()*1000))")
   result=$(_invoke_tool "$session_id" "$tool_name" "$tool_args")
+  end_ts=$(python3 -c "import time; print(int(time.time()*1000))")
+  latency_ms=$((end_ts - start_ts))
 
   # Session 失效时刷新一次重试
   if echo "$result" | grep -qiE '"(session[^"]*(invalid|expired|not[ _]found)|invalid[ _]session)"'; then
     echo "[session] 缓存失效，刷新后重试" >&2
+    log_request "$tool_name" "session_refresh" "$latency_ms" "$args_preview" "session invalid, retrying" "$session_tag"
     invalidate_session
     session_id=$(get_session) || {
+      log_request "$tool_name" "mcp_unavailable" "" "$args_preview" "session refresh failed" ""
       echo '{"error": "session 刷新失败"}' | format_json
       exit 1
     }
+    session_tag="${session_id: -8}"
+    start_ts=$(python3 -c "import time; print(int(time.time()*1000))")
     result=$(_invoke_tool "$session_id" "$tool_name" "$tool_args")
+    end_ts=$(python3 -c "import time; print(int(time.time()*1000))")
+    latency_ms=$((end_ts - start_ts))
   fi
+
+  # 根据响应判定 status
+  if echo "$result" | grep -qE '"(error|isError)"[[:space:]]*:[[:space:]]*(true|"[^"]+")'; then
+    status="error"
+    error_hint=$(echo "$result" | python3 -c "
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+    e = d.get('error') or d.get('result', {}).get('content', [{}])[0].get('text', '')
+    print(str(e)[:150])
+except Exception:
+    pass
+" 2>/dev/null)
+  fi
+  log_request "$tool_name" "$status" "$latency_ms" "$args_preview" "$error_hint" "$session_tag"
 
   echo "$result" | format_json
 }
@@ -307,13 +371,19 @@ mcp_call() {
 CMD="$1"
 shift
 
-# quota 子命令不需要启动 MCP
+# quota / log 子命令不需要启动 MCP
 if [ "$CMD" = "quota" ]; then
   if [ -f "$QUOTA_FILE" ]; then
     cat "$QUOTA_FILE" | format_json
   else
     echo '{"date": null, "counts": {}}' | format_json
   fi
+  exit 0
+fi
+
+if [ "$CMD" = "log" ]; then
+  DB_SCRIPT="$(dirname "$0")/db.sh"
+  bash "$DB_SCRIPT" query-request-log "$@" | format_json
   exit 0
 fi
 

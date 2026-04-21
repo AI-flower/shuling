@@ -147,8 +147,24 @@ CREATE TABLE IF NOT EXISTS generated_images (
     gen_status TEXT DEFAULT 'pending',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS request_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    called_at TEXT NOT NULL,
+    tool TEXT NOT NULL,
+    args_preview TEXT,
+    status TEXT NOT NULL,
+    latency_ms INTEGER,
+    error_hint TEXT,
+    session_tag TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_request_log_called ON request_log(called_at);
+CREATE INDEX IF NOT EXISTS idx_request_log_tool ON request_log(tool, called_at);
+CREATE INDEX IF NOT EXISTS idx_request_log_status ON request_log(status);
 "
-    echo '{"ok": true, "tables": ["posts","post_metrics","user_choices","topic_candidates","comment_insights","note_diagnosis","generated_images"]}'
+    echo '{"ok": true, "tables": ["posts","post_metrics","user_choices","topic_candidates","comment_insights","note_diagnosis","generated_images","request_log"]}'
 }
 
 cmd_add_post() {
@@ -414,6 +430,72 @@ ORDER BY p.date DESC, p.id DESC;
 "
 }
 
+
+cmd_add_request_log() {
+    local json="$1"
+    [ -z "$json" ] && { echo '{"error": "missing JSON argument"}' >&2; exit 1; }
+
+    local tool status latency_ms args_preview error_hint session_tag called_at
+    tool="$(sql_escape "$(json_val "$json" "tool")")"
+    status="$(sql_escape "$(json_val "$json" "status")")"
+    latency_ms="$(json_val "$json" "latency_ms")"
+    args_preview="$(sql_escape "$(json_val "$json" "args_preview")")"
+    error_hint="$(sql_escape "$(json_val "$json" "error_hint")")"
+    session_tag="$(sql_escape "$(json_val "$json" "session_tag")")"
+    called_at="$(json_val "$json" "called_at")"
+    [ -z "$called_at" ] && called_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    called_at="$(sql_escape "$called_at")"
+
+    sql "
+INSERT INTO request_log (called_at, tool, args_preview, status, latency_ms, error_hint, session_tag)
+VALUES ('$called_at','$tool','$args_preview','$status',${latency_ms:-NULL},'$error_hint','$session_tag');
+" >/dev/null
+    echo '{"ok": true}'
+}
+
+cmd_query_request_log() {
+    local days=1 tool="" status="" limit=100 summary=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --days)    shift; days="${1:-1}"; shift ;;
+            --tool)    shift; tool="${1:-}"; shift ;;
+            --status)  shift; status="${1:-}"; shift ;;
+            --limit)   shift; limit="${1:-100}"; shift ;;
+            --summary) summary=1; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    local where="WHERE called_at >= datetime('now', '-${days} days')"
+    [ -n "$tool" ]   && where="$where AND tool = '$(sql_escape "$tool")'"
+    [ -n "$status" ] && where="$where AND status = '$(sql_escape "$status")'"
+
+    if [ "$summary" = "1" ]; then
+        sql_json "
+SELECT tool,
+       status,
+       COUNT(*) AS n,
+       ROUND(AVG(latency_ms), 0) AS avg_ms,
+       MAX(latency_ms) AS max_ms
+FROM request_log
+$where
+GROUP BY tool, status
+ORDER BY tool, status;
+"
+    else
+        sql_json "
+SELECT id, called_at, tool, status, latency_ms,
+       substr(args_preview, 1, 60) AS args_preview,
+       substr(error_hint, 1, 80)   AS error_hint,
+       session_tag
+FROM request_log
+$where
+ORDER BY id DESC
+LIMIT $limit;
+"
+    fi
+}
+
 # ─── Main dispatch ────────────────────────────────────────────────────
 
 cmd="${1:-}"
@@ -431,6 +513,8 @@ case "$cmd" in
     add-diagnosis)      cmd_add_diagnosis "$@" ;;
     query-diagnosis)    cmd_query_diagnosis "$@" ;;
     query-undiagnosed)  cmd_query_undiagnosed "$@" ;;
+    add-request-log)    cmd_add_request_log "$@" ;;
+    query-request-log)  cmd_query_request_log "$@" ;;
     *)
         echo "Usage: db.sh <command> [args]"
         echo ""
@@ -446,6 +530,8 @@ case "$cmd" in
         echo "  add-diagnosis '<json>'         Insert NoteRx diagnosis result"
         echo "  query-diagnosis --post-id N    Get latest diagnosis for a post"
         echo "  query-undiagnosed [--days N]   List published posts without diagnosis"
+        echo "  add-request-log '<json>'       Record one MCP call (tool, status, latency_ms, ...)"
+        echo "  query-request-log [--days N --tool T --status S --limit N --summary]"
         exit 1
         ;;
 esac
