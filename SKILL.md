@@ -10,8 +10,8 @@ description: |
   - "我想做XX方向的博主"
   - "帮我研究一下小红书上XX话题"
   - "复盘一下最近的帖子"
-version: 2.1.0
-codename: Anti-Ban Shield
+version: 2.1.1
+codename: Anti-Ban Shield (+ Request Log)
 last_updated: 2026-04-21
 ---
 

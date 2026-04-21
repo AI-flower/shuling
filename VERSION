@@ -1,6 +1,6 @@
-version: "2.1.0"
-codename: "Anti-Ban Shield"
-released: "2026-04-21"
+version: "2.1.1"
+codename: "Anti-Ban Shield"  # ← 继承 2.1.0 族系
+released: "2026-04-21"  # 2.1.1 同日小版本
 
 # 版本号语义: BRAIN.HANDS.CALIB
 #   BRAIN: SKILL.md 核心流程重构 / 自进化算法换代 / 业务能力跃迁
@@ -35,6 +35,7 @@ hands:
     - comment_insights
     - note_diagnosis
     - generated_images
+    - request_log
   platforms:
     - hermes
     - claude-code
@@ -51,6 +52,7 @@ hands:
     - screenshot.cjs
 
 calib:
+  observability: "request-log-v1"
   throttle_profile: "v1-conservative"
   quota_profile: "v1-conservative"
   content_rules: "2026-04-17"
