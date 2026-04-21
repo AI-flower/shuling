@@ -48,3 +48,6 @@ __pycache__/
 .Python
 node_modules/
 .npm/
+
+# 带时间戳的备份文件（如 xhs.sh.bak.20260421_023540）
+*.bak.*

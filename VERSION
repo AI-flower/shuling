@@ -1,0 +1,58 @@
+version: "2.1.0"
+codename: "Anti-Ban Shield"
+released: "2026-04-21"
+
+# 版本号语义: BRAIN.HANDS.CALIB
+#   BRAIN: SKILL.md 核心流程重构 / 自进化算法换代 / 业务能力跃迁
+#   HANDS: scripts/ 新增或重写 / DB schema 迁移 / MCP 接口替换
+#   CALIB: 阈值/关键词/节流参数调整 / bugfix / prompt 微调
+
+brain:
+  skill_md_sections: [0a, 0, 1, 2, 3, 4, 5, 6, 7, 8]
+  algorithms:
+    preference_learning: "bayesian-laplace-v1"
+    exploration: "epsilon-greedy-7day"
+    confidence: "concentration-x-sample-factor"
+    drafting: "redink-dual-step-v1"
+    image_gen: "two-stage-cover-reference-v1"
+
+hands:
+  mcp_tools:
+    - search_feeds
+    - get_feed_detail
+    - list_feeds
+    - publish_content
+    - post_comment_to_feed
+    - user_profile
+    - check_login_status
+    - get_login_qrcode
+    - import_cookie
+  db_tables:
+    - posts
+    - post_metrics
+    - user_choices
+    - topic_candidates
+    - comment_insights
+    - note_diagnosis
+    - generated_images
+  platforms:
+    - hermes
+    - claude-code
+    - codex
+  scripts:
+    - xhs.sh
+    - db.sh
+    - fetch-metrics.sh
+    - fetch-comments.sh
+    - fetch-post-data.sh
+    - image.py
+    - noterx-diagnose.sh
+    - preflight.py
+    - screenshot.cjs
+
+calib:
+  throttle_profile: "v1-conservative"
+  quota_profile: "v1-conservative"
+  content_rules: "2026-04-17"
+  emoji_dict_version: "v1"
+  spam_keywords_version: "v1"
