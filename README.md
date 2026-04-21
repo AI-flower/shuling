@@ -5,6 +5,9 @@
 [![Version](https://img.shields.io/badge/version-2.2.0-blue)](VERSION)
 [![Codename](https://img.shields.io/badge/codename-Existing%20Creator%20Support-green)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](#许可)
+[![Website](https://img.shields.io/badge/🌐_website-shuling.pages.dev-f97316)](https://shuling.pages.dev)
+
+🌐 **官网**：[https://shuling.pages.dev](https://shuling.pages.dev)（中英文双语介绍页）
 
 📦 **v2.2.0** · 2026-04-21 · [CHANGELOG](CHANGELOG.md) · [UPGRADE](UPGRADE.md) · [RELEASING](RELEASING.md)
 
@@ -434,6 +437,7 @@ bash scripts/xhs.sh log --tool search_feeds --days 7
 
 | 你想做什么 | 去读 |
 |---|---|
+| 想先看项目介绍页（中英文） | [shuling.pages.dev](https://shuling.pages.dev) |
 | 我是 AI / 想知道整个业务怎么运行 | [SKILL.md](SKILL.md)（必读） |
 | 我是用户 / 每次发版有什么变化 | [CHANGELOG.md](CHANGELOG.md) |
 | 我要从 vX.Y.Z 升级到新版 | [UPGRADE.md](UPGRADE.md) |
