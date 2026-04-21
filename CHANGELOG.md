@@ -15,6 +15,31 @@
 
 ---
 
+## [2.2.1] - 2026-04-21 "Migration Safety Fix"
+
+修复 v2.1.1 migration 在存量 v2.0 升级到 v2.2.x 时阻断的问题。
+
+### 📦 用户可见改动
+
+- 存量 v2.0 部署跑 `bash install.sh` 升级不再被 `no such column: source` 错误挡下
+- 各 migration 职责单一，互不拖累
+
+### ✋ Hands
+
+- `migrations/v2.1.1.sh` 重写：只建 `request_log` 表，**不再调用 `db.sh init`**（原实现会跑到 v2.2.0 的 `CREATE INDEX idx_posts_source`，在 posts 还没 source 字段时炸）
+- 其他 migration 不变
+
+### ⬆️ 如何升级
+
+```bash
+cd /path/to/shuling && git pull
+bash install.sh     # v2.1.1.sh 现在幂等安全
+```
+
+无 breaking。已经成功跑过老版 v2.1.1.sh 的部署无影响（幂等再跑）。
+
+---
+
 ## [2.2.0] - 2026-04-21 "Existing Creator Support"
 
 让已经在运营小红书的老博主无缝接入，用他们自己的历史数据预填画像、挖掘 patterns、bootstrap 偏好——第一条薯灵发帖即达其历史 P50 水平。
