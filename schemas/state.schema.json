@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/state.schema.json",
+  "title": "config/state.json",
+  "description": "薯灵业务里程碑状态。由 scripts/preflight.py 和 SKILL.md 业务流程维护，不要手改。SKILL.md §0a 业务路由会读这个文件决定下一步。",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "setup_completed": {
+      "type": "boolean",
+      "description": "全部前置环境就绪（依赖/MCP/DB/画像）。true 时 §0a 直接进入每日流程。"
+    },
+    "profile_created": {
+      "type": "boolean",
+      "description": "博主画像已建立（profile.json 存在且有效）。true 时 §0a 不再问方向/受众/风格。"
+    },
+    "mcp_configured": {
+      "type": "boolean",
+      "description": "xiaohongshu-mcp 曾检测 ok。true 时 preflight 超时会放宽（按已就绪处理）。"
+    },
+    "cold_start_done": {
+      "type": "boolean",
+      "description": "冷启动播种（竞品分析 + patterns.md 初始化）已完成。true 时不再走冷启动流程。"
+    },
+    "setup_date": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "setup_completed 首次置 true 的日期。"
+    }
+  }
+}

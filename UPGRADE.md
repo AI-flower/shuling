@@ -44,6 +44,49 @@ bash install.sh
 
 ## 逐版本迁移步骤
 
+### → v2.1.3 "Friendly Onboarding"（2026-04-21）
+
+**类型**：HANDS + CALIB（install.sh 重构 + schema 新增 + 文档打磨）
+**Breaking**：无
+
+**新增内容**：
+- `install.sh` 四个新模式：`--check` / `--dry-run` / `--yes` / `--target`
+- `scripts/preflight.py --human`：彩色健康检查
+- `schemas/` 目录：JSON Schema 约束 AI 写入 state/profile/preferences
+- `SKILL.md §0b`：识别平台 + 写入前校验
+- `docs/mcp-setup.md` 重写（一键安装 + cookie 图文 + systemd/launchd）
+- `RELEASING.md` 新增 .bak 清理检查 + `--check`/`--dry-run` 验证步
+
+**升级动作**：
+```bash
+# 从任意 2.x 版本升级（推荐）
+bash install.sh
+# install.sh 会自动识别 v2.1.2 → v2.1.3 并跑 v2.1.3.sh（无实际 DB 操作）
+
+# 或者先预演再执行
+bash install.sh --dry-run           # 列出要做什么
+bash install.sh                     # 确认后真跑
+
+# CI/远程/cron 场景
+SHULING_ASSUME_YES=1 bash install.sh
+```
+
+**如何验证**：
+```bash
+bash install.sh --check                  # 只自检，不改文件
+python3 scripts/preflight.py --human     # 彩色健康检查
+ls schemas/                              # 应看到 3 个 .schema.json
+```
+
+**新增/变化环境变量**：
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `SHULING_ASSUME_YES` | `0` | 设 `1` 等同 `--yes`，所有交互用默认值 |
+| `GEMINI_API_KEY` | 空 | 非交互模式下预填 Gemini Key，避免被 prompt 卡住 |
+| `XHS_MCP_URL` | 空 | 非交互模式下预填 MCP URL |
+
+> `preflight.py` 退出码从 v2.1.3 起分级：`0` 就绪 / `1` 可自动修复 / `2` 需用户配合。如果你的 CI 脚本之前假设 exit=0 就是"没问题"，请复核——以前总是返回 0。
+
 ### → v2.1.2 "Release Polish"（2026-04-21）
 
 **类型**：CALIB + HANDS（install.sh 增强）

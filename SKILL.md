@@ -10,8 +10,8 @@ description: |
   - "我想做XX方向的博主"
   - "帮我研究一下小红书上XX话题"
   - "复盘一下最近的帖子"
-version: 2.1.2
-codename: Release Polish
+version: 2.1.3
+codename: Friendly Onboarding
 last_updated: 2026-04-21
 ---
 
@@ -52,6 +52,49 @@ python3 scripts/preflight.py
 - **不要重复问画像**：如果 `knowledge-base/profile.json` 已存在，直接读取使用；要修改请等用户主动说"更新画像"
 - **不要因为没具体指令就放空**：如果上层调起但没给具体业务指令（例如 cron 触发只给 skill 加载），按上表自行选择下一步业务动作
 - **不要绕回默认路径**：用户主动提议方案（如"我给你 cookie"）时，立即采纳
+
+---
+
+## 0b. 识别运行平台 + 写入前校验 schema
+
+### 识别当前运行平台
+
+你可能被 Hermes / Claude Code / Codex / OpenClaw 中任一平台装载。识别方法（按优先级）：
+
+1. **检查 skill 所在路径**：
+   - 路径含 `~/.hermes/skills/` → Hermes（支持 cron job）
+   - 路径含 `~/.claude/skills/` → Claude Code（支持 `/loop` 定时）
+   - 路径含 `~/.codex/skills/` → Codex
+   - 路径含 `~/.agents/skills/` → OpenClaw / 通用 agents
+2. **检查触发方式**：
+   - 无用户具体指令（cron 自动触发）→ 必定是 Hermes cron，走 §0a 自行选业务
+   - 有 `/loop` 上下文 → Claude Code
+3. **兜底**：不确定时按"通用对话"处理，所有命令走 skill 根目录相对路径
+
+**平台相关行为差异**见 `platform/{hermes,claude-code,codex}.md`——只有在需要调用平台特有能力（如 cron 配置、`/loop` 建议）时才参考，业务流程本身在所有平台一致。
+
+### 写入前校验 schema
+
+**每次写入 `config/state.json`、`knowledge-base/profile.json`、`knowledge-base/preferences.json` 之前**，先读对应 JSON Schema，确保字段名、类型、枚举值符合约定：
+
+| 目标文件 | Schema |
+|---|---|
+| `config/state.json` | [`schemas/state.schema.json`](schemas/state.schema.json) |
+| `knowledge-base/profile.json` | [`schemas/profile.schema.json`](schemas/profile.schema.json) |
+| `knowledge-base/preferences.json` | [`schemas/preferences.schema.json`](schemas/preferences.schema.json) |
+
+**关键纪律**：
+- **日期字段一律 `YYYY-MM-DD`**（如 `created_at / updated_at / setup_date`），不要用 `createdAt`、ISO 时间戳或本地化格式
+- **必填字段不得缺**：`profile.json` 必须有 `niche / audience / tone / created_at`；`preferences.json` 必须有 `dimensions / total_choices / confidence_level / updated_at`
+- **`weight` 值范围 `[0.0, 1.0]`**，公式 `(chosen+1)/(chosen+skipped+2)`；越界先回查公式再写
+- **`confidence_level` 不是 weight**，不要误用 `chosen/(chosen+skipped)`（详见 §4.1 严正提示）
+- **`dimension` 只能是 `topic` / `style` / `title_pattern`**，别造新维度；要加维度走 BRAIN 版本号并更新 schema
+
+验证命令（可选，环境有 `jsonschema` 包时）：
+
+```bash
+python3 -m jsonschema -i knowledge-base/profile.json schemas/profile.schema.json
+```
 
 ---
 

@@ -2,11 +2,11 @@
 
 > 小红书博主成长助手 — 帮你选题、写稿、发布、复盘，越用越懂你。
 
-[![Version](https://img.shields.io/badge/version-2.1.2-blue)](VERSION)
-[![Codename](https://img.shields.io/badge/codename-Release%20Polish-green)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.1.3-blue)](VERSION)
+[![Codename](https://img.shields.io/badge/codename-Friendly%20Onboarding-green)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](#许可)
 
-**当前版本**：`v2.1.2 "Release Polish"`（2026-04-21）
+**当前版本**：`v2.1.3 "Friendly Onboarding"`（2026-04-21）
 **完整变更**：[CHANGELOG.md](CHANGELOG.md) ｜ **升级指南**：[UPGRADE.md](UPGRADE.md) ｜ **发版流程**：[RELEASING.md](RELEASING.md)
 
 ---
@@ -67,13 +67,25 @@ bash install.sh
 cd /path/to/shuling
 git fetch --tags origin
 git checkout main && git pull
-bash install.sh   # v2.1.2+ 自动识别已部署版本、按需运行 migration
+bash install.sh              # v2.1.2+ 自动识别已部署版本、按需运行 migration
 ```
 
 `install.sh` 升级模式会：
 1. 对比每个部署目录的 `VERSION` 与源版本
 2. 按需运行 `migrations/vX.Y.Z.sh`（幂等）
 3. 保留你的私人数据（`.env` / `config/runtime.env` / `data/*.db` / `knowledge-base/*`）
+
+### v2.1.3 新增的非交互模式
+
+```bash
+bash install.sh --check                             # 只自检：依赖 + 平台 + 版本对比，不写文件
+bash install.sh --dry-run                           # 预演：列出将要执行的全部动作，不真跑
+bash install.sh --yes                               # 跳过所有交互，用默认值（cron/CI）
+bash install.sh --target ~/.myagents/skills/shuling # 显式指定部署目标（可重复）
+SHULING_ASSUME_YES=1 GEMINI_API_KEY=xxx bash install.sh  # 远程/自动化一键部署
+
+python3 scripts/preflight.py --human                # 人类可读的彩色健康检查
+```
 
 逐版本升级注意事项 → [UPGRADE.md](UPGRADE.md)
 
