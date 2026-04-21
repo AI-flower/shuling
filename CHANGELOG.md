@@ -15,6 +15,74 @@
 
 ---
 
+## [2.3.0] - 2026-04-21 "Pure Image Pipeline"
+
+图像生成管线的一次收紧：去掉 HTML 截图降级路径，强制走 Gemini AI 生图；引入结构化 prompt 模板系统 + 封面回流参考图 + 极简 fallback。
+
+### 📦 用户可见改动
+
+- **Gemini API Key 现在是必需**，没有就无法生图，也就无法发帖（install.sh 会强制问）
+- **HTML 截图降级路径完全移除**：不再有 'templates/post.html + Playwright screenshot' 的兜底，Gemini 出错就硬停、提示重试
+- **新增 prompt 模板系统**：'prompts/image_prompt.txt'（完整版）+ 'prompts/image_prompt_short.txt'（API 上下文受限时的极简版），由 image.py 自动渲染
+- **封面回流参考**：'image.py --reference <cover>' 把第一张封面作为参考图回注每一张内容页，大幅提升风格统一性（Nano Banana Pro multimodal 能力）
+- **老的 xhs-content-generator 子 skill 撤销**（单独用 HTML 模板出图的能力已被主 skill 消化）
+
+### 🧠 Brain
+
+- 'SKILL.md §0' 第 2 步：图片生成 API 由 '可选' → '必需'，措辞替换为'硬停'语义
+- 'SKILL.md §2.3' 图片生成流程重写：只保留 AI 生图一条路径，明确两阶段封面参考 + --short fallback
+- 'SKILL.md §8' 异常处理矩阵：'Gemini 不可用 → HTML 截图降级' 改为 '硬停并提示用户配置 Key'
+- 'generated_images' 表的 'prompt' 字段改为存 'page_content' 短语义，不存整段渲染后 prompt（节省空间 + 便于 pattern 学习）
+
+### ✋ Hands
+
+- 'scripts/image.py' 重写 (~240 行 diff):
+  - 'render_prompt(page_type, page_content, full_outline, user_topic, short)' 模板渲染器
+  - '_gen_gemini_native()' 独立 gemini-native protocol 分支
+  - '_load_reference_image()' 支持 '--reference' 参考图回注
+  - '--short' flag 切到极简 prompt 模板
+  - CLI 新增 '--topic' / '--outline-file' / 多个 '--reference'
+- **删除文件**:
+  - 'scripts/screenshot.cjs' (HTML 截图降级脚本)
+  - 'templates/post.html' (448 行 HTML 模板)
+  - 'skills/xhs-content-generator/' 整个子 skill 目录
+- 'scripts/preflight.py' 调整：图片 API 从 'optional' → 'required'
+- 'install.sh' 调整：不配 Gemini Key 会报更强的警告
+- 'config/runtime.env.example' 更新变量说明
+
+### 🌐 Landing page
+
+- 'landing/index.html' 版本号全部动态化（读 GitHub Releases API）：
+  - 所有 'v2.X.Y'（当前版本）/ codename / 发布日期硬编码处加 'data-ver' 属性
+  - 顶部加载一段 ~15 行 JS，fetch /releases/latest 后覆盖
+  - 硬编码值作 fallback（API 失败不破坏页面）
+  - 发版后 Landing page **自动同步**，不再需要手动改
+
+### 🎛 Calib
+
+- 'docs/capability-overview.md' / 'shuling-full-spec.md' / 'platform/hermes.md' 同步删除 HTML 截图相关段落
+
+### ⬆️ 如何升级
+
+```bash
+cd /path/to/shuling && git pull
+bash install.sh     # 会强制问你要 Gemini API Key（老安装如已有 Key 不会重问）
+```
+
+**有 breaking**：存量部署之前靠 HTML 截图兜底的，升级后必须配 Gemini Key 才能继续发帖。建议先：
+
+```bash
+python3 scripts/image.py --check
+```
+
+返回 0 才能跑 v2.3.0 日常流程。
+
+### 🔀 路线图调整
+
+原 v2.3.0 规划主题 'Human Rhythm（行为节奏模拟）' 顺延到 v2.4.0+。本版本主题改为图像管线收紧。
+
+---
+
 ## [2.2.1] - 2026-04-21 "Migration Safety Fix"
 
 修复 v2.1.1 migration 在存量 v2.0 升级到 v2.2.x 时阻断的问题。

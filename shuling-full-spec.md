@@ -37,8 +37,8 @@
 │              新流程: 多草稿并行 + 三维验证                 │
 │              旧流程: 单次生成 + 兜底模板                   │
 │                                                          │
-│  图片生成     三策略: AI (OpenAI API) / HTML截图           │
-│              (Playwright) / auto (AI优先+截图降级)        │
+│  图片生成     Gemini 3 Pro Image (中文模板，两阶段参考图)  │
+│              无降级，Key 未配置直接硬停                    │
 │                                                          │
 │  数据存储     SQLite (WAL模式) 9张表                      │
 │                                                          │
@@ -220,7 +220,6 @@
 | 策略 | 方法 | 使用条件 |
 |------|------|---------|
 | `ai` | OpenAI 兼容 API（默认 gpt-image-1） | 配置了 `IMAGE_GEN_API_KEY` |
-| `html` | Playwright 截图（screenshot.cjs） | 未配 API Key / 教程类内容 |
 | `auto`（默认） | AI 优先，失败降级截图 | 推荐配置 |
 
 **AI 图片生成细节：**
@@ -228,10 +227,6 @@
 - 并行生成 + Semaphore 并发控制
 - 单张图片可单独重新生成（`regenerate_image()`）
 
-**HTML 截图细节：**
-- 调用 `screenshot.cjs`（Playwright Chromium）
-- viewport 1080 × 10000，逐个 `.page` 元素截图
-- 输出 page-1.png ~ page-N.png（1080×1440 px）
 
 **图片来源策略推荐：** `recommend_image_strategy()` 根据内容类型自动判断（教程类 → html，其他 → ai）
 
@@ -256,8 +251,6 @@ orchestrator.py 降级逻辑（每个环节独立降级）：
 验证评分失败 ──→ build_fallback_validation() 按生成顺序排列，无评分
 Telegram 不可用 ──→ 自动选择 #1，跳过交互
 telegram_listener 导入失败 ──→ 自动选择 #1
-AI 图片失败 ──→ fallback_html_images() HTML 截图
-图片全部失败 ──→ HTML 截图兜底
 Telegram 审图不可用 ──→ 自动确认
 ```
 
@@ -272,7 +265,7 @@ Telegram 审图不可用 ──→ 自动确认
 2. 构建完整 Claude prompt（项目信息 + README 摘要 + 写作角度 + 合规规则 + HTML 技术要求）
 3. Claude CLI 生成 HTML（超时 180 秒）
 4. 失败时调用 `generate_html_fallback()` — 硬编码 5 页彩色卡片风格模板（封面/发现/适合谁/怎么开始/总结）
-5. Playwright 截图 → page-*.png
+5. Gemini 返回 PNG base64 → 直接落盘到 page-*.png
 6. 从 HTML 提取标题（`<h1>` 标签）
 7. 生成 meta.json（标题 ≤20 字 / 正文 ≤1000 字 / 标签 5-8 个 / schedule_at 自动计算）
 8. 防重检查 `slot_already_exists()` → 写入 `posts` 表
@@ -591,27 +584,6 @@ keyword_tracking ─── 关键词竞争度缓存
 
 ---
 
-## 九、独立 Skill — 内容图生成器
-
-`skills/xhs-content-generator/` — 可独立使用的小红书内容图生成器
-
-**触发词：** 小红书内容图 / xhs 内容 / 生成小红书图文
-
-**执行流程：**
-1. WebSearch 搜索主题资料（中文 + 英文）
-2. 规划 N 页内容结构（封面 + 概念 + 核心内容 + 总结 CTA）
-3. 生成 HTML（13 种 CSS 组件 class）
-4. Playwright 截图 → PNG
-
-**三种风格：**
-
-| 风格 | 背景 | 主色 | 装饰 |
-|------|------|------|------|
-| warm（暖橙卡通，默认） | #FFFBF5 / 暖橙渐变 | #FF6348 | emoji + blob + 星星 |
-| dark（深色科技） | #0f0c29 → #302b63 | 金色渐变 | 光晕 + 网格线 |
-| minimal（简约白） | #FFFFFF | #333333 | 极简线条 |
-
----
 
 ## 十、XHS-Downloader 辅助工具链
 
@@ -686,10 +658,7 @@ shuling/
 ├── install.sh                          # 一键安装脚本
 │
 ├── skills/
-│   ├── xhs-content-generator/          # 独立内容图生成 Skill
-│   │   ├── SKILL.md
-│   │   └── scripts/screenshot.cjs      # Playwright 截图脚本
-│   │
+
 │   └── xiaohongshu/                    # 小红书 MCP Skill
 │       ├── SKILL.md
 │       ├── README.md / README_CN.md
@@ -742,7 +711,7 @@ shuling/
     └── examples/                       # 示例数据
         ├── candidates-2026-04-14.json
         └── posts/
-            ├── 2026-04-14-post1/       # 含 meta.json + post.html + page-*.png
+            ├── 2026-04-14-post1/       # 含 meta.json + page-*.png（Gemini 直接生图，无 HTML 中间产物）
             └── 2026-04-14-post2/
 ```
 

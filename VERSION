@@ -1,5 +1,5 @@
-version: "2.2.1"
-codename: "Migration Safety Fix"
+version: "2.3.0"
+codename: "Pure Image Pipeline"
 released: "2026-04-21"
 
 # ─── 版本号语义: BRAIN.HANDS.CALIB ──────────────────────────────────

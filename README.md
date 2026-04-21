@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](#许可)
 [![Website](https://img.shields.io/badge/🌐_website-shuling.pages.dev-f97316)](https://shuling.pages.dev)
 
-🌐 **官网**：[https://shuling.pages.dev](https://shuling.pages.dev)（中英文双语介绍页）
+🌐 **官网**：[https://shuling.pages.dev](https://shuling.pages.dev)（中英文双语介绍页，源码同步在 `landing/index.html`，可直接双击本地预览）
 
 📦 **v2.2.0** · 2026-04-21 · [CHANGELOG](CHANGELOG.md) · [UPGRADE](UPGRADE.md) · [RELEASING](RELEASING.md)
 
@@ -82,7 +82,7 @@
 | 2 | **老博主接入**（v2.2.0） | "已在运营" / `--mode=existing-creator` | 历史导入 + 画像反推 + patterns 种子 + 体检报告 |
 | 3 | **选题研究** | "今天发什么" / cron 午间 | 带偏好加权的候选话题 |
 | 4 | **内容创作**（RedInk 双阶段） | "帮我写一条" / cron 午/晚间 | 6-9 页大纲 + 正文（≤1000 字）+ 5-8 标签 |
-| 5 | **图片生成**（两阶段封面参考） | 起稿后 | 封面 + 内容页图（Gemini → OpenAI → HTML 三路降级） |
+| 5 | **图片生成**（两阶段封面参考） | 起稿后 | 封面 + 内容页图（Gemini 强制、中文模板） |
 | 6 | **发布** | 起稿完成 | 小红书已发帖 + 本地 `posts` 记录 |
 | 7 | **每日复盘 + 周回顾** | 夜间 cron / 周日加餐 | 日/周报 + patterns/anti-patterns 进化 + NoteRx 五维诊断 |
 
@@ -128,8 +128,8 @@
 |---|---|---|
 | **AI 助手** | 大脑，读 SKILL.md 驱动流程 | [hermes](https://github.com/anthropics/hermes) / [Claude Code](https://claude.com/claude-code) / [Codex](https://github.com/openai/codex) / OpenClaw 任选 |
 | **xiaohongshu-mcp** | 小红书 MCP（搜索/详情/发布/评论/登录） | [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)；详见 [docs/mcp-setup.md](docs/mcp-setup.md) |
-| **Node / Python 3 / sqlite3 / Playwright / jq** | 截图 / DB / 生图 / JSON | macOS: `brew install node sqlite jq`；Linux: `apt install nodejs sqlite3 jq`；`npx playwright install chromium` |
-| **图片生成 API**（可选） | AI 生图（不配走 HTML 截图） | Gemini Key（推荐，有免费额度）/ OpenAI Key |
+| **Python 3 / sqlite3 / jq** | DB / 生图 / JSON | macOS: `brew install sqlite jq`；Linux: `apt install sqlite3 jq` |
+| **Gemini 图片 API**（**必需**） | AI 生图（唯一路径） | Gemini Key（https://aistudio.google.com/app/apikey） |
 | **NoteRx API**（可选） | 五维诊断 | 配 `NOTERX_API_KEY` 才启用 |
 
 > ❌ **不在本 skill 范围**：Telegram / 微信等 IM 通讯凭证——由 hermes-agent 或你的 AI 平台管理。
@@ -340,7 +340,6 @@ shuling/
 │   ├── db.sh                             # SQLite CRUD（8 表）
 │   ├── xhs.sh                            # 小红书 MCP 统一入口（9 工具 + 节流 + 限额 + 日志）
 │   ├── image.py                          # Gemini / OpenAI 生图
-│   ├── screenshot.cjs                    # HTML 模板截图（Playwright 降级）
 │   ├── fetch-post-data.sh                # 合并拉 metrics + comments（v2.1.0+）
 │   ├── fetch-metrics.sh / fetch-comments.sh  # 旧（v2.1.0 前）
 │   ├── noterx-diagnose.sh                # NoteRx 五维诊断
@@ -371,9 +370,6 @@ shuling/
 │   ├── xhs.db                            # SQLite（8 张表，运行时生成）
 │   └── content-rules.md                  # 内容规则与平台限制
 │
-├── templates/
-│   └── post.html                         # 小红书风格 HTML 模板（截图降级路径）
-│
 ├── docs/
 │   ├── mcp-setup.md                      # xiaohongshu-mcp 完整安装指南（含 cookie 图文）
 │   └── features/
@@ -402,7 +398,7 @@ shuling/
 | `XHS_MCP_URL` | 空 | 预填 MCP URL（避免 prompt 卡住） |
 | `GEMINI_API_KEY` | 空 | Gemini 生图 Key（推荐） |
 | `IMAGE_GEN_MODEL` | `gemini-3-pro-image-preview` | 图像模型（Nano Banana Pro，中文渲染更稳） |
-| `IMAGE_GEN_PROVIDER` | `gemini` | 设 `openai` 走 OpenAI；未配置则降级 HTML 截图 |
+| `IMAGE_GEN_PROTOCOL` | `gemini-native` | 也可设 `openai-chat`（走兼容代理）；不配置无 HTML 降级 |
 | `NOTERX_API_KEY` | 空 | NoteRx 五维诊断 Key（不配则跳过 §3 诊断步骤） |
 
 ### 节流与限额（profile `v1-conservative`，v2.1.0+）

@@ -22,10 +22,9 @@ cp -r "$SKILL_SRC/templates" "$HERMES_SKILL_DIR/"
 
 需要复制的内容：
 - `SKILL.md` — Agent 执行的主剧本
-- `scripts/` — 数据库操作 (db.sh)、MCP 调用 (xhs.sh)、图片生成 (image.py)、截图 (screenshot.cjs)
+- `scripts/` — 数据库操作 (db.sh)、MCP 调用 (xhs.sh)、图片生成 (image.py)
 - `data/` — SQLite 数据库与内容规则
 - `knowledge-base/` — 博主画像与偏好数据（首次运行会自动生成）
-- `templates/` — HTML 截图模板
 
 ### 2. 初始化数据库
 
@@ -114,7 +113,7 @@ env:
 
 ### Q: 图片生成失败？
 
-检查 Gemini API Key 是否已配置。如果未配置或额度耗尽，系统会自动降级为 HTML 截图模式（使用 `templates/post.html` 模板 + Playwright 截图）。
+检查 Gemini API Key 是否已配置。未配置时硬停并提示用户补配（薯灵已移除 HTML 截图降级路径）。
 
 ### Q: MCP 连接超时？
 

@@ -174,13 +174,6 @@ printf "\n${BOLD}=== 检查依赖 ===${RESET}\n\n"
 
 MISSING=0
 
-if command -v node >/dev/null 2>&1; then
-    info "Node.js $(node -v)"
-else
-    fail "Node.js 未安装（截图功能需要）"
-    MISSING=1
-fi
-
 if command -v python3 >/dev/null 2>&1; then
     info "Python $(python3 --version 2>&1 | awk '{print $2}')"
 else
@@ -330,7 +323,9 @@ else
         run "写入 GEMINI_API_KEY" bash -c "echo 'GEMINI_API_KEY=$gemini_key' >> '$ENV_FILE'"
         info "Gemini API Key 已保存到 .env"
     else
-        warn "未配置 Gemini Key，将使用 HTML 截图模式生成图片"
+        fail "未配置 Gemini Key —— 薯灵强制使用 Gemini 生图，没有 Key 将无法发帖"
+        info "获取 Key: https://aistudio.google.com/app/apikey"
+        info "之后可重跑 install 或运行: python3 scripts/image.py --set-key <KEY>"
     fi
 fi
 

@@ -10,8 +10,8 @@ description: |
   - "我想做XX方向的博主"
   - "帮我研究一下小红书上XX话题"
   - "复盘一下最近的帖子"
-version: 2.2.1
-codename: Migration Safety Fix
+version: 2.3.0
+codename: Pure Image Pipeline
 last_updated: 2026-04-21
 ---
 
@@ -247,10 +247,12 @@ python3 scripts/preflight.py
      - **用户主动提议方案优先**：用户说"我给你 cookie"/"我直接粘贴"/"帮我用 cookie 登录"等任何变体 → **立即接受**，让用户从浏览器复制完整 `Cookie` 头字符串，调用 `bash scripts/xhs.sh import-cookie '<cookie字符串>'`。**不要绕回扫码、不要继续解释扫码流程**
      - 默认扫码：执行 `bash scripts/xhs.sh login` 获取二维码链接，返回给上层让用户扫码
 
-2. **图片生成 API**（可选——不配也能用，走 HTML 截图降级）
-   - 问用户："图片可以用 AI 生成（更好看），也可以用 HTML 模板截图（免费）。要配置 AI 图片吗？"
-   - 如果要：问 API Key、服务商（openai/gemini），写入 `config/runtime.env`
-   - 如果不要：跳过，告诉用户后续想开可以再配
+2. **图片生成 API**（**必需** —— 强制 Gemini，无降级路径）
+   - 薯灵已移除 HTML 截图降级。没有 Gemini API Key 就无法生图，也就无法发帖
+   - 问用户："薯灵需要 Gemini 图片 API（免费额度 / 有 Nano Banana Pro 模型）。请提供你的 API Key。"
+   - 获取地址：https://aistudio.google.com/app/apikey
+   - 拿到 Key 写入：`python3 scripts/image.py --set-key <KEY>`
+   - **用户拒绝提供 Key 时**：明确告知这是强依赖，安装流程停在这一步，不进入 §1 建画像
 
 > **不要在 0 节问 Telegram / IM 通讯凭证**——通讯渠道由 hermes-agent 自己配置，不属于 skill 业务范围。
 
@@ -642,71 +644,89 @@ scripts/db.sh log-choice '{"choice_type":"draft","offered_count":2,"chosen_index
 
 用户确认草稿后，生成配图。
 
+> **核心范式（向 RedInk 5.2k⭐ 学的）**：中文 prompt 模板 + "小红书"锚词 + 两阶段参考图。**不翻译成英文**、**不禁止 AI 画文字**、**每张图都带完整大纲**。这三条是让生图"像小红书"的根因。
+
 **步骤**：
 
-1. **读图片 pattern 库 + 品牌风格**
+1. **准备工作区 + 整篇大纲落盘**
+
+   生图模板需要"整篇大纲原文"作为上下文，所以先把 2.2 节生成的大纲写到文件里：
+   ```bash
+   mkdir -p /tmp/xhs-post
+   # 把 2.2 节最终确认的大纲原文（含所有 <page> 分隔 + 配图建议行）写进去
+   cat > /tmp/xhs-post/outline.txt <<'OUTLINE_EOF'
+   <整篇大纲原文粘贴到这里>
+   OUTLINE_EOF
+   ```
+
+2. **读图片 pattern 库（可选增益）**
    ```bash
    cat knowledge-base/image-patterns.md 2>/dev/null  # 没有就跳过
    ```
-   - 选当前博主领域适用、`confidence ≥ medium` 的 pattern 作为本帖图片基线
-   - 如 `config/runtime.env` 配了 `IMAGE_BRAND_STYLE`，把它作为所有 prompt 的统一前缀
-   - 如果 image-patterns.md 不存在或全是 experimental，按本节后面的"prompt 通用要求"现编
-
-2. **规划图片内容**：根据草稿规划 5-6 张图
-   - 第 1 张：封面（标题 + 核心视觉元素，抓眼球）
-   - 第 2-5 张：内容页（每页对应正文的一个段落/知识点）
-   - 最后 1 张：CTA 收尾页（收藏/关注引导）
+   - 如有 `confidence ≥ medium` 的 pattern → 把 pattern 描述**追加到该页 `--page-content` 末尾**（不是替换 prompt，是作为补充视觉线索）
+   - 没有就跳过——模板里的"小红书爆款图文风格"锚词已经足够
 
 3. **检查图片生成能力**
    ```bash
    python3 scripts/image.py --check
    ```
-   - 返回 0 → 走 Gemini AI 生图
-   - 返回非 0 → 走 HTML 截图降级（不向用户要 Key，不阻塞流程）
+   - 返回 0 → 走 AI 生图（下面的第 4 步）
+   - 返回 2 → **硬停**。告诉用户："Gemini API Key 未配置，薯灵强制使用 Gemini 生图，请先配置 Key 才能继续"，不要尝试降级任何 HTML 截图路径
 
-4. **AI 生图路径**（gemini-native 或 openai-chat 协议，由 IMAGE_GEN_PROTOCOL 决定）
-   
-   **关键：必须分两阶段——先生封面，再带封面作 `--reference` 生其余各页。** 这是让多页风格统一的核心招式（向 RedInk 5.2k star 项目学的：Nano Banana Pro 支持 multimodal 输入，看到参考图后会自动锁定色调/字体/构图）。
+4. **AI 生图路径**（中文模板驱动，两阶段生成）
+
+   **强制使用结构化 CLI**（加载 `prompts/image_prompt.txt`，自动注入 4 变量）：
 
    ```bash
-   # 阶段 a：先单独生成封面（无参考图）
-   python3 scripts/image.py "封面：暖色调插画风格，展示XX主题的核心概念" /tmp/xhs-post/page-1.png
+   # 阶段 a：封面（无参考图）
+   python3 scripts/image.py \
+       --page-type "封面" \
+       --page-content "$(extract_page_content_from_outline 1)" \
+       --outline-file /tmp/xhs-post/outline.txt \
+       --topic "<用户原始主题原文>" \
+       --output /tmp/xhs-post/page-1.png
 
-   # 阶段 b：每张内容页都带封面作参考图
-   python3 scripts/image.py "内容页：信息图风格，展示3个要点" /tmp/xhs-post/page-2.png \
+   # 阶段 b：每张内容页带封面作参考图
+   python3 scripts/image.py \
+       --page-type "内容" \
+       --page-content "$(extract_page_content_from_outline 2)" \
+       --outline-file /tmp/xhs-post/outline.txt \
+       --topic "<用户原始主题原文>" \
+       --output /tmp/xhs-post/page-2.png \
        --reference /tmp/xhs-post/page-1.png
-   python3 scripts/image.py "内容页：第二个要点的展示" /tmp/xhs-post/page-3.png \
+
+   # 总结页
+   python3 scripts/image.py \
+       --page-type "总结" \
+       --page-content "<总结页大纲原文>" \
+       --outline-file /tmp/xhs-post/outline.txt \
+       --topic "<用户原始主题原文>" \
+       --output /tmp/xhs-post/page-N.png \
        --reference /tmp/xhs-post/page-1.png
-   # ... 后续每页都 --reference page-1.png
    ```
 
-   **推荐 model**：`gemini-3-pro-image-preview`（Nano Banana Pro，中文文字渲染最准 + 支持 multimodal）。在 `config/runtime.env` 配 `IMAGE_GEN_MODEL=gemini-3-pro-image-preview`。上一代的 `gemini-2.5-flash-image` 文字常乱码，不推荐用于含中文的封面。
-   
-   图片 prompt 要求：
-   - 英文，30-60 词
-   - **如果第 1 步读到了适用 pattern**：用 pattern 的 template 作为基础，再注入本帖具体内容（如"5 个 AI 工具"），不要凭空发挥
-   - **如果配了 IMAGE_BRAND_STYLE**：把它拼在 prompt 最前面，确保多帖之间风格一致
-   - 封面突出 eye-catching、vibrant
-   - 内容页与该页具体知识点相关
-   - 所有图片保持统一风格
-   - 描述画面内容，不要包含文字（文字由 HTML 截图补充）
+   **参数硬规则**：
+   - `--page-type` **只能是** `封面` / `内容` / `总结` 三选一（模板按这三型激活不同子约束）
+   - `--page-content` = 2.2 节大纲里该页的**完整原文**（包括 `配图建议：xxx` 那一行，一起喂进去）
+   - `--outline-file` = **必传**。让模型看到全篇上下文，自动协调跨页视觉
+   - `--topic` = 用户原始输入，给模型定方向
+   - 非封面页**必须** `--reference <封面路径>`，这是多页风格统一的核心
 
-   **记录**：每张图生成后，到 SKILL.md 第 2.4 节发布之前的某一步，把 prompt + image_path 写到 `generated_images` 表（这是图片自进化的数据基础）：
+   **提示词理念**（跟 RedInk 对齐，**不要违反**）：
+   - **禁止自己写英文 prompt**——模板已经是中文的 77 行完整约束
+   - **禁止说"不要包含文字"**——Gemini 3 Pro 的中文字形渲染已过关，强制"文字必须完整呈现"反而更像小红书
+   - **禁止用 `IMAGE_BRAND_STYLE` 拼前缀**——模板里"小红书爆款图文风格"这个锚词就是品牌风格的最高表达
+   - **推荐模型**：`gemini-3-pro-image-preview`（Nano Banana Pro，中文文字 + multimodal 参考图都最准）
+
+   **极短 prompt 兜底**（仅当 API 上下文受限）：加 `--short` 切到 `prompts/image_prompt_short.txt`（6 行极简版）。
+
+   **记录**：每张图生成后，写到 `generated_images` 表（自进化的数据基础）：
    ```bash
-   sqlite3 data/xhs.db "INSERT INTO generated_images (post_id, image_index, prompt, image_path, gen_model, gen_strategy, gen_status) VALUES (<post_id>, <0/1/2...>, '<完整 prompt>', '<绝对路径>', '<model 名>', 'ai', 'success');"
+   sqlite3 data/xhs.db "INSERT INTO generated_images (post_id, image_index, prompt, image_path, gen_model, gen_strategy, gen_status) VALUES (<post_id>, <0/1/2...>, '<该页 page_content 原文，不用存整个渲染后 prompt>', '<绝对路径>', '<model 名>', 'ai', 'success');"
    ```
-   `<post_id>` 从 add-post 返回。如果 post 还没插入（图片在前），可以先用临时占位，发布完成后批量 UPDATE 关联。
+   存 `page_content`（短）而不是整个渲染后 prompt（长且重复），既节省空间又便于 pattern 学习。
 
-5. **HTML 截图降级路径**
-
-   当 Gemini 不可用时：
-   a) 生成包含草稿内容的 HTML 文件（使用 `templates/post.html` 的结构，每页 1080x1440px，包含 `.page` class）
-   b) 调用截图：
-   ```bash
-   NODE_PATH="$(npm root -g)" node scripts/screenshot.cjs /tmp/xhs-post/post.html /tmp/xhs-post/
-   ```
-
-6. **组装 meta.json**
+5. **组装 meta.json**
 
    将草稿内容和图片路径组装为发布数据：
    ```json
@@ -1087,13 +1107,6 @@ python3 scripts/image.py "图片描述prompt" /output.png    # 生成图片
 
 环境变量：`IMAGE_GEN_API_KEY`、`IMAGE_GEN_MODEL`（默认 gemini-2.0-flash-preview-image-generation）
 
-### scripts/screenshot.cjs — HTML 截图
-
-```bash
-NODE_PATH="$(npm root -g)" node scripts/screenshot.cjs <html文件> <输出目录>
-```
-
-按 `.page` class 逐页截图，输出 page-1.png, page-2.png...
 
 ### scripts/db.sh — 数据库操作
 
@@ -1182,7 +1195,7 @@ scripts/noterx-diagnose.sh --test
 |------|---------|
 | MCP 未运行 | `xhs.sh` 自动尝试启动，失败则提示用户 |
 | 登录过期 | `xhs.sh login` 获取二维码 → 返回给上层让用户扫码；若用户主动给 cookie，用 `xhs.sh import-cookie` |
-| Gemini 不可用 | 降级 HTML 截图，不阻塞流程，不反复向用户要 Key |
+| Gemini 不可用 | 硬停并提示用户配置 Key（已不再提供 HTML 截图降级） |
 | 用户长时间不回复 | 超时后自动选择评分最高的（超时时间由平台层配置） |
 | 知识库文件损坏/不存在 | 用默认值继续，不阻塞创作 |
 | 发布失败 | 返回失败原因，保留 meta.json 供重试 |
