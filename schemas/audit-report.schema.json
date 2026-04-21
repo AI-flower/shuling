@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/audit-report.schema.json",
+  "title": "knowledge-base/audit-<YYYY-MM-DD>.json",
+  "description": "账号体检报告输出结构（v2.2.0+）。scripts/audit-report.sh 生成；AI 读入做归因分析后将 ai_narrative 填入并追加到配套 .md 文件。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["meta", "account_snapshot", "traffic_trend", "top_posts", "bottom_posts", "topic_distribution", "title_pattern_performance", "comment_backlog", "risk_signals", "ai_narrative"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["generated_at", "window_days", "scope", "schema_version"],
+      "properties": {
+        "generated_at":   { "type": "string", "format": "date-time" },
+        "window_days":    { "type": "integer", "minimum": 1 },
+        "scope":          { "type": "string", "enum": ["imported", "imported+shuling"] },
+        "schema_version": { "type": "string", "const": "audit-report-v1" }
+      }
+    },
+    "account_snapshot": {
+      "description": "historical_stats 最新行；老博主接入后必有，否则为空对象。",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "snapshotted_at":       { "type": "string" },
+        "followers":            { "type": ["integer", "null"] },
+        "total_likes":          { "type": ["integer", "null"] },
+        "total_posts":          { "type": ["integer", "null"] },
+        "imported_posts_count": { "type": ["integer", "null"] },
+        "earliest_post_at":     { "type": ["string", "null"] },
+        "latest_post_at":       { "type": ["string", "null"] }
+      }
+    },
+    "traffic_trend": {
+      "type": "array",
+      "description": "按天聚合的发布量与平均收藏率，用于画 90 天趋势图。",
+      "items": {
+        "type": "object",
+        "required": ["day", "posts_count", "avg_save_rate"],
+        "properties": {
+          "day":           { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+          "posts_count":   { "type": "integer", "minimum": 0 },
+          "avg_save_rate": { "type": ["number", "null"] },
+          "total_likes":   { "type": ["integer", "null"] },
+          "total_saves":   { "type": ["integer", "null"] }
+        }
+      }
+    },
+    "top_posts":    { "$ref": "#/$defs/PostList" },
+    "bottom_posts": { "$ref": "#/$defs/PostList" },
+    "topic_distribution": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["topic_type", "posts_count"],
+        "properties": {
+          "topic_type":    { "type": "string" },
+          "posts_count":   { "type": "integer", "minimum": 0 },
+          "avg_save_rate": { "type": ["number", "null"] }
+        }
+      }
+    },
+    "title_pattern_performance": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title_pattern", "posts_count"],
+        "properties": {
+          "title_pattern": { "type": "string" },
+          "posts_count":   { "type": "integer", "minimum": 0 },
+          "avg_save_rate": { "type": ["number", "null"] },
+          "max_save_rate": { "type": ["number", "null"] }
+        }
+      }
+    },
+    "comment_backlog": {
+      "type": "array",
+      "description": "AI 已分析过的评论洞察；重点看 content_requests（用户明确的内容需求），用于指导下条帖选题。",
+      "items": {
+        "type": "object",
+        "properties": {
+          "post_id":          { "type": "integer" },
+          "title":            { "type": "string" },
+          "content_requests": { "type": ["string", "null"] },
+          "top_questions":    { "type": ["string", "null"] }
+        }
+      }
+    },
+    "risk_signals": {
+      "type": "array",
+      "description": "系统性风险（账号级，需要立刻介入）。AI 不得忽略这些信号。",
+      "items": {
+        "type": "object",
+        "required": ["code", "detail"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": ["insufficient_history", "consecutive_low_performance", "sparse_publishing", "followers_drop", "topic_drift"]
+          },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "extract_patterns": {
+      "description": "仅 --extract-patterns 模式输出。Top 20% 作为 pattern 候选，Bottom 10% 作为 anti-pattern 候选。",
+      "type": "object",
+      "properties": {
+        "pattern_candidates":      { "type": "array", "items": { "$ref": "#/$defs/Post" } },
+        "anti_pattern_candidates": { "type": "array", "items": { "$ref": "#/$defs/Post" } },
+        "note":                    { "type": "string" }
+      }
+    },
+    "ai_narrative": {
+      "description": "AI 读完上述数据后填入的归因分析。包含 top/bottom 成因、本周 3 条行动建议、需观察的信号。写入前需按本子 schema 核对字段。",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["written_at", "top_reasoning", "bottom_reasoning", "action_items", "watch_signals"],
+          "properties": {
+            "written_at":       { "type": "string", "format": "date-time" },
+            "top_reasoning":    { "type": "string", "minLength": 1 },
+            "bottom_reasoning": { "type": "string", "minLength": 1 },
+            "action_items": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 5,
+              "items": {
+                "type": "object",
+                "required": ["priority", "action"],
+                "properties": {
+                  "priority": { "type": "string", "enum": ["high", "medium", "low"] },
+                  "action":   { "type": "string", "minLength": 1 },
+                  "rationale":{ "type": "string" }
+                }
+              }
+            },
+            "watch_signals": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "Post": {
+      "type": "object",
+      "properties": {
+        "id":            { "type": "integer" },
+        "note_id":       { "type": ["string", "null"] },
+        "title":         { "type": "string" },
+        "published_at":  { "type": ["string", "null"] },
+        "topic_type":    { "type": ["string", "null"] },
+        "title_pattern": { "type": ["string", "null"] },
+        "content_style": { "type": ["string", "null"] },
+        "likes":         { "type": ["integer", "null"] },
+        "saves":         { "type": ["integer", "null"] },
+        "comments":      { "type": ["integer", "null"] },
+        "shares":        { "type": ["integer", "null"] },
+        "save_rate":     { "type": ["number", "null"] }
+      }
+    },
+    "PostList": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/Post" }
+    }
+  }
+}

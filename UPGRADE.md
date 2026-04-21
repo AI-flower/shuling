@@ -44,6 +44,62 @@ bash install.sh
 
 ## 逐版本迁移步骤
 
+### → v2.2.0 "Existing Creator Support"（2026-04-21）
+
+**类型**：HANDS + CALIB（新脚本 + DB schema 扩展 + §0c 新分支）
+**Breaking**：无
+
+**新增内容**：
+- `SKILL.md §0c` 已有账号接入模式（AI 5 步流程）
+- `scripts/import-existing.sh` 批量导入历史帖
+- `scripts/audit-report.sh` 账号体检报告
+- `posts.source` 字段 + `historical_stats` 新表
+- `schemas/audit-report.schema.json`
+- `install.sh --mode=existing-creator`
+- `docs/features/existing-creator-onboarding.md` 完整设计文档
+
+**升级动作**：
+
+```bash
+cd /path/to/shuling && git pull
+bash install.sh     # 自动跑 v2.2.0.sh migration（ALTER posts + CREATE historical_stats）
+```
+
+**新能力使用**：
+
+```bash
+# 老博主接入流程（推荐用 install.sh 一次配置）:
+bash install.sh --mode=existing-creator
+
+# 或在 AI 对话里说:
+# "我已经在运营小红书，帮我接入"
+
+# 手动流程:
+bash scripts/import-existing.sh --limit 200            # 批量导入（~30 分钟）
+bash scripts/audit-report.sh --extract-patterns        # 出体检 + patterns 候选
+```
+
+**新增环境变量**：
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `SHULING_CREATOR_MODE` | 空 | 设 `existing` 等同 `--mode=existing`，用于 install.sh 预填 |
+| `SHULING_IMPORT_USER_ID` | 空 | 老博主接入时可显式指定要导入的账号 ID |
+
+**DB schema 变化**（幂等 migration 自动处理）：
+- `posts` 表加 `source TEXT DEFAULT 'shuling'` 列（不影响已有行）
+- 新增 `historical_stats` 表（账号快照纵向趋势）
+- 新增 `idx_posts_source` / `idx_posts_note_id` / `idx_hstats_snapshotted_at` 索引
+
+**兼容性说明**：
+- 老用户（新博主，`creator_mode != 'existing'`）行为**完全不变**
+- §0c 是 additive 扩展，不触发任何老流程的重构
+- `posts.source` 默认 `shuling`，不需要回填老数据
+- 每日复盘默认只看 `source='shuling'`，老博主导入的帖子不会被误判为"今日新发"
+
+**MVP 阶段已知限制**（不影响升级）：
+- `xhs.sh` 尚未暴露 `list-user-feeds` 子命令 → import-existing.sh 真实路径需等小版本补齐；当前可用 `--mock <json>` 完整测试
+- AI 自动分类 imported 帖子靠 SKILL.md 描述驱动，未来版本会加 prompt 模板
+
 ### → v2.1.3 "Friendly Onboarding"（2026-04-21）
 
 **类型**：HANDS + CALIB（install.sh 重构 + schema 新增 + 文档打磨）

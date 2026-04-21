@@ -1,5 +1,5 @@
-version: "2.1.3"
-codename: "Friendly Onboarding"
+version: "2.2.0"
+codename: "Existing Creator Support"
 released: "2026-04-21"
 
 # ─── 版本号语义: BRAIN.HANDS.CALIB ──────────────────────────────────
@@ -11,6 +11,12 @@ released: "2026-04-21"
 # BRAIN: SKILL.md 核心流程重构 / 自进化算法换代 / 业务能力跃迁
 # HANDS: scripts/ 新增或重写 / DB schema 迁移 / MCP 接口替换
 # CALIB: 阈值/关键词/节流参数调整 / bugfix / prompt 微调
+#
+# 版本位决策（本版 v2.2.0）:
+#   - SKILL.md 新增 §0c 分支（老博主接入），为 additive 扩展，**不改变** 原有流程与算法
+#   - 算法层零变化（preference_learning/confidence/drafting/image_gen 保持 v2.1.3）
+#   - 主要是 HANDS 扩展：新脚本 + 新 DB 字段 + 新表 + 新 schema
+#   - 遂定 HANDS +1 → v2.2.0。如果未来对 §0c 做算法化改造（如自动聚类替代 AI 聚类），视为 BRAIN +1
 
 breaking_change_policy:
   brain:
@@ -27,13 +33,14 @@ breaking_change_policy:
     requires_migration: false
 
 brain:
-  skill_md_sections: [0a, 0b, 0, 1, 2, 3, 4, 5, 6, 7, 8]
+  skill_md_sections: [0a, 0b, 0c, 0, 1, 2, 3, 4, 5, 6, 7, 8]
   algorithms:
     preference_learning: "bayesian-laplace-v1"
     exploration: "epsilon-greedy-7day"
     confidence: "concentration-x-sample-factor"
     drafting: "redink-dual-step-v1"
     image_gen: "two-stage-cover-reference-v1"
+    existing_creator_onboarding: "v2.2.0-mvp"      # v2.2.0 新增：AI 驱动的画像反推 + patterns 种子挖掘 + 偏好 bootstrap
 
 hands:
   mcp_tools:
@@ -55,6 +62,11 @@ hands:
     - note_diagnosis
     - generated_images
     - request_log
+    - historical_stats                             # v2.2.0 新增
+  post_sources:                                    # v2.2.0 新增：posts.source 字段
+    - shuling
+    - imported
+    - manual
   platforms:
     - hermes
     - claude-code
@@ -69,13 +81,16 @@ hands:
     - noterx-diagnose.sh
     - preflight.py
     - screenshot.cjs
+    - import-existing.sh                           # v2.2.0 新增
+    - audit-report.sh                              # v2.2.0 新增
   installer:
-    mode: "install + upgrade + check + dry-run"   # v2.1.3 起 install.sh 支持 --check/--dry-run/--yes/--target
+    mode: "install + upgrade + check + dry-run + creator-mode"   # v2.2.0 起 --mode=existing-creator
     migrations_dir: "migrations"
-  schemas:                                         # v2.1.3 新增：AI 写入前自校验
+  schemas:
     - state.schema.json
     - profile.schema.json
     - preferences.schema.json
+    - audit-report.schema.json                     # v2.2.0 新增
 
 calib:
   observability: "request-log-v1"
@@ -85,4 +100,5 @@ calib:
   emoji_dict_version: "v1"
   spam_keywords_version: "v1"
   docs_format: "keep-a-changelog + upgrade-guide + releasing-sop"
-  onboarding_polish: "v2.1.3"                      # mcp-setup 重写 + cookie 图文指引 + preflight --human
+  onboarding_polish: "v2.1.3"
+  existing_creator_feature: "v2.2.0-mvp"           # 本版引入，完整路径见 docs/features/existing-creator-onboarding.md

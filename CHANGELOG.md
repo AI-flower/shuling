@@ -15,6 +15,82 @@
 
 ---
 
+## [2.2.0] - 2026-04-21 "Existing Creator Support"
+
+让已经在运营小红书的老博主无缝接入，用他们自己的历史数据预填画像、挖掘 patterns、bootstrap 偏好——第一条薯灵发帖即达其历史 P50 水平。
+
+### 📦 用户可见改动
+
+- **新增"老博主接入模式"**：
+  - `bash install.sh --mode=existing-creator` 一键进入；或对话里说"我已经在运营小红书"
+  - 系统会拉你最近 200 条历史帖，自动分析出你的领域 / 受众 / 风格
+  - 挖掘出你自己已经验证有效的标题模式与结构，写入 `patterns.md` (confidence=medium)
+  - 产出**账号体检报告** `knowledge-base/audit-<YYYY-MM-DD>.md`：Top5/Bottom5 归因、主题分布、标题模式命中率、评论需求积压、风险信号
+- **新增两条命令行工具**：
+  - `bash scripts/import-existing.sh --limit 200` 批量导入历史（带节流 / 断点续跑 / dry-run / mock）
+  - `bash scripts/audit-report.sh --extract-patterns` 出体检报告 + patterns 候选
+- **install.sh 新增 `--mode <new|existing|ask>`**：装完后问一次是新号还是老号（非交互默认 new）
+
+### 🧠 Brain
+
+- **SKILL.md 新增 §0c "已有账号接入模式"**（additive，不改变原有 §1 新博主流程）
+  - 5 步流程：确认登录 → 批量导入 → 自动分类 → 画像反推 → 出体检报告
+  - 四条关键纪律（不走三问对话 / 不让用户凭空填 / 多方向不擅自合并 / 中断必可续）
+- **§0a 业务路由扩展**：新增 `creator_mode == 'existing'` 分支，路由到 §0c
+- **偏好 bootstrap 协议**：把历史已发视为"隐式选择"，封顶 `total_choices=50` 预留学习空间
+
+### ✋ Hands
+
+- **新增脚本**：
+  - `scripts/import-existing.sh` — 批量导入历史帖，带 `--limit / --batch-size / --dry-run / --resume / --override-quota / --mock`，节流遵守 `v1-conservative` profile
+  - `scripts/audit-report.sh` — 账号体检报告生成器，纯 SQL 统计 + jq 组装 JSON，8 维度
+- **DB schema 扩展**：
+  - `posts` 表新增 `source` 字段（`shuling` / `imported` / `manual`，默认 `shuling`）；新增 `idx_posts_source` 和 `idx_posts_note_id` 索引
+  - 新增 `historical_stats` 表（账号快照纵向趋势）+ `idx_hstats_snapshotted_at` 索引
+  - `posts` 的 `add-post` 现在支持 `source` + `published_at` 字段，对 `source=imported` + `note_id` 做幂等 upsert
+- **db.sh 新增命令**：
+  - `db.sh add-historical-stat '<json>'`
+  - `db.sh query-historical-stats [--limit N]`
+  - `db.sh update-post-meta '<json>'`（给 AI 分类 imported 帖子后回写三维分类）
+  - `db.sh query-posts --source <shuling|imported|manual>` 按来源过滤
+- **新增 schema**：`schemas/audit-report.schema.json`（约束 audit-report.sh 输出 + AI `ai_narrative` 写入契约）
+- **state.schema.json 扩展**：新增 `creator_mode` (new/existing/unset) 和 `existing_import_done` 字段
+- **install.sh 新增 `--mode`**：支持 `new / existing / existing-creator / ask`；通过 `SHULING_CREATOR_MODE` 环境变量预填；写入每个 target 的 `config/state.json`
+- **新增 migration**：`migrations/v2.2.0.sh`（幂等：ALTER posts 加 source + CREATE historical_stats）
+- **设计文档**：`docs/features/existing-creator-onboarding.md`（完整 spec，含用户故事 / 数据模型 / 风险矩阵 / 验收标准）
+
+### 🎛 Calib
+
+- `existing_creator_feature: v2.2.0-mvp` — MVP 阶段：MCP `list_feeds` 的用户 feed 拉取需等 xhs.sh 后续迭代暴露，当前可走 `--mock` 路径完整测试
+- 老博主 imported posts **不纳入每日复盘**（`§3` 默认 `source='shuling'`），需要时 `audit-report.sh --include-organic`
+
+### ⬆️ 如何升级
+
+```bash
+cd /path/to/shuling && git pull
+bash install.sh     # v2.2.0.sh migration 自动跑：ALTER posts add source + CREATE historical_stats
+
+# 老博主接入（全新能力）:
+bash install.sh --mode=existing-creator
+# 或对话里说: "我已经在运营小红书，帮我接入"
+
+# 手动跑核心脚本:
+bash scripts/import-existing.sh --limit 200           # 批量导入（~30 分钟）
+bash scripts/audit-report.sh --extract-patterns      # 出体检 + patterns 候选
+```
+
+**无 breaking**。老用户（新博主）行为完全不变；§0c 是可选分支，仅在 `creator_mode=existing` 时触发。
+
+### 🚧 v2.2.0 MVP 未覆盖（留给后续）
+
+- MCP `list_feeds` 在 xhs.sh 的子命令包装（目前需走 `--mock` 或后续小版本补齐）
+- AI 自动分类 imported 帖子的 prompt 模板（SKILL.md §0c 第 3 步，目前靠 AI 按 SKILL.md 描述自由发挥）
+- audit-report 的 90 天趋势 PNG（目前只有 markdown 表 + JSON）
+- 历史帖改写重发建议脚本 `rewrite-suggest.sh`（Layer 2）
+- 竞品横向对标（Layer 3，规划中）
+
+---
+
 ## [2.1.3] - 2026-04-21 "Friendly Onboarding"
 
 降低新手门槛 + 拓宽非交互场景 + 给智能体写入协议。

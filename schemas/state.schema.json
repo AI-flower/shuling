@@ -27,6 +27,15 @@
       "format": "date",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
       "description": "setup_completed 首次置 true 的日期。"
+    },
+    "creator_mode": {
+      "type": "string",
+      "enum": ["new", "existing", "unset"],
+      "description": "v2.2.0+: 博主类型。'new' = 从零起步；'existing' = 有存量账号，走 §0c 流程；'unset' = 未询问。老博主接入时必须显式设为 'existing'。"
+    },
+    "existing_import_done": {
+      "type": "boolean",
+      "description": "v2.2.0+: §0c 五步流程全部完成（批量导入 + 分类 + 画像反推 + patterns 挖掘 + 体检报告）。false 时 §0a 路由到 §0c 继续。"
     }
   }
 }
