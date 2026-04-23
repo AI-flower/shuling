@@ -1,74 +1,91 @@
-# 薯灵推广物料包
+# 薯灵推广物料包 · 第三方源采纳版
 
-> 生成于 2026-04-23
-> 目标：把薯灵 v2.3.0 "Pure Image Pipeline" 推广到各 skill 集合源
-> 策略：T2 Awesome 列表 → T3 第三方 skill 仓库 → T1 anthropics/skills 官方
+> 2026-04-23 调整：**只做"被第三方源平台采纳"**（awesome 列表 / anthropics/skills / skill marketplace）。
+> **去掉**所有"自己在第三方平台发布内容"的推广（博客 / 社群贴 / Twitter / HN 等）。
+>
+> 内容类弹药完备归档在 `archived-content-campaign/`，未来策略变化可取用。
 
 ---
 
-## 物料清单
+## 🗓️ 从这里开始
 
-### 🗓️ 执行手册（先看这个）
-| 文件 | 用途 |
+| 文件 | 做什么 |
 |---|---|
-| **`DAY-0-QUICKSTART.md`** | 🔥 **今天 1 小时搞定准备**（8 步可复制粘贴命令） |
-| **`RUNBOOK.md`** | 14 天完整执行时间表，每天勾选即可 |
+| **`RUNBOOK.md`** | **主文件**：4 个源 × 不同通道 × 2 周时间表 |
+| `DAY-0-QUICKSTART.md` | Day 0 准备工作（v2.3 版初始设置，已完成参考） |
+| `DAY-0-v2.4.0-PATCH.md` | v2.4 上线追加动作（commit 未提交物料 + badge 同步 + 发 Release） |
 
-### 📦 直接可用的发布物料
-| 文件 | 用途 | 投放目标 |
+---
+
+## 📦 核心采纳物料（投稿时用）
+
+| 文件 | 目标源 | 通道 |
 |---|---|---|
-| `github-release-v2.3.0.md` | v2.3.0 Release notes（935 词，中英混排） | GitHub Releases 页面直接粘贴 |
-| `blog-1-skill-as-brain.md` | **核心博客**：Skill-as-Brain 架构全解（3800 字中文） | 少数派/掘金/个人博客 |
-| `blog-1-skill-as-brain.en.md` | 英文版（2730 词） | Dev.to/Medium/Hacker News |
-| `blog-2-semver.md` | BRAIN.HANDS.CALIB 版本号文章（2700-2900 字） | 同上，第二篇 |
-| `blog-3-preference-learning.md` | 算法深度稿 Laplace+Confidence（4500-5000 字） | 同上，第三篇（技术最硬） |
-| `awesome-prs-ready-to-submit.md` | **3 个 Awesome 列表实地调研 + PR/Issue 完整草案**（含禁用 gh CLI 警告等关键信息） | 按列表不同通道提交 |
-| `anthropics-skills-pr.md` | anthropics/skills 官方 PR 描述（T1 冲刺用） | PR body 粘贴 |
-| `social-posts.md` | 7 个平台发布贴（V2EX/即刻/Twitter/HN/Discord/微信群/B 站） | 按日期分平台发 |
-| `awesome-listings.md` | 各 Awesome 列表一行介绍（中英 10 变体） | 补充备选文案 |
-| `anti-faq.md` | 13 个常见质疑的标准回复（推广时评论区用） | 遇到问题时查 |
-
-### 🏗️ 项目补齐文件
-| 文件 | 用途 |
-|---|---|
-| `LICENSE` | MIT LICENSE（项目根目录缺失） |
-| `SECURITY.md` | 安全声明：数据本地化、凭据保护、威胁模型 |
-| `patches/01-version-sync.patch` | README + landing badge v2.2.0 → v2.3.0 替换说明 |
-
-### 🎨 配图与深度内容
-| 文件 | 用途 |
-|---|---|
-| `architecture-diagram.md` | 3 份 mermaid 架构图源码（全景/业务路由/自进化） |
-| `blog-drafts.md` | 原始三篇大纲（仅留作参考，blog-1/2/3 已完整稿） |
+| **`awesome-prs-ready-to-submit.md`** | 3 个 awesome 列表（含实地调研与正确通道） | PR / Issue |
+| **`anthropics-skills-pr.md`** | anthropics/skills 官方 marketplace | PR |
+| `awesome-listings.md` | 10 变体一行介绍（CN/EN） | 备选文案 |
 
 ---
 
-## 如何使用
+## 🛡️ 投稿前置硬阻断（必须先齐）
 
-### 第 1 步：apply patch（可选）
-
-```bash
-cd /Users/weiyong/Documents/10/shuling
-git diff > /tmp/current-dirty.patch  # 先备份当前脏工作区
-# 用编辑器把 patches/01-version-sync.patch 的替换逻辑对照到 README.md 和 landing/index.html
-```
-
-> ⚠️ 注意：你本地已有 README.md / landing/index.html 的未提交改动（tabel 已改成 v2.3.0，title 已改成新文案），patch 只需改 README 顶部 badge（3 处）+ landing 硬编码 v2.2.0（8 处）。不要盲目用 `git apply`，因为当前脏状态会冲突——手工改最稳。
-
-### 第 2 步：复制 LICENSE 和 SECURITY.md
-
-```bash
-scp /root/shuling-promotion/LICENSE weiyong@100.79.106.110:/Users/weiyong/Documents/10/shuling/LICENSE
-scp /root/shuling-promotion/SECURITY.md weiyong@100.79.106.110:/Users/weiyong/Documents/10/shuling/SECURITY.md
-```
-
-### 第 3 步：按时间表投稿
-
-参考主回答里的两周时间表，从 Day 3 开始 T2 Awesome 列表批量 PR，到 Day 10 冲 anthropics/skills 官方。
+| 文件 | 用途 | 状态 |
+|---|---|---|
+| `LICENSE` | MIT，被投稿必要条件 | ✅ 已上线 |
+| `SECURITY.md` | 数据/凭据/威胁模型 | ✅ 已上线 |
+| `github-release-v2.3.0.md` | v2.3 Release body | ✅ 已发 |
+| **`github-release-v2.4.0.md`** | **v2.4 Release body（1148 词，待发）** | 🔴 需发 |
+| `patches/01-version-sync.patch` | v2.2 → v2.3 badge 同步说明（已过） | （参考） |
 
 ---
 
-## 关于 demo GIF 和架构图
+## 🎨 PR 附件（README 会展示）
 
-- **demo GIF**：我无法代录，建议你用 `asciinema rec` 或 `vhs` 录 90 秒。脚本：`install.sh --check` → "帮我发小红书" → 选题三选一 → 大纲 → 图（配图建议展示）→ 发布成功。
-- **架构图**：我生成了 mermaid 源码，`architecture-diagram.md` 里 3 张。用 `mermaid.live` 或本地 `mmdc` 导出 SVG/PNG 后放 README。
+| 文件 | 用途 |
+|---|---|
+| `architecture-diagram.md` | 3 张 mermaid 源码（全景 / 业务路由 / 自进化），PR 里 README 配图 |
+| `demo.tape` + `demo-README.md` | vhs 脚本自动录制 demo GIF（75 秒，无需真 Claude） |
+
+---
+
+## 📁 archived-content-campaign/ · 内容类弹药（当前不启用）
+
+| 文件 | 类型 |
+|---|---|
+| `blog-1-skill-as-brain.md` + `.en.md` | 博客 3800 字中 / 2730 词英 |
+| `blog-2-semver.md` + `.en.md` | 博客 2800 字中 / 2719 词英 |
+| `blog-3-preference-learning.md` + `.en.md` | 博客 4800 字中 / 4300 词英 |
+| `blog-drafts.md` | 原始博客大纲 |
+| `social-posts.md` | V2EX / 即刻 / Twitter / HN / Discord / 微信群 / B 站 7 平台 |
+| `hn-show-hn-post.md` | HN Show HN 优化稿 + 提交策略 |
+| `v2.4.0-pitch.md` | v2.4 专属独立推广素材 |
+| `anti-faq.md` | 13 条社群质疑回复模板 |
+
+归档理由见 `archived-content-campaign/_WHY-ARCHIVED.md`。
+
+未来要激活：删除一个 README 里的说明行，从 archive 把文件 mv 回父目录。
+
+---
+
+## 🎯 2 周目标
+
+| 周 | 动作 |
+|---|---|
+| Week 1 | 投 1-2 个 awesome 列表（e2b-dev + hesreallyhim），发 v2.4 Release |
+| Week 2 | 跟进 review，投第 3 个，冲 anthropics/skills 官方 |
+
+**最低成功线**：Week 2 结束前至少 1 个 awesome 列表 merge。
+
+---
+
+## ✅ 当前状态速查
+
+```bash
+# 验证线上就绪
+curl -s -o /dev/null -w "LICENSE:  %{http_code}\n"   https://raw.githubusercontent.com/AI-flower/shuling/main/LICENSE
+curl -s -o /dev/null -w "SECURITY: %{http_code}\n"   https://raw.githubusercontent.com/AI-flower/shuling/main/SECURITY.md
+curl -s https://raw.githubusercontent.com/AI-flower/shuling/main/README.md | grep -E 'version-|codename-' | head -2
+curl -s -o /dev/null -w "Release v2.4.0: %{http_code}\n" https://api.github.com/repos/AI-flower/shuling/releases/tags/v2.4.0
+```
+
+通过 4 项（200/200/v2.4.0 badge/200），立刻开始投 Step 2。
