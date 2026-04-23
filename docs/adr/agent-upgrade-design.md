@@ -1,8 +1,11 @@
 ---
 title: 面向智能体的升级基础设施设计
-status: draft
+status: active
 created: 2026-04-21
+moved_from: docs/agent-upgrade-design.md
+moved_at: 2026-04-23
 audience: agent  # 使用方 + 升级执行方都是 AI agent，人类只做指挥
+category: adr
 ---
 
 # 面向智能体的升级基础设施设计

@@ -1,3 +1,18 @@
+---
+title: 小红书 Skill 重设计 — 完整规格文档
+status: archived
+moved_from: docs/superpowers/specs/2026-04-15-skill-redesign-design.md
+moved_at: 2026-04-23
+original_date: 2026-04-15
+archive_reason: superseded
+---
+
+> **归档说明**（2026-04-23 v2.4.0 docs 重组）：
+> 本文档已归档。原因：superseded — Skill-as-Brain 架构规格已由 v2.0 实际实现取代，此 spec 的细节与当前代码组织存在偏差，仅保留历史脉络。
+> 如需了解当前状态请参阅：根目录 `SKILL.md` 与 `CHANGELOG.md`。
+
+---
+
 # 小红书 Skill 重设计 — 完整规格文档
 
 > 日期: 2026-04-15

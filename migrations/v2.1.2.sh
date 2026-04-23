@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
-# Migration for v2.1.2 "Release Polish" — 无 DB 迁移
-# 仅作为版本留痕，install.sh 跑完可更新已部署 VERSION
+# Migration for v2.1.2 "Release Polish" —— 无 DB 迁移, 仅版本留痕
 set -e
-echo "  [v2.1.2] 纯文档版本，无 DB 迁移"
+
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+source "$SKILL_DIR/migrations/_guard.sh"
+
+if already_applied "2.1.2"; then
+    echo '{"status":"skipped","reason":"already_applied","version":"2.1.2"}'
+    exit 0
+fi
+
+mark_applied "2.1.2"
+echo '{"status":"ok","reason":"no_schema_change","version":"2.1.2"}'

@@ -1,3 +1,19 @@
+---
+title: 已有账号接入模式（Existing Creator Onboarding）
+status: archived
+archive_reason: completed
+moved_from: docs/features/existing-creator-onboarding.md
+moved_at: 2026-04-23
+original_date: 2026-04-21
+released_in: v2.2.0
+---
+
+> **归档说明**（2026-04-23 v2.4.0 docs 重组）：
+> 本文档已归档。原因：completed — 已作为 v2.2.0 "Existing Creator Support" 特性发版落地。
+> 如需了解当前状态请参阅：`CHANGELOG.md` v2.2.0 条目与根目录 `SKILL.md` 中的账号接入流程。
+
+---
+
 # 已有账号接入模式（Existing Creator Onboarding）
 
 > v2.2.0 "Existing Creator Support" 主要特性设计文档

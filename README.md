@@ -2,14 +2,14 @@
 
 > 小红书博主成长助手 — 选题、写稿、发布、复盘一体化，越用越懂你。
 
-[![Version](https://img.shields.io/badge/version-2.3.0-blue)](VERSION)
-[![Codename](https://img.shields.io/badge/codename-Pure%20Image%20Pipeline-green)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.4.0-blue)](VERSION)
+[![Codename](https://img.shields.io/badge/codename-Agent--Friendly%20Upgrade%20Infra-green)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](#许可)
 [![Website](https://img.shields.io/badge/🌐_website-shuling.pages.dev-f97316)](https://shuling.pages.dev)
 
 🌐 **官网**：[https://shuling.pages.dev](https://shuling.pages.dev)（中英文双语介绍页，源码同步在 `landing/index.html`，可直接双击本地预览）
 
-📦 **v2.3.0** · 2026-04-21 · [CHANGELOG](CHANGELOG.md) · [UPGRADE](UPGRADE.md) · [RELEASING](RELEASING.md)
+📦 **v2.4.0** · 2026-04-23 · [CHANGELOG](CHANGELOG.md) · [UPGRADE](UPGRADE.md) · [RELEASING](RELEASING.md)
 
 ---
 
@@ -127,7 +127,7 @@
 | 依赖 | 用途 | 安装 |
 |---|---|---|
 | **AI 助手** | 大脑，读 SKILL.md 驱动流程 | [hermes](https://github.com/anthropics/hermes) / [Claude Code](https://claude.com/claude-code) / [Codex](https://github.com/openai/codex) / OpenClaw 任选 |
-| **xiaohongshu-mcp** | 小红书 MCP（搜索/详情/发布/评论/登录） | [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)；详见 [docs/mcp-setup.md](docs/mcp-setup.md) |
+| **xiaohongshu-mcp** | 小红书 MCP（搜索/详情/发布/评论/登录） | [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)；详见 [docs/runbooks/mcp-setup.md](docs/runbooks/mcp-setup.md) |
 | **Python 3 / sqlite3 / jq** | DB / 生图 / JSON | macOS: `brew install sqlite jq`；Linux: `apt install sqlite3 jq` |
 | **Gemini 图片 API**（**必需**） | AI 生图（唯一路径） | Gemini Key（https://aistudio.google.com/app/apikey） |
 | **NoteRx API**（可选） | 五维诊断 | 配 `NOTERX_API_KEY` 才启用 |
@@ -159,7 +159,7 @@ bash install.sh
 # 2. 登录小红书（二选一）
 #    扫码:   AI 会调 scripts/xhs.sh login 给二维码链接
 #    Cookie: 对话里说 "我给你 cookie：<浏览器 F12 复制的完整串>"
-#    详细图文 → docs/mcp-setup.md
+#    详细图文 → docs/runbooks/mcp-setup.md
 
 # 3. 建立画像（在 AI 里说 "我想做小红书博主"）
 #    AI 三问: 做什么方向 / 目标受众 / 风格偏好
@@ -194,7 +194,7 @@ bash install.sh --mode=existing-creator
 bash scripts/import-existing.sh --limit 200            # 批量导入（可 --resume 断点续跑）
 bash scripts/audit-report.sh --extract-patterns        # 出体检报告 + patterns 候选
 ```
-详细设计 → [docs/features/existing-creator-onboarding.md](docs/features/existing-creator-onboarding.md)
+详细设计 → [docs/plans/existing-creator-onboarding.md](docs/plans/existing-creator-onboarding.md)
 
 > **首次安装后**：`config/runtime.env`、`config/state.json`、`knowledge-base/profile.json`、`data/xhs.db` 等是你的私人数据，已被 `.gitignore` 屏蔽。**不要 `git add -f` 这些文件**。
 
@@ -438,8 +438,8 @@ bash scripts/xhs.sh log --tool search_feeds --days 7
 | 我是用户 / 每次发版有什么变化 | [CHANGELOG.md](CHANGELOG.md) |
 | 我要从 vX.Y.Z 升级到新版 | [UPGRADE.md](UPGRADE.md) |
 | 我要自己发版 | [RELEASING.md](RELEASING.md) |
-| xiaohongshu-mcp 装不上 / cookie 怎么拿 | [docs/mcp-setup.md](docs/mcp-setup.md) |
-| 老博主接入流程的完整设计 | [docs/features/existing-creator-onboarding.md](docs/features/existing-creator-onboarding.md) |
+| xiaohongshu-mcp 装不上 / cookie 怎么拿 | [docs/runbooks/mcp-setup.md](docs/runbooks/mcp-setup.md) |
+| 老博主接入流程的完整设计 | [docs/plans/existing-creator-onboarding.md](docs/plans/existing-creator-onboarding.md) |
 | AI 写入 JSON 时要遵守什么契约 | [schemas/](schemas/) + [schemas/README.md](schemas/README.md) |
 | 我的平台（hermes / claude / codex）怎么配 | [platform/](platform/) |
 | 知道有哪些表、字段是什么 | `scripts/db.sh init` 看 SQL；或 SKILL.md §7 |
@@ -468,8 +468,10 @@ bash scripts/xhs.sh log --tool search_feeds --days 7
 | v2.1.3 | Friendly Onboarding（install.sh 六模式 + preflight --human + schemas + §0b） | ✅ |
 | v2.2.0 | Existing Creator Support（老博主接入 + 账号体检 + patterns 种子） | ✅ |
 | v2.2.1 | Migration Safety Fix（v2.1.1 迁移脚本在存量 v2.0 升级时阻断修复） | ✅ |
-| **v2.3.0** | **Pure Image Pipeline（去 HTML 截图降级 + Gemini 必需 + prompt 模板系统 + 封面参考图）** | ✅ **当前** |
-| v2.4.0 | Agent-Friendly Upgrade Infrastructure（`install.sh upgrade-all` + `upgrade-hooks/` + `__migrations` 表 + SKILL.md §1 preferences.json 模板 schema 对齐） | 规划中 |
+| v2.3.0 | Pure Image Pipeline（去 HTML 截图降级 + Gemini 必需 + prompt 模板系统 + 封面参考图） | ✅ |
+| **v2.4.0** | **Agent-Friendly Upgrade Infrastructure（`install.sh upgrade-all` + `upgrade-hooks/` + `__migrations` 表 + schema drift 校验 + docs 五子目录 + requirements.txt）** | ✅ **当前** |
+| v2.4.1 | Observability + Test（脚本 JSON 日志 + smoke 测试 + ShellCheck） | 规划中 |
+| v2.5.0 | SKILL.md Modular（1208 行瘦身 → 主干 ≤300 行 + skill-chapters/） | 规划中 |
 | v2.x 其他 | 历史帖改写重发建议 / 评论回复助手（Layer 2） | 规划中 |
 | v3.0.0 | 视频笔记 / 多账号灰度 / 竞品对标（Layer 3）；候选议题：Phase-Aware Weights（phase 权重自适应硬化）/ Pattern Confidence State Machine（low→medium→high 升级规则）——待真实数据量（20+ 帖、10+ 诊断）到位后再决定 | 远期 |
 

@@ -1,7 +1,9 @@
 ---
 title: 薯灵项目侧优化路线图
-status: draft
+status: active
 created: 2026-04-21
+moved_from: docs/2026-04-21-project-optimization-roadmap.md
+moved_at: 2026-04-23
 audience: agent  # 使用方与执行方均为 AI agent
 scope: project-infrastructure  # 仅工程/架构侧，不含业务规划
 current_version: v2.3.0

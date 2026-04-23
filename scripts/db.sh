@@ -180,8 +180,14 @@ CREATE TABLE IF NOT EXISTS historical_stats (
     meta_json TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_hstats_snapshotted_at ON historical_stats(snapshotted_at DESC);
+
+-- v2.2.1: migration tracking (also ensured by migrations/_guard.sh)
+CREATE TABLE IF NOT EXISTS __migrations (
+    version TEXT PRIMARY KEY,
+    applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 "
-    echo '{"ok": true, "tables": ["posts","post_metrics","user_choices","topic_candidates","comment_insights","note_diagnosis","generated_images","request_log","historical_stats"]}'
+    echo '{"ok": true, "tables": ["posts","post_metrics","user_choices","topic_candidates","comment_insights","note_diagnosis","generated_images","request_log","historical_stats","__migrations"]}'
 }
 
 cmd_add_post() {

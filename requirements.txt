@@ -1,0 +1,15 @@
+# 薯灵 v2.4.0 Python 依赖锁定
+#
+# 范围规则：允许 patch 升级，禁止 major 升级（>=X.Y,<X+1.0）
+# 依据：scripts/*.py 实际 import 扫描（2026-04-23）
+#
+# 扫描结论：
+#   - scripts/image.py 只用 stdlib（urllib.request/urllib.error/base64/json/os/re/sys）
+#     直接裸调 Gemini 和 OpenAI 兼容 REST API，不依赖 google-genai / openai SDK
+#   - scripts/preflight.py 只用 stdlib（argparse/json/os/shutil/subprocess/sys/pathlib）
+#   - scripts/validate.py（v2.4.0 新增）使用 jsonschema
+#
+# 所以本文件当前仅列一个真依赖。未来若 image.py 切到官方 SDK
+# 或引入 requests，再按同一规则追加。
+
+jsonschema>=4.0,<5.0

@@ -1,3 +1,18 @@
+---
+title: 小红书内容自进化系统 — 设计规格
+status: archived
+moved_from: docs/2026-04-15-self-evolution-design.md
+moved_at: 2026-04-23
+original_date: 2026-04-15
+archive_reason: superseded
+---
+
+> **归档说明**（2026-04-23 v2.4.0 docs 重组）：
+> 本文档已归档。原因：superseded — 自进化能力已在 v2.0-v2.3 落地（`knowledge-base/`、`evolution-log.md`、post-eval 循环），此设计稿与实际实现存在偏差，仅保留历史脉络。
+> 如需了解当前状态请参阅：根目录 `SKILL.md` 的"知识库进化"章节与 `CHANGELOG.md`。
+
+---
+
 # 小红书内容自进化系统 — 设计规格
 
 > 日期: 2026-04-15

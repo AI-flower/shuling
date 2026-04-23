@@ -1,3 +1,11 @@
+---
+title: xiaohongshu-mcp 安装指南
+status: active
+moved_from: docs/mcp-setup.md
+moved_at: 2026-04-23
+category: runbook
+---
+
 # xiaohongshu-mcp 安装指南
 
 > `xiaohongshu-mcp` 是薯灵的核心依赖，提供搜索、发布、评论、登录等 API。skill 通过 `scripts/xhs.sh` 调用它与小红书交互。源码仓库：[xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)。

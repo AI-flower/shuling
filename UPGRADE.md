@@ -44,6 +44,117 @@ bash install.sh
 
 ## 逐版本迁移步骤
 
+### → v2.4.0 "Agent-Friendly Upgrade Infrastructure"（2026-04-23）
+
+**类型**：HANDS（纯工程基础设施，SKILL.md 完全不动）
+**Breaking**：无
+
+**新增内容**：
+- `install.sh upgrade-all` 一键升级所有已装 target（agent-first，JSON 输出）
+- `migrations/__migrations` 表 + `_guard.sh`：migration 全部幂等化可安全重跑
+- `upgrade-hooks/v2.3.0/` 三个 hook 固化本次升级手工踩过的坑（runtime-env 同步 / preferences schema 迁移 / hermes cron prompt 更新）
+- `scripts/validate.py`：schemas JSON schema drift 校验
+- `requirements.txt`：Python 依赖锁定
+- `docs/{adr,plans,runbooks,reference,archive}/` 五子目录结构
+
+**升级动作（推荐新路径）**：
+
+```bash
+cd /path/to/shuling
+git pull
+
+# 先看计划不执行
+bash install.sh upgrade-all --dry-run --json | python3 -m json.tool
+
+# 实际升级（所有 target 一起）
+bash install.sh upgrade-all
+
+# 或只升某个 target
+bash install.sh upgrade-all --target=hermes
+```
+
+**升级后验证**：
+
+```bash
+# 1. __migrations 表应列出 2.1.1 ~ 2.3.0
+sqlite3 <target>/data/xhs.db "SELECT * FROM __migrations"
+
+# 2. schema drift 检查
+python3 scripts/validate.py --target <target-path> --json
+
+# 3. preflight 过（含新增 schemas check）
+cd <target> && python3 scripts/preflight.py --json
+```
+
+**兼容性说明**：
+- 老的 `bash install.sh` 六模式完全保留，不强制改路径
+- `upgrade-all` 与 `--target=<name>` 组合过滤，未匹配返回 exit 3
+- 所有 migration / hook 都幂等，重跑安全；失败不阻塞其他 target
+- 原有 `knowledge-base/` / `config/runtime.env` / `data/xhs.db` 完全保留，不动用户私人数据
+
+**升级出错时**：
+- 回滚：`mv <target>.bak-v2.4.0-<timestamp> <target>`（备份在每个 target 同级目录）
+- 查错：`bash install.sh upgrade-all --json 2>&1 | tee upgrade.log` 的 JSON 每步有 status/reason
+- schema drift：`python3 scripts/validate.py --target <path>` 指出具体字段
+
+**本版扫出的历史 drift**（已知但不自动修）：
+- `~/.codex/skills/shuling/config/state.json` 缺 `setup_completed` / `profile_created` / `setup_date`
+- validate.py 会报，但升级 hook 暂不自动修复 —— 需 agent 下次按 §0a 业务路由触发状态重建
+
+---
+
+### → v2.3.0 "Pure Image Pipeline"（2026-04-21）
+
+> ⚠️ 本条目为 v2.4.0 发版时**补录**（v2.3.0 发版时 UPGRADE.md 漏更新）。
+
+**类型**：HANDS + CALIB
+**Breaking**：**有** —— 之前靠 HTML 截图兜底的部署必须配 Gemini API Key
+
+**变化**：
+- HTML 截图降级路径完全删除（`scripts/screenshot.cjs` / `templates/post.html` 移除）
+- Gemini API Key 从可选变必需
+- `scripts/image.py` 重写：`render_prompt()` 模板系统 + `--reference` 封面回流 + `--short` 极简 fallback
+- 新增 `prompts/image_prompt.txt` / `prompts/image_prompt_short.txt` 中文模板
+- `generated_images.prompt` 字段改为存 `page_content` 短语义（节省空间 + 便于 pattern 学习）
+
+**升级动作**：
+
+```bash
+cd /path/to/shuling && git pull
+bash install.sh     # 会强制问 Gemini API Key（老安装已配则不问）
+
+# 预检
+python3 scripts/image.py --check    # 返回 0 才能继续
+```
+
+**兼容性说明**：
+- 老部署若未配 Gemini Key：发帖流程 §2.3 会硬停，按提示补配
+- 老数据（posts / generated_images）完全保留
+- v2.4.0 起 upgrade-hooks/v2.3.0/ 提供自动化路径（`runtime-env-sync.sh` 跨 target 借用 Key）
+
+---
+
+### → v2.2.1 "Migration Safety Fix"（2026-04-21）
+
+> ⚠️ 本条目为 v2.4.0 发版时**补录**（v2.2.1 发版时 UPGRADE.md 漏更新）。
+
+**类型**：HANDS（bugfix）
+**Breaking**：无
+
+**变化**：
+- `migrations/v2.1.1.sh` 重写：只建 `request_log` 表，不再连调 `db.sh init`（避免存量 v2.0 → v2.2.x 跨版升级时 `no such column: source` 阻断）
+
+**升级动作**：
+
+```bash
+cd /path/to/shuling && git pull
+bash install.sh     # 幂等，无新 schema 变化
+```
+
+无特殊兼容性问题。v2.4.0 起此 migration 也受 `__migrations` 表保护，不会重复跑。
+
+---
+
 ### → v2.2.0 "Existing Creator Support"（2026-04-21）
 
 **类型**：HANDS + CALIB（新脚本 + DB schema 扩展 + §0c 新分支）
@@ -56,7 +167,7 @@ bash install.sh
 - `posts.source` 字段 + `historical_stats` 新表
 - `schemas/audit-report.schema.json`
 - `install.sh --mode=existing-creator`
-- `docs/features/existing-creator-onboarding.md` 完整设计文档
+- `docs/plans/existing-creator-onboarding.md` 完整设计文档
 
 **升级动作**：
 
@@ -110,7 +221,7 @@ bash scripts/audit-report.sh --extract-patterns        # 出体检 + patterns �
 - `scripts/preflight.py --human`：彩色健康检查
 - `schemas/` 目录：JSON Schema 约束 AI 写入 state/profile/preferences
 - `SKILL.md §0b`：识别平台 + 写入前校验
-- `docs/mcp-setup.md` 重写（一键安装 + cookie 图文 + systemd/launchd）
+- `docs/runbooks/mcp-setup.md` 重写（一键安装 + cookie 图文 + systemd/launchd）
 - `RELEASING.md` 新增 .bak 清理检查 + `--check`/`--dry-run` 验证步
 
 **升级动作**：

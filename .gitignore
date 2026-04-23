@@ -26,6 +26,8 @@ knowledge-base/README.md
 /tmp/xhs-post/
 *.log
 *.bak
+*.old
+*-backup-*
 
 # =================================================================
 # 平台/IDE 本地数据（不属于 skill 本身）

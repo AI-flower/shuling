@@ -1,3 +1,21 @@
+---
+title: 薯灵 Skill 路径统一、渠道解耦与稳健化实施计划
+status: archived
+moved_from: docs/superpowers/plans/2026-04-17-shuling-skill-fix.md
+moved_at: 2026-04-23
+original_date: 2026-04-17
+archive_reason: completed
+checkbox_count: 52
+---
+
+> **归档说明**（2026-04-23 v2.4.0 docs 重组）：
+> 本文档已归档。原因：completed — 路径统一、渠道解耦、状态持久化相关修复已在 v2.1-v2.3 落地。
+> 如需了解当前状态请参阅：`CHANGELOG.md` v2.1-v2.3 条目与根目录 `SKILL.md`。
+>
+> **Checkbox 状态 reconcile**：本 plan 含 52 个未勾 checkbox，2026-04-23 归档时统一判定"不再追踪"。已落地部分归入 v2.0-v2.3 实际发版（见 `CHANGELOG.md`），未落地部分若仍需要将另开新 plan。
+
+---
+
 # 薯灵 Skill 路径统一、渠道解耦与稳健化实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

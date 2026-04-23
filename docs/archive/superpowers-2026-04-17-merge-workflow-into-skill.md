@@ -1,3 +1,21 @@
+---
+title: 薯灵 workflow 合并进 skill 实施计划
+status: archived
+moved_from: docs/superpowers/plans/2026-04-17-merge-workflow-into-skill.md
+moved_at: 2026-04-23
+original_date: 2026-04-17
+archive_reason: completed
+checkbox_count: 63
+---
+
+> **归档说明**（2026-04-23 v2.4.0 docs 重组）：
+> 本文档已归档。原因：completed — workflow 双线已合并入 skill 主体，v2.1-v2.3 已完成收敛。
+> 如需了解当前状态请参阅：`CHANGELOG.md` v2.1-v2.3 条目与根目录 `SKILL.md`。
+>
+> **Checkbox 状态 reconcile**：本 plan 含 63 个未勾 checkbox，2026-04-23 归档时统一判定"不再追踪"。已落地部分归入 v2.0-v2.3 实际发版（见 `CHANGELOG.md`），未落地部分若仍需要将另开新 plan。
+
+---
+
 # 薯灵 workflow 合并进 skill 实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

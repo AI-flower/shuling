@@ -1,6 +1,6 @@
-version: "2.3.0"
-codename: "Pure Image Pipeline"
-released: "2026-04-21"
+version: "2.4.0"
+codename: "Agent-Friendly Upgrade Infrastructure"
+released: "2026-04-23"
 
 # ─── 版本号语义: BRAIN.HANDS.CALIB ──────────────────────────────────
 #
@@ -12,11 +12,11 @@ released: "2026-04-21"
 # HANDS: scripts/ 新增或重写 / DB schema 迁移 / MCP 接口替换
 # CALIB: 阈值/关键词/节流参数调整 / bugfix / prompt 微调
 #
-# 版本位决策（本版 v2.2.0）:
-#   - SKILL.md 新增 §0c 分支（老博主接入），为 additive 扩展，**不改变** 原有流程与算法
-#   - 算法层零变化（preference_learning/confidence/drafting/image_gen 保持 v2.1.3）
-#   - 主要是 HANDS 扩展：新脚本 + 新 DB 字段 + 新表 + 新 schema
-#   - 遂定 HANDS +1 → v2.2.0。如果未来对 §0c 做算法化改造（如自动聚类替代 AI 聚类），视为 BRAIN +1
+# 版本位决策（本版 v2.4.0）:
+#   - SKILL.md 完全不动：业务流程 / 自进化算法 / AI 行为方式零变化
+#   - 纯工程基础设施：migrations/__migrations 表 + upgrade-hooks/ 新目录 + install.sh upgrade-all 聚合器 + schema drift 校验 + requirements.txt 依赖锁定 + docs/ 五子目录重组
+#   - 非 breaking：老部署跑 `bash install.sh upgrade-all` 平滑升级
+#   - 遂定 HANDS +1 → v2.4.0
 
 breaking_change_policy:
   brain:
@@ -40,7 +40,7 @@ brain:
     confidence: "concentration-x-sample-factor"
     drafting: "redink-dual-step-v1"
     image_gen: "two-stage-cover-reference-v1"
-    existing_creator_onboarding: "v2.2.0-mvp"      # v2.2.0 新增：AI 驱动的画像反推 + patterns 种子挖掘 + 偏好 bootstrap
+    existing_creator_onboarding: "v2.2.0-mvp"
 
 hands:
   mcp_tools:
@@ -62,8 +62,9 @@ hands:
     - note_diagnosis
     - generated_images
     - request_log
-    - historical_stats                             # v2.2.0 新增
-  post_sources:                                    # v2.2.0 新增：posts.source 字段
+    - historical_stats
+    - __migrations                                 # v2.4.0 新增：migration 应用台账
+  post_sources:
     - shuling
     - imported
     - manual
@@ -81,16 +82,22 @@ hands:
     - noterx-diagnose.sh
     - preflight.py
     - screenshot.cjs
-    - import-existing.sh                           # v2.2.0 新增
-    - audit-report.sh                              # v2.2.0 新增
+    - import-existing.sh
+    - audit-report.sh
+    - validate.py                                  # v2.4.0 新增：schemas JSON schema drift 校验
   installer:
-    mode: "install + upgrade + check + dry-run + creator-mode"   # v2.2.0 起 --mode=existing-creator
+    mode: "install + upgrade + check + dry-run + creator-mode + upgrade-all"  # v2.4.0 新增：upgrade-all agent-first 聚合器
     migrations_dir: "migrations"
+    upgrade_hooks_dir: "upgrade-hooks"              # v2.4.0 新增
   schemas:
     - state.schema.json
     - profile.schema.json
     - preferences.schema.json
-    - audit-report.schema.json                     # v2.2.0 新增
+    - audit-report.schema.json
+  upgrade_hooks:                                   # v2.4.0 新增：代码/DB 之外升级副作用的声明式存放
+    - v2.3.0/runtime-env-sync
+    - v2.3.0/preferences-structure-migrate
+    - v2.3.0/scheduler-prompt-update
 
 calib:
   observability: "request-log-v1"
@@ -100,5 +107,9 @@ calib:
   emoji_dict_version: "v1"
   spam_keywords_version: "v1"
   docs_format: "keep-a-changelog + upgrade-guide + releasing-sop"
+  docs_structure: "adr/plans/runbooks/reference/archive"  # v2.4.0 新增：docs 五子目录重组
   onboarding_polish: "v2.1.3"
-  existing_creator_feature: "v2.2.0-mvp"           # 本版引入，完整路径见 docs/features/existing-creator-onboarding.md
+  existing_creator_feature: "v2.2.0-mvp"           # 完整路径见 docs/plans/existing-creator-onboarding.md（v2.4.0 docs 重组后新路径）
+  schema_drift_validation: "v2.4.0"                # v2.4.0 新增：激活 schemas/ + validate.py
+  migration_idempotency: "v2.4.0"                  # v2.4.0 新增：__migrations 表 + _guard.sh
+  dependencies_locked: "v2.4.0"                    # v2.4.0 新增：requirements.txt
