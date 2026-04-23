@@ -2,14 +2,14 @@
 
 > 小红书博主成长助手 — 选题、写稿、发布、复盘一体化，越用越懂你。
 
-[![Version](https://img.shields.io/badge/version-2.2.0-blue)](VERSION)
-[![Codename](https://img.shields.io/badge/codename-Existing%20Creator%20Support-green)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.3.0-blue)](VERSION)
+[![Codename](https://img.shields.io/badge/codename-Pure%20Image%20Pipeline-green)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-lightgrey)](#许可)
 [![Website](https://img.shields.io/badge/🌐_website-shuling.pages.dev-f97316)](https://shuling.pages.dev)
 
 🌐 **官网**：[https://shuling.pages.dev](https://shuling.pages.dev)（中英文双语介绍页，源码同步在 `landing/index.html`，可直接双击本地预览）
 
-📦 **v2.2.0** · 2026-04-21 · [CHANGELOG](CHANGELOG.md) · [UPGRADE](UPGRADE.md) · [RELEASING](RELEASING.md)
+📦 **v2.3.0** · 2026-04-21 · [CHANGELOG](CHANGELOG.md) · [UPGRADE](UPGRADE.md) · [RELEASING](RELEASING.md)
 
 ---
 
