@@ -1,5 +1,5 @@
-version: "2.4.1"
-codename: "Install Reliability Patch"
+version: "2.4.2"
+codename: "Source-Target Isolation Patch"
 released: "2026-04-23"
 
 # ─── 版本号语义: BRAIN.HANDS.CALIB ──────────────────────────────────
@@ -12,16 +12,18 @@ released: "2026-04-23"
 # HANDS: scripts/ 新增或重写 / DB schema 迁移 / MCP 接口替换
 # CALIB: 阈值/关键词/节流参数调整 / bugfix / prompt 微调
 #
-# 版本位决策（本版 v2.4.1）:
-#   - SKILL.md 完全不动；无新功能；纯 bugfix
-#   - 社区验证复盘 4 处断点修复：
-#     1. install.sh 依赖检查补 jq + rsync（避免 rsync 缺失直接崩）
-#     2. install.sh 把 Gemini Key 写入 config/runtime.env 的 IMAGE_GEN_API_KEY
-#        （过去写根 .env 的 GEMINI_API_KEY，运行时读不到 → 发帖无法生图）
-#     3. install.sh 把 MCP URL 同样写入 config/runtime.env 的 MCP_URL
-#     4. preflight.py check_mcp 收紧判据：否定信号优先、取消 state.mcp_configured
-#        掩盖失败的 lenient fallback，避免把 check_login_status 报错误判成 ok
-#   - 遂定 CALIB +1 → v2.4.1
+# 版本位决策（本版 v2.4.2）:
+#   - SKILL.md 完全不动；业务能力 / 算法 / MCP 接口零变化；纯 bugfix
+#   - 社区二次验证复盘 5 处 source-target 路径混淆修复：
+#     1. install.sh _runtime_env_set 改 force override (MCP_URL 不再被模板默认值顶掉)
+#     2. install.sh §7.5 每 target 循环追加 db.sh init (target DB 真实初始化 + __migrations)
+#     3. install.sh ua_step_migrations 传 SHULING_DB=$target/data/xhs.db
+#        (migrations 写入 target DB, 不再误写源仓库 DB)
+#     4. db.sh 支持 SHULING_DB env var override (允许调用方显式指定 DB 路径)
+#     5. _guard.sh 调 db.sh init 时透传 SHULING_DB (target DB 不存在时, init 目标正确)
+#   - 附赠: ua_step_preflight 判定放宽 (exit 1/2 为运行时配置未就绪, 不是 upgrade 失败)
+#   - 新增: scripts/pre-submit-verify.sh 21 项本地回归套件 (预演社区 verifier 行为)
+#   - 遂定 CALIB +1 → v2.4.2
 
 breaking_change_policy:
   brain:
@@ -121,3 +123,10 @@ calib:
   install_dep_check: "v2.4.1"                      # v2.4.1 新增：install.sh 补 jq + rsync 依赖检查
   install_env_write_target: "config/runtime.env"   # v2.4.1 修正：从根 .env 的 GEMINI_API_KEY → config/runtime.env 的 IMAGE_GEN_API_KEY
   preflight_mcp_strict: "v2.4.1"                   # v2.4.1 修正：check_mcp 否定信号优先，去掉 state.mcp_configured 掩盖失败的 fallback
+  runtime_env_force_override: "v2.4.2"             # v2.4.2 修正：_runtime_env_set 强制覆盖模板默认值（MCP_URL 才能被真写入）
+  install_target_db_init: "v2.4.2"                 # v2.4.2 新增：每 target 循环跑 db.sh init，target 的 data/xhs.db 不再 not_initialized
+  migration_target_isolation: "v2.4.2"             # v2.4.2 修正：migrations 通过 SHULING_DB 写 target DB 而非源 DB
+  db_sh_shuling_db_override: "v2.4.2"              # v2.4.2 新增：db.sh 支持 SHULING_DB env var
+  guard_init_propagation: "v2.4.2"                 # v2.4.2 修正：_guard.sh 调 db.sh init 时透传 SHULING_DB
+  preflight_upgrade_tolerance: "v2.4.2"            # v2.4.2 修正：ua_step_preflight exit 1/2 视为 runtime 配置未就绪, 不算 upgrade 失败
+  pre_submit_gate: "v2.4.2"                        # v2.4.2 新增：scripts/pre-submit-verify.sh 21 项本地回归套件

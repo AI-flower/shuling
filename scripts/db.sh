@@ -2,9 +2,16 @@
 set -e
 
 # ─── Auto-detect paths ───────────────────────────────────────────────
+# v2.4.2: 支持 SHULING_DB env var override, 允许调用方（install.sh / _guard.sh）
+# 明确指定操作哪个 DB, 避免在 target install 路径上 db.sh 误写源仓库 DB.
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-DB_DIR="$SKILL_DIR/data"
-DB_PATH="$DB_DIR/xhs.db"
+if [ -n "${SHULING_DB:-}" ]; then
+    DB_PATH="$SHULING_DB"
+    DB_DIR="$(dirname "$DB_PATH")"
+else
+    DB_DIR="$SKILL_DIR/data"
+    DB_PATH="$DB_DIR/xhs.db"
+fi
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 
