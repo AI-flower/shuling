@@ -15,6 +15,122 @@
 
 ---
 
+## [2.4.0] - 2026-04-23 "Agent-Friendly Upgrade Infrastructure"
+
+工程侧大修：把本次 v2.2.1→v2.3.0 升级 agent 手推 9 步的经验固化为可复用基础设施。**SKILL.md / 业务流程 / 自进化算法完全不变**，纯工程升级。
+
+**版本位决策**：BRAIN +0 / HANDS +1 / CALIB +0 → HANDS +1 → v2.4.0
+
+### 📦 用户可见改动
+
+- **一键升级**：`bash install.sh upgrade-all [--dry-run] [--json] [--target=<name>]` 扫出所有已装 target 并统一升级，替代过去逐 target 手动 rsync + migrate + run hook 的 9 步
+- **JSON 可观测**：每步（backup / rsync / migration / upgrade_hook / pip_install / preflight）输出机器可读 JSON，agent 可审计每步为什么跑/跳/改了什么
+- **migrations 幂等化**：旧 4 份 migration 改造后安全重跑；新增 v2.2.1 / v2.3.0 空壳保持版本线连续；所有 migration 通过 `__migrations` 表记录 applied
+- **升级副作用固化**：新增 `upgrade-hooks/v2.3.0/` 三个 hook（runtime-env 四字段同步 / preferences schema 迁移 / hermes jobs.json "HTML 截图" 词条替换），下次 agent 升级不用再手工推理
+- **依赖锁定**：新增 `requirements.txt`（当前只锁 `jsonschema>=4.0,<5.0`，实际扫描后 image.py/preflight.py 纯 stdlib）
+- **schema drift 可校验**：`python3 scripts/validate.py --target <path>` 一键查 state/profile/preferences/audit-report 是否符合 schema —— 本次扫出 codex target `state.json` 缺 `setup_completed` 等字段的历史 drift
+- **docs/ 结构化**：五子目录 `adr/plans/runbooks/reference/archive`；195 个悬挂 checkbox 的旧 plan 统一归档；`docs/README.md` 目录索引
+
+### 🧠 Brain
+
+_无。本版 SKILL.md 完全不动。业务流程 / 自进化算法 / AI 行为方式零变化。_
+
+### ✋ Hands
+
+**migrations 幂等化（B1 + B2）**
+- `migrations/_applied_table.sql`：单一真实 `__migrations(version, applied_at)` schema，供 guard 和 `db.sh init` 共用
+- `migrations/_guard.sh`：公共库，提供 `already_applied` / `mark_applied`；source 时自动建表兜底；DB 路径从 `$SHULING_DB` 或 `$SKILL_DIR/data/xhs.db` 推导
+- `migrations/v2.2.1.sh` / `v2.3.0.sh`：空壳占位，保持版本线连续（install.sh upgrade-all 按目录扫描）
+- `migrations/v2.1.1.sh` / `v2.1.2.sh` / `v2.1.3.sh` / `v2.2.0.sh`：存量四份全部改造为 guard-wrapped，DDL 本体保留，重跑无害，输出统一单行 JSON
+- `scripts/db.sh init`：同步补建 `__migrations` 表，`.tables` 输出从 10 张扩展到 11 张
+
+**升级副作用固化（B3）**
+- `upgrade-hooks/README.md` + `upgrade-hooks/v2.3.0/README.md`：目录约定文档
+- `upgrade-hooks/v2.3.0/runtime-env-sync.sh`：检查 `config/runtime.env` 的 `IMAGE_GEN_*` 四字段；缺则从其他 target 借用 API_KEY，补默认值；**不覆盖用户已有值**
+- `upgrade-hooks/v2.3.0/preferences-structure-migrate.sh`：旧扁平 `topic_preferences/style_preferences/title_pattern_preferences` → 新嵌套 `dimensions.topic/style/title_pattern`，自动备份到 `.bak-v2.3.0-<timestamp>`
+- `upgrade-hooks/v2.3.0/scheduler-prompt-update.sh`：hermes `~/.hermes/cron/jobs.json` 里 "HTML 截图" 替换 "Gemini 生图"，自动备份
+- 每 hook 幂等、JSON stdout（单行）、无交互
+
+**install.sh 升级聚合器（B4）**
+- 新增子命令 `upgrade-all`（install.sh 487 → 979 行）：
+  - `discover_targets()` 扫 `~/.codex/skills/*` / `~/.hermes/skills/**` / `~/.claude/skills/*`，识别需同时有 VERSION + SKILL.md
+  - 每 target 6 步：backup / rsync_code / migrations / upgrade_hooks / pip_install / preflight
+  - 支持 `--dry-run`（纯 plan）/ `--json`（agent-first）/ `--target=<name>`（过滤）
+  - 单 step 失败 → 本 target 后续自动 `skipped/prior_failed`，不阻塞其他 target
+  - JSON 契约符合 `docs/adr/agent-upgrade-design.md`
+- 原六模式（install / --check / --dry-run / --yes / --target / --mode=existing-creator）完全兼容
+
+**依赖锁定（D4）**
+- `requirements.txt`（新）：按 `scripts/*.py` 实际 import 扫描产出；image.py/preflight.py 只用 stdlib；唯一真依赖是 `jsonschema>=4.0,<5.0`（v2.4.0 新增的 validate.py 使用）；注释说明未来引入 SDK 的追加规则
+
+**schema drift 校验（C3）**
+- `scripts/validate.py`（新）：读 `schemas/*.json` 校验对应 runtime 产物（state/profile/preferences + glob audit-*.json）；`--target <path>` / `--file <path> --schema <name>` / `--json` / 退出码 0/1/2
+- `scripts/preflight.py`：加 `check_schemas()` 项，drift 时 action="optional" 引导跑 validate.py
+
+### 🎛 Calib
+
+**docs 重组（D1）**
+- 新建 `docs/{adr,plans,runbooks,reference,archive}/` 五子目录
+- `git mv` 共 11 份历史文档归档（保留 history）：
+  - `runbooks/`: mcp-setup.md
+  - `reference/`: capability-overview.md
+  - `plans/`: 2026-04-21-project-optimization-roadmap.md / existing-creator-onboarding.md（从 features/ 移出）
+  - `adr/`: agent-upgrade-design.md / 2026-04-23-kb-health-diagnosis.md（Phase 0 新建）
+  - `archive/`: 2026-04-15-self-evolution-{design,plan}.md + 4 份 superpowers-*.md 历史 plan
+- 195 个悬挂 checkbox 头部加 reconcile 说明统一归档，不逐一勾选
+- 新建 `docs/README.md` 目录索引（frontmatter + 用途表）
+
+**清杂物（D2）**
+- 删除 `SKILL.md.bak` / `scripts/image.py.bak`
+- `.gitignore` 追加 `*.bak.*` / `.session-recorder/`
+
+**引用修正**
+- SKILL.md / README.md / UPGRADE.md 中指向旧 `docs/mcp-setup.md` 和 `docs/features/existing-creator-onboarding.md` 的链接全部更新到新路径
+
+### ⬆️ 如何升级
+
+**推荐（新路径，v2.4.0 起）**：
+
+```bash
+cd /path/to/shuling && git pull
+bash install.sh upgrade-all --dry-run --json | python3 -m json.tool  # 先看 plan
+bash install.sh upgrade-all                                           # 实际升级
+```
+
+`upgrade-all` 会对每个发现的 target：
+1. backup 到 `<target>.bak-v2.4.0-<timestamp>`
+2. rsync 源码（自动 exclude `data/ / config/runtime.env / knowledge-base/`）
+3. 跑 migrations（已 applied 自动 skip）
+4. 跑 upgrade-hooks（已处理自动 skip）
+5. pip install -r requirements.txt
+6. preflight 验证
+
+**老路径依然可用**（向后兼容）：
+
+```bash
+bash install.sh         # 原六模式完全保留
+```
+
+**升级后验证**：
+
+```bash
+python3 scripts/validate.py --target <target-path>                       # schema drift
+sqlite3 <target>/data/xhs.db "SELECT * FROM __migrations"                 # 应列出 2.1.1~2.3.0
+```
+
+**Breaking**：无。老部署一条命令平滑升级。
+
+### 🧭 路线图预告
+
+- **v2.4.1**（Observability + Test）：C1 脚本级 JSON 日志 + C2 smoke 测试 + E1 ShellCheck
+- **v2.5.0**（SKILL.md Modular，BRAIN+1）：A1 1208 行 SKILL.md 拆分为主干 ≤300 行 + `skill-chapters/*`
+- **历史债 backlog**（按需触发）：A2 db.sh → db.py、C4 三平台独立 smoke、D5 备份清理
+- **永久不做**：E2 命名一致性改名（成本 > 收益）
+
+详见 `docs/plans/2026-04-21-project-optimization-roadmap.md`
+
+---
+
 ## [2.3.0] - 2026-04-21 "Pure Image Pipeline"
 
 图像生成管线的一次收紧：去掉 HTML 截图降级路径，强制走 Gemini AI 生图；引入结构化 prompt 模板系统 + 封面回流参考图 + 极简 fallback。

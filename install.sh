@@ -3,19 +3,28 @@ set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# ─── 参数解析（v2.1.3+） ─────────────────────────────────────────────
+# ─── 参数解析（v2.1.3+ / v2.4.0+） ───────────────────────────────────
 #
 # 用法:
-#   bash install.sh [选项]
+#   bash install.sh [选项]                          # 原 install 流程
+#   bash install.sh upgrade-all [选项]              # agent-first 批量升级（v2.4.0+）
 #
 # 选项:
 #   -y, --yes, --non-interactive   不问任何问题，交互项用默认值跳过
 #   --dry-run                      只打印将要执行的动作，不写任何东西
 #   --check                        只跑预检（依赖 + 平台 + 版本对比），不部署
 #   --target <path>                显式指定部署目标（可重复），覆盖默认自动检测
+#                                  upgrade-all 下：--target=<name> 只升指定 target
 #   --mode <new|existing|ask>      创作者模式（v2.2.0+）；existing = 老博主走 §0c 流程
 #   --skip-preflight               跳过部署后的 preflight 运行
+#   --json                         upgrade-all 强制机器可读 JSON 输出
 #   -h, --help                     显示此帮助
+#
+# 子命令 upgrade-all (v2.4.0+):
+#   bash install.sh upgrade-all                    # 升级所有发现 target
+#   bash install.sh upgrade-all --dry-run          # 只出 plan JSON 不执行
+#   bash install.sh upgrade-all --target=<name>    # 只升某一个
+#   bash install.sh upgrade-all --json             # 强制机器可读 JSON
 #
 # 环境变量（非交互模式下替代 prompt）:
 #   GEMINI_API_KEY=xxx             预填 Gemini API Key，写入 .env
@@ -27,6 +36,7 @@ SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 #   bash install.sh --check                            # 只自检不动手
 #   bash install.sh --dry-run                          # 预演一次
 #   bash install.sh --mode=existing-creator            # 老博主接入模式
+#   bash install.sh upgrade-all --dry-run --json       # 计划 JSON
 #   SHULING_ASSUME_YES=1 GEMINI_API_KEY=xxx bash install.sh   # CI/远程
 #   bash install.sh --target ~/.myagents/skills/shuling       # 自定义目标
 
@@ -37,9 +47,20 @@ SKIP_PREFLIGHT=0
 CREATOR_MODE="${SHULING_CREATOR_MODE:-ask}"
 declare -a EXPLICIT_TARGETS=()
 
+# upgrade-all 子命令（v2.4.0+）
+UPGRADE_ALL=0
+JSON_OUT=0
+UA_TARGET_FILTER=""
+
 usage() {
     sed -n '/^# ─── 参数解析/,/^$/p' "$0" | sed 's/^# \{0,1\}//'
 }
+
+# 先截获子命令（位置参数），不影响原有 option 解析
+if [ $# -gt 0 ] && [ "$1" = "upgrade-all" ]; then
+    UPGRADE_ALL=1
+    shift
+fi
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -47,9 +68,21 @@ while [ $# -gt 0 ]; do
         --dry-run)                  DRY_RUN=1; shift ;;
         --check)                    CHECK_ONLY=1; shift ;;
         --skip-preflight)           SKIP_PREFLIGHT=1; shift ;;
+        --json)                     JSON_OUT=1; shift ;;
+        --target=*)
+            # upgrade-all 下 --target=<name> 是 target name 过滤；install 模式下允许也当路径看待
+            if [ "$UPGRADE_ALL" = "1" ]; then
+                UA_TARGET_FILTER="${1#*=}"; shift
+            else
+                EXPLICIT_TARGETS+=("${1#*=}"); shift
+            fi ;;
         --target)
             [ $# -ge 2 ] || { echo "错误: --target 需要一个路径参数" >&2; exit 2; }
-            EXPLICIT_TARGETS+=("$2"); shift 2 ;;
+            if [ "$UPGRADE_ALL" = "1" ]; then
+                UA_TARGET_FILTER="$2"; shift 2
+            else
+                EXPLICIT_TARGETS+=("$2"); shift 2
+            fi ;;
         --mode=*)
             case "${1#*=}" in
                 new|existing|ask)             CREATOR_MODE="${1#*=}" ;;
@@ -67,6 +100,11 @@ while [ $# -gt 0 ]; do
         *) echo "错误: 未知参数 $1（见 --help）" >&2; exit 2 ;;
     esac
 done
+
+# upgrade-all 默认强制 JSON 输出（agent-first）
+if [ "$UPGRADE_ALL" = "1" ]; then
+    JSON_OUT=1
+fi
 
 # 非 TTY 环境自动进入非交互模式（cron/ssh/CI）
 if [ ! -t 0 ] && [ "$ASSUME_YES" = "0" ]; then
@@ -161,6 +199,465 @@ run_migrations() {
         printf "  无需 migration（已是 %s）\n" "$to_ver"
     fi
 }
+
+# ═══════════════════════════════════════════════════════════════════
+# upgrade-all 子命令（v2.4.0+）—— agent-first 批量升级
+# ═══════════════════════════════════════════════════════════════════
+#
+# 设计原则：
+#   - 零人类文案依赖：结果全 JSON，stderr 只输步骤调试、stdout 只输最终 JSON
+#   - 幂等：backup/rsync/migrations/hooks/pip 全部可重跑
+#   - 声明式：每 target 每 step 都有 {id,status,...} 记录
+#   - 容错：单 step 失败本 target 其余 step 标 skipped/prior_failed，继续下一 target
+
+# ─── JSON 小工具 ────────────────────────────────────────────────────
+# 用 python3 做 JSON 转义（bash 写 JSON 会挂在引号 / 控制字符上）
+json_escape() {
+    python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$1"
+}
+
+# 日志输出到 stderr（以避免污染 stdout 的 JSON）
+ua_log() {
+    [ "$JSON_OUT" = "1" ] || return 0
+    # JSON 模式下全部静音；非 JSON 模式（未来保留扩展）这里可以 printf
+    :
+}
+
+# ─── 发现 targets ──────────────────────────────────────────────────
+#
+# 扫描三路径：
+#   ~/.codex/skills/*
+#   ~/.hermes/skills/**   （最多两层，支持 social-media/shuling）
+#   ~/.claude/skills/*
+#
+# 识别条件：目录内同时有 VERSION + SKILL.md
+#
+# 输出全局数组 UA_TARGETS，每项为 "name\tpath\truntime_env\tscheduler_kind\tscheduler_config"
+#   scheduler_kind   : "none" | "hermes-cron"
+#   scheduler_config : 调度器配置文件绝对路径，none 时为空
+declare -a UA_TARGETS=()
+
+_ua_is_target() {
+    local dir="$1"
+    [ -f "$dir/VERSION" ] && [ -f "$dir/SKILL.md" ] || return 1
+    # 排除备份目录（install.sh 自己生成的命名约定 *.bak-v<ver>-<ts>）
+    case "$(basename "$dir")" in
+        *.bak-*|*.bak|*.backup|*.old) return 1 ;;
+    esac
+    return 0
+}
+
+_ua_guess_name() {
+    local path="$1" base
+    case "$path" in
+        "$HOME/.codex/skills/"*)    echo "codex" ;;
+        "$HOME/.hermes/skills/"*)   echo "hermes" ;;
+        "$HOME/.claude/skills/"*)   echo "claude" ;;
+        *)
+            base="$(basename "$path")"
+            # 兜底：目录名不是 shuling 就用它；是 shuling 就用上级
+            if [ "$base" = "shuling" ]; then
+                base="$(basename "$(dirname "$path")")"
+            fi
+            echo "${base:-custom}"
+            ;;
+    esac
+}
+
+discover_targets() {
+    UA_TARGETS=()
+    local seen=""
+    local d
+
+    # ~/.codex/skills/* （一层）
+    if [ -d "$HOME/.codex/skills" ]; then
+        for d in "$HOME/.codex/skills"/*; do
+            [ -d "$d" ] || continue
+            _ua_is_target "$d" || continue
+            case "$seen" in *"|$d|"*) continue ;; esac
+            seen="$seen|$d|"
+            UA_TARGETS+=("codex	$d	$d/config/runtime.env	none	")
+        done
+    fi
+
+    # ~/.hermes/skills/** （最多两层：扫 skills/* 和 skills/*/*）
+    if [ -d "$HOME/.hermes/skills" ]; then
+        local jobs_json="$HOME/.hermes/cron/jobs.json"
+        local sched_kind="none" sched_cfg=""
+        if [ -f "$jobs_json" ]; then
+            sched_kind="hermes-cron"
+            sched_cfg="$jobs_json"
+        fi
+        # 一层
+        for d in "$HOME/.hermes/skills"/*; do
+            [ -d "$d" ] || continue
+            if _ua_is_target "$d"; then
+                case "$seen" in *"|$d|"*) continue ;; esac
+                seen="$seen|$d|"
+                UA_TARGETS+=("hermes	$d	$d/config/runtime.env	$sched_kind	$sched_cfg")
+            fi
+        done
+        # 两层（如 social-media/shuling）
+        for d in "$HOME/.hermes/skills"/*/*; do
+            [ -d "$d" ] || continue
+            if _ua_is_target "$d"; then
+                case "$seen" in *"|$d|"*) continue ;; esac
+                seen="$seen|$d|"
+                UA_TARGETS+=("hermes	$d	$d/config/runtime.env	$sched_kind	$sched_cfg")
+            fi
+        done
+    fi
+
+    # ~/.claude/skills/* （一层）
+    if [ -d "$HOME/.claude/skills" ]; then
+        for d in "$HOME/.claude/skills"/*; do
+            [ -d "$d" ] || continue
+            _ua_is_target "$d" || continue
+            case "$seen" in *"|$d|"*) continue ;; esac
+            seen="$seen|$d|"
+            UA_TARGETS+=("claude	$d	$d/config/runtime.env	none	")
+        done
+    fi
+}
+
+# ─── 每 step 构造 JSON 片段（拼到 STEP_JSONS 里）────────────────────
+# step_record <id> <status> [key1 val1 key2 val2 ...]
+#   生成 {"id":"...","status":"...",<extra k/v>} 并追加到全局 STEP_JSONS
+declare -a STEP_JSONS=()
+CURRENT_TARGET_FAILED=0
+
+step_record() {
+    local id="$1" status="$2"; shift 2
+    local extras=""
+    while [ $# -ge 2 ]; do
+        local k="$1" v="$2"; shift 2
+        # 数字类型（files_changed）特殊处理——纯数字就不引号
+        if [[ "$v" =~ ^[0-9]+$ ]]; then
+            extras="$extras,$(json_escape "$k"):$v"
+        else
+            extras="$extras,$(json_escape "$k"):$(json_escape "$v")"
+        fi
+    done
+    STEP_JSONS+=("{$(json_escape "id"):$(json_escape "$id"),$(json_escape "status"):$(json_escape "$status")$extras}")
+    [ "$status" = "failed" ] && CURRENT_TARGET_FAILED=1
+}
+
+# ─── 6 个 step 的具体实现 ───────────────────────────────────────────
+
+ua_step_backup() {
+    local path="$1" to_ver="$2"
+    local ts backup_path
+    ts="$(date +%Y%m%d-%H%M%S)"
+    backup_path="${path}.bak-v${to_ver}-${ts}"
+    if [ "$DRY_RUN" = "1" ]; then
+        step_record "backup" "planned" "artifact" "$backup_path"
+        return 0
+    fi
+    if cp -R "$path" "$backup_path" 2>/dev/null; then
+        step_record "backup" "ok" "artifact" "$backup_path"
+    else
+        step_record "backup" "failed" "reason" "cp_failed" "artifact" "$backup_path"
+    fi
+}
+
+ua_step_rsync_code() {
+    local path="$1"
+    if [ "$CURRENT_TARGET_FAILED" = "1" ]; then
+        step_record "rsync_code" "skipped" "reason" "prior_failed"
+        return 0
+    fi
+    if [ "$DRY_RUN" = "1" ]; then
+        step_record "rsync_code" "planned" "source" "$SKILL_DIR"
+        return 0
+    fi
+    local log files_changed
+    log="$(mktemp)"
+    if rsync -a --delete \
+        --exclude=data/ \
+        --exclude=config/runtime.env \
+        --exclude=config/state.json \
+        --exclude=knowledge-base/ \
+        --exclude=landing/ \
+        --exclude=.playwright-mcp/ \
+        --exclude=.git \
+        --exclude=.DS_Store \
+        --exclude=.idea \
+        --exclude=.session-recorder \
+        --exclude=skills \
+        --exclude=docs \
+        --exclude='*.md' \
+        --itemize-changes \
+        "$SKILL_DIR/" "$path/" > "$log" 2>&1; then
+        # 每一行是一个文件变化
+        files_changed="$(grep -c '^' "$log" 2>/dev/null || echo 0)"
+        # 保留核心 .md（SKILL / README / CHANGELOG / UPGRADE / RELEASING / VERSION）
+        local doc
+        for doc in SKILL.md README.md CHANGELOG.md UPGRADE.md RELEASING.md VERSION; do
+            [ -f "$SKILL_DIR/$doc" ] && cp "$SKILL_DIR/$doc" "$path/" 2>/dev/null || true
+        done
+        step_record "rsync_code" "ok" "files_changed" "$files_changed"
+        rm -f "$log"
+    else
+        step_record "rsync_code" "failed" "reason" "rsync_failed"
+        rm -f "$log"
+    fi
+}
+
+ua_step_migrations() {
+    local path="$1" from_ver="$2" to_ver="$3"
+    if [ "$CURRENT_TARGET_FAILED" = "1" ]; then
+        step_record "migrations" "skipped" "reason" "prior_failed"
+        return 0
+    fi
+    local migrations_dir="$SKILL_DIR/migrations"
+    if [ ! -d "$migrations_dir" ]; then
+        step_record "migrations" "skipped" "reason" "no_migrations_dir"
+        return 0
+    fi
+    local any=0 m fname v
+    for m in $(ls "$migrations_dir"/v*.sh 2>/dev/null | sort -V); do
+        fname="$(basename "$m")"
+        v="${fname#v}"; v="${v%.sh}"
+        # 只跑 from < v <= to
+        version_lt "$from_ver" "$v" || continue
+        version_le "$v" "$to_ver" || continue
+        any=1
+        local step_id="migration_v${v}"
+        if [ "$DRY_RUN" = "1" ]; then
+            step_record "$step_id" "planned" "script" "$fname"
+            continue
+        fi
+        # migration 脚本自身通过 _guard.sh 查 __migrations 表做幂等
+        # 我们检测退出码 + 输出关键字来判定 ok/skipped
+        local out rc
+        out="$(SKILL_DIR="$path" bash "$m" 2>&1)" && rc=0 || rc=$?
+        if [ "$rc" = "0" ]; then
+            # 脚本打印 "already applied" 视为 skipped；其余视为 ok
+            if echo "$out" | grep -qiE "already[ _-]?applied|skipped|no_schema_change"; then
+                step_record "$step_id" "skipped" "reason" "already_applied"
+            else
+                step_record "$step_id" "ok" "script" "$fname"
+            fi
+        else
+            step_record "$step_id" "failed" "reason" "migration_exit_$rc" "script" "$fname"
+        fi
+    done
+    if [ "$any" = "0" ]; then
+        step_record "migrations" "skipped" "reason" "no_pending_migration"
+    fi
+}
+
+ua_step_upgrade_hooks() {
+    local path="$1" from_ver="$2" to_ver="$3"
+    if [ "$CURRENT_TARGET_FAILED" = "1" ]; then
+        step_record "upgrade_hooks" "skipped" "reason" "prior_failed"
+        return 0
+    fi
+    local hooks_root="$SKILL_DIR/upgrade-hooks"
+    if [ ! -d "$hooks_root" ]; then
+        step_record "upgrade_hooks" "skipped" "reason" "no_hooks_dir"
+        return 0
+    fi
+    local any=0 vdir vname
+    for vdir in $(ls -d "$hooks_root"/v*/ 2>/dev/null | sort -V); do
+        vname="$(basename "$vdir")"          # "v2.3.0"
+        local v="${vname#v}"
+        version_lt "$from_ver" "$v" || continue
+        version_le "$v" "$to_ver" || continue
+        # 跑该版本下所有 *.sh
+        local hook hname
+        local hooks_in_ver=0
+        for hook in "$vdir"*.sh; do
+            [ -f "$hook" ] || continue
+            hooks_in_ver=$((hooks_in_ver + 1))
+            any=1
+            hname="$(basename "$hook" .sh)"
+            local step_id="upgrade_hook_${hname}"
+            if [ "$DRY_RUN" = "1" ]; then
+                step_record "$step_id" "planned" "version" "$v" "hook" "$hname"
+                continue
+            fi
+            local out rc
+            out="$(bash "$hook" "$path" 2>&1)" && rc=0 || rc=$?
+            if [ "$rc" = "0" ]; then
+                if echo "$out" | grep -qiE "already|skipped|no_change"; then
+                    step_record "$step_id" "skipped" "reason" "already_applied" "version" "$v"
+                else
+                    step_record "$step_id" "ok" "version" "$v" "hook" "$hname"
+                fi
+            else
+                step_record "$step_id" "failed" "reason" "hook_exit_$rc" "version" "$v" "hook" "$hname"
+            fi
+        done
+        if [ "$hooks_in_ver" = "0" ]; then
+            # 空目录（Team-2 未交付），明确记录
+            step_record "upgrade_hooks_${vname}" "skipped" "reason" "empty_version_dir"
+        fi
+    done
+    if [ "$any" = "0" ]; then
+        step_record "upgrade_hooks" "skipped" "reason" "no_applicable_hooks"
+    fi
+}
+
+ua_step_pip_install() {
+    local path="$1"
+    if [ "$CURRENT_TARGET_FAILED" = "1" ]; then
+        step_record "pip_install" "skipped" "reason" "prior_failed"
+        return 0
+    fi
+    local req="$SKILL_DIR/requirements.txt"
+    if [ ! -f "$req" ]; then
+        step_record "pip_install" "skipped" "reason" "no_requirements_txt"
+        return 0
+    fi
+    if [ "$DRY_RUN" = "1" ]; then
+        step_record "pip_install" "planned" "source" "$req"
+        return 0
+    fi
+    if pip3 install -r "$req" --disable-pip-version-check --quiet >/dev/null 2>&1; then
+        step_record "pip_install" "ok" "source" "$req"
+    else
+        step_record "pip_install" "failed" "reason" "pip_install_failed"
+    fi
+}
+
+ua_step_preflight() {
+    local path="$1"
+    if [ "$CURRENT_TARGET_FAILED" = "1" ]; then
+        step_record "preflight" "skipped" "reason" "prior_failed"
+        return 0
+    fi
+    local pf="$path/scripts/preflight.py"
+    if [ ! -f "$pf" ]; then
+        step_record "preflight" "skipped" "reason" "no_preflight_script"
+        return 0
+    fi
+    if [ "$DRY_RUN" = "1" ]; then
+        step_record "preflight" "planned" "script" "$pf"
+        return 0
+    fi
+    if (cd "$path" && python3 scripts/preflight.py >/dev/null 2>&1); then
+        step_record "preflight" "ok"
+    else
+        step_record "preflight" "failed" "reason" "preflight_nonzero"
+    fi
+}
+
+# ─── 升级单个 target ───────────────────────────────────────────────
+# $1..$5 = name \t path \t runtime_env \t scheduler_kind \t scheduler_config
+#  输出：一段 JSON 对象片段（不带外层逗号）
+upgrade_one_target() {
+    local name="$1" path="$2" runtime_env="$3" sched_kind="$4" sched_cfg="$5"
+    local from_ver to_ver
+    from_ver="$(read_version "$path/VERSION")"
+    to_ver="$SRC_VERSION"
+
+    STEP_JSONS=()
+    CURRENT_TARGET_FAILED=0
+
+    ua_step_backup          "$path" "$to_ver"
+    ua_step_rsync_code      "$path"
+    ua_step_migrations      "$path" "$from_ver" "$to_ver"
+    ua_step_upgrade_hooks   "$path" "$from_ver" "$to_ver"
+    ua_step_pip_install     "$path"
+    ua_step_preflight       "$path"
+
+    # 组装 steps 数组
+    local steps_joined="" i
+    for i in "${!STEP_JSONS[@]}"; do
+        if [ "$i" = "0" ]; then
+            steps_joined="${STEP_JSONS[$i]}"
+        else
+            steps_joined="$steps_joined,${STEP_JSONS[$i]}"
+        fi
+    done
+
+    # 调度器元信息
+    local sched_json
+    if [ "$sched_kind" = "none" ] || [ -z "$sched_kind" ]; then
+        sched_json="{$(json_escape kind):$(json_escape none)}"
+    else
+        sched_json="{$(json_escape kind):$(json_escape "$sched_kind"),$(json_escape config):$(json_escape "$sched_cfg")}"
+    fi
+
+    printf '{%s:%s,%s:%s,%s:%s,%s:%s,%s:%s,%s:%s,%s:[%s]}' \
+        "$(json_escape name)"         "$(json_escape "$name")" \
+        "$(json_escape path)"         "$(json_escape "$path")" \
+        "$(json_escape from_version)" "$(json_escape "$from_ver")" \
+        "$(json_escape to_version)"   "$(json_escape "$to_ver")" \
+        "$(json_escape runtime_env)"  "$(json_escape "$runtime_env")" \
+        "$(json_escape scheduler)"    "$sched_json" \
+        "$(json_escape steps)"        "$steps_joined"
+
+    # 若该 target 任一 step failed，标记 overall 需降级
+    if [ "$CURRENT_TARGET_FAILED" = "1" ]; then
+        return 1
+    fi
+    return 0
+}
+
+# ─── 主入口 ────────────────────────────────────────────────────────
+run_upgrade_all() {
+    discover_targets
+
+    local filtered=()
+    local entry name path re sk sc
+    for entry in "${UA_TARGETS[@]+"${UA_TARGETS[@]}"}"; do
+        IFS=$'\t' read -r name path re sk sc <<< "$entry"
+        if [ -n "$UA_TARGET_FILTER" ] && [ "$name" != "$UA_TARGET_FILTER" ]; then
+            continue
+        fi
+        filtered+=("$entry")
+    done
+
+    if [ "${#filtered[@]}" = "0" ]; then
+        local reason="no_targets_found"
+        [ -n "$UA_TARGET_FILTER" ] && reason="filter_matched_nothing"
+        printf '{"overall":"failed","reason":%s,"targets":[]}\n' "$(json_escape "$reason")"
+        exit 3
+    fi
+
+    local targets_joined="" any_failed=0 i=0
+    for entry in "${filtered[@]}"; do
+        IFS=$'\t' read -r name path re sk sc <<< "$entry"
+        local target_json
+        if target_json="$(upgrade_one_target "$name" "$path" "$re" "$sk" "$sc")"; then
+            :
+        else
+            any_failed=1
+        fi
+        if [ "$i" = "0" ]; then
+            targets_joined="$target_json"
+        else
+            targets_joined="$targets_joined,$target_json"
+        fi
+        i=$((i + 1))
+    done
+
+    local overall
+    if [ "$DRY_RUN" = "1" ]; then
+        overall="planned"
+    elif [ "$any_failed" = "1" ]; then
+        overall="failed"
+    else
+        overall="success"
+    fi
+
+    # 单行 JSON 输出到 stdout
+    printf '{"overall":%s,"src_version":%s,"target_count":%s,"targets":[%s]}\n' \
+        "$(json_escape "$overall")" \
+        "$(json_escape "$SRC_VERSION")" \
+        "${#filtered[@]}" \
+        "$targets_joined"
+
+    [ "$any_failed" = "1" ] && exit 1
+    exit 0
+}
+
+# 如果是 upgrade-all 模式，立刻执行并退出（不跑下面的 install 流程）
+if [ "$UPGRADE_ALL" = "1" ]; then
+    run_upgrade_all
+fi
 
 # ─── 模式提示 ───────────────────────────────────────────────────────
 MODE_BANNER=""

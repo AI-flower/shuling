@@ -241,7 +241,7 @@ python3 scripts/preflight.py
 1. **xiaohongshu-mcp**（核心依赖——没有它就无法操作小红书）
    - 如果未运行：问用户是否已安装 xiaohongshu-mcp
    - 已安装但未启动：执行 `bash scripts/xhs.sh status`，根据输出判断
-   - 未安装：告诉用户需要安装，提供安装方式（参考 `docs/mcp-setup.md`）
+   - 未安装：告诉用户需要安装，提供安装方式（参考 `docs/runbooks/mcp-setup.md`）
    - MCP 启动后，执行 `bash scripts/xhs.sh status` 验证登录态
    - **登录策略**（按优先级）：
      - **用户主动提议方案优先**：用户说"我给你 cookie"/"我直接粘贴"/"帮我用 cookie 登录"等任何变体 → **立即接受**，让用户从浏览器复制完整 `Cookie` 头字符串，调用 `bash scripts/xhs.sh import-cookie '<cookie字符串>'`。**不要绕回扫码、不要继续解释扫码流程**

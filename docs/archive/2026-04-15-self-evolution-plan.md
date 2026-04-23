@@ -1,3 +1,21 @@
+---
+title: 小红书内容自进化系统 Implementation Plan
+status: archived
+moved_from: docs/2026-04-15-self-evolution-plan.md
+moved_at: 2026-04-23
+original_date: 2026-04-15
+archive_reason: obsolete
+checkbox_count: 45
+---
+
+> **归档说明**（2026-04-23 v2.4.0 docs 重组）：
+> 本文档已归档。原因：obsolete — 自进化能力已在 v2.0-v2.3 实际落地，此 plan 的 task 分解与当前代码组织方式已不对齐。
+> 如需了解当前状态请参阅：`CHANGELOG.md`（v2.0-v2.3 条目）和根目录 `SKILL.md`。
+>
+> **Checkbox 状态 reconcile**：本 plan 含 45 个未勾 checkbox，2026-04-23 归档时统一判定"不再追踪"。已落地部分归入 v2.0-v2.3 实际发版（见 `CHANGELOG.md`），未落地部分若仍需要将另开新 plan。
+
+---
+
 # 小红书内容自进化系统 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

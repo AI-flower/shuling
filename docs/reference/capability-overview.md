@@ -1,3 +1,12 @@
+---
+title: 小红书自动发布系统 — 完整功能业务能力清单
+status: active
+moved_from: docs/capability-overview.md
+moved_at: 2026-04-23
+original_date: 2026-04-15
+category: reference
+---
+
 # 小红书自动发布系统 — 完整功能业务能力清单
 
 > 版本: 2026-04-15 | 项目: shuling

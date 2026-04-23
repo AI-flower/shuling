@@ -221,6 +221,63 @@ def check_profile():
     }
 
 
+def check_schemas():
+    """校验 runtime 文件对 schemas/ 的一致性（v2.4.0）。
+
+    复用 scripts/validate.py。drift 归为 optional 级别：
+    - ok     : 全部 valid
+    - drift  : runtime 有文件违反 schema
+    - missing: schemas/ 不存在或 jsonschema 未安装
+    """
+    if not (SKILL_DIR / "schemas").is_dir():
+        return {
+            "name": "Schema 校验",
+            "status": "missing",
+            "detail": "schemas/ 不存在",
+            "action": "optional",
+        }
+    try:
+        sys.path.insert(0, str(SCRIPTS_DIR))
+        from validate import run as _validate_run
+    except ImportError as e:
+        return {
+            "name": "Schema 校验",
+            "status": "missing",
+            "detail": f"scripts/validate.py 不可用: {e}",
+            "action": "optional",
+        }
+    try:
+        result = _validate_run(target=SKILL_DIR, skill_dir=SKILL_DIR)
+    except Exception as e:
+        return {
+            "name": "Schema 校验",
+            "status": "missing",
+            "detail": f"校验异常: {e}",
+            "action": "optional",
+        }
+
+    if result.get("fatal"):
+        return {
+            "name": "Schema 校验",
+            "status": "missing",
+            "detail": result.get("fatal_reason") or "jsonschema 库未安装",
+            "action": "optional",
+            "fix_cmd": "pip install -r requirements.txt",
+        }
+    if result["valid"]:
+        return {"name": "Schema 校验", "status": "ok", "detail": "runtime 文件全部匹配 schema", "action": None}
+
+    drift_files = sorted({item["file"] for item in result["drift"]})
+    return {
+        "name": "Schema 校验",
+        "status": "drift",
+        "detail": f"{len(drift_files)} 个文件 drift: {', '.join(Path(p).name for p in drift_files)}",
+        "action": "ask_user",
+        "ask": "runtime 文件与 schema 不一致；跑 `python3 scripts/validate.py` 查细节，或在确认可接受后更新 schema/回填字段。",
+        "drift_files": drift_files,
+    }
+
+
 def run_preflight():
     checks = [
         check_python(),
@@ -229,6 +286,7 @@ def run_preflight():
         check_image_gen(),
         check_database(),
         check_profile(),
+        check_schemas(),
     ]
 
     summary = {
@@ -283,6 +341,7 @@ def _status_icon(status: str, use_color: bool) -> str:
         "error": ("❌", "31"),
         "unknown": ("❓", "33"),
         "skip": ("⏭ ", "2"),
+        "drift": ("⚠️ ", "33"),
     }
     icon, color = table.get(status, ("·", "0"))
     return _color(icon, color, use_color)
