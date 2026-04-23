@@ -1,239 +1,213 @@
-# 薯灵推广执行 Runbook（14 天完整时间表）
+# 薯灵推广执行 Runbook · 第三方源采纳版
 
-> 每天照着打勾执行。所有动作都有对应物料文件，不用现写。
-
----
-
-## Day 0 · 今日必做（准备工作，2-3 小时）
-
-### ☐ 1. 同步版本 badge
-```bash
-# 按 patches/01-version-sync.patch 手工改 README.md + landing/index.html
-# 或一键 sed（小心当前工作区已脏，冲突时手工）
-cd /Users/weiyong/Documents/10/shuling
-
-# 先 commit 当前脏工作区（如果改动是 OK 的）
-git diff README.md landing/index.html > /tmp/shuling-dirty-backup.patch
-
-# 再 apply badge 同步
-# 详细替换命令见 patches/01-version-sync.patch
-```
-
-### ☐ 2. 添加 LICENSE 和 SECURITY.md
-```bash
-scp /root/shuling-promotion/LICENSE weiyong@100.79.106.110:/Users/weiyong/Documents/10/shuling/LICENSE
-scp /root/shuling-promotion/SECURITY.md weiyong@100.79.106.110:/Users/weiyong/Documents/10/shuling/SECURITY.md
-```
-
-### ☐ 3. 导出 mermaid 架构图 → SVG/PNG
-- 打开 `architecture-diagram.md`
-- 逐个复制 mermaid 代码块到 https://mermaid.live
-- 选 `dark` 主题，Export SVG
-- 保存到 Mac 的 `shuling/docs/images/`（新建目录）：
-  - `architecture-overview.svg`（全景）
-  - `routing-flow.svg`（业务路由）
-  - `self-evolution.svg`（自进化引擎）
-
-### ☐ 4. 录 demo GIF（可选但强推）
-- 工具：`vhs` 或 `asciinema` 或手机录屏转 GIF
-- 内容：60-90 秒
-- 脚本：
-  1. 终端输入 `bash install.sh --check`（3s）
-  2. 切到 Claude Code，输入"帮我发小红书"（3s）
-  3. 展示选题三选一（8s）
-  4. 用户回"1"（1s）
-  5. 展示大纲 6 页（10s 滚动）
-  6. 展示图片生成过程（15s）
-  7. 展示发布成功（3s）
-  8. 数据进化日志（5s）
-- 保存 `shuling/docs/images/demo.gif`（≤5MB，推特/GitHub 友好）
-
-### ☐ 5. commit + tag + push
-```bash
-cd /Users/weiyong/Documents/10/shuling
-git add LICENSE SECURITY.md README.md landing/index.html docs/images/
-git commit -m "docs(v2.3.0): sync badges + add LICENSE/SECURITY.md + demo assets"
-git tag -a v2.3.0 -m "Pure Image Pipeline"
-git push origin main --tags
-```
-
-### ☐ 6. 在 GitHub 创建 Release v2.3.0
-- 访问 https://github.com/AI-flower/shuling/releases/new
-- Tag: `v2.3.0`
-- Title: `v2.3.0 — Pure Image Pipeline`
-- Body: 复制 `github-release-v2.3.0.md` 内容
-- Publish
+> **推广策略**：只做"让其他 skill 集合源 / awesome 列表 / 官方 marketplace **采纳** 薯灵"——不发内容、不运营社交账号。
+> **时间表**：2 周内完成 3-5 个集合源的提交 + 至少 1-2 个被 merge。
 
 ---
 
-## Day 1-2 · 内容储备
+## 📋 总览：4 个目标源 · 4 种不同通道
 
-### ☐ 7. 补充项目根目录的 `docs/promotion/` 目录
-```bash
-scp -r /root/shuling-promotion weiyong@100.79.106.110:/Users/weiyong/Documents/10/shuling/docs/promotion/
-# 注意：这个目录会进 git，体现你把推广当作正规工程
-```
-
-### ☐ 8. 发三篇博客中的至少一篇到你的平台
-- 首选：文章 1（Skill-as-Brain） → `blog-1-skill-as-brain.md`
-- 平台：少数派 / 掘金 / Medium（英文） / 个人博客
-- 发布后把链接更新到 `anthropics-skills-pr.md` 的 "Architecture deep-dive" 占位
+| 源 | 通道 | 预期效果 | 优先级 |
+|---|---|---|---|
+| **anthropics/skills**（Claude 官方 skill marketplace） | PR | 最强背书，long-term 流量 | P0（最终目标） |
+| **e2b-dev/awesome-ai-agents** | PR | 通用 AI agent 合集，标准列表 | P0（先投，热身） |
+| **hesreallyhim/awesome-claude-code** | **Issue 表单**（禁止 PR） | Claude Code 生态精准流量 | P1 |
+| **Shubhamsaboo/awesome-llm-apps** | PR（需贡献代码副本） | 接纳概率低，不强求 | P2 |
 
 ---
 
-## Day 3 · 中文社群首轮（先拉 stars，不投 awesome）
+## ✅ Step 0 · 投稿前硬阻断（必须全部满足才能投）
 
-### ☐ 9. V2EX 分享创造节点发长贴（早 10 点）
-- 使用 `social-posts.md` 第 1 条完整版
-- 重点突出 "Skill-as-Brain 架构" 的叙事
-- 目标：产出 1 个 V2EX 贴子 → 200+ 浏览 → 10-20 GitHub stars
+| 检查项 | 状态确认命令 | 当前 |
+|---|---|---|
+| ☐ 线上 LICENSE 存在 | `curl -s -o /dev/null -w "%{http_code}" https://raw.githubusercontent.com/AI-flower/shuling/main/LICENSE` | ✅ 200（v2.3 Day 0 已修） |
+| ☐ 线上 SECURITY.md 存在 | 同上，路径换 SECURITY.md | ✅ 200 |
+| ☐ README badge 是当前版本 | `curl -s https://raw.githubusercontent.com/AI-flower/shuling/main/README.md \| grep version-` | **需更新到 v2.4.0**（见 `DAY-0-v2.4.0-PATCH.md`） |
+| ☐ 最新 Release 已发 | 浏览器看 `/releases/latest` | **v2.4.0 需发**（用 `github-release-v2.4.0.md`） |
+| ☐ 仓库 ≥ 7 天 | git log 第一个 commit | ✅ 2026-04-16 创建，已 ≥ 7 天 |
+| ☐ stars ≥ 10（awesome-claude-code 无明文门槛但实际会看） | 浏览器看 stars | **需补** |
 
-### ☐ 10. 即刻 AI 探索者圈子短贴（午 12:30）
-- 使用 `social-posts.md` 第 2 条
-- 配图：博客 1 里的架构 mermaid 截图
+> ⚠️ **不满足这 6 条就提 PR/Issue** → reviewer 第一眼就会关闭。
 
-### ☐ 11. Claude Code 中文社区微信/飞书群（晚 8 点）
-- 使用 `social-posts.md` 第 6 条（200 字版）
-- 强调"参考架构"，不要推销"小红书工具"
-
-**目标**：Day 4 早上 GitHub stars ≥ 15-20，才具备冲 awesome 的资格。
-
----
-
-## Day 4-7 · T2 Awesome 列表投递（❗ 顺序和通道都有讲究）
-
-> ⚠️ **实地调研发现**（见 `awesome-prs-ready-to-submit.md`）：三个列表规则差异很大，**不要一起 PR**。
-
-### ☐ 12a. Day 4 · 先投 `e2b-dev/awesome-ai-agents`（最标准，PR 通道）
-- 按字母序插入 `## [shuling](url)` + `<details>` 块
-- 允许 PR 或 Google Form 双通道
-- **pitch 重心**：贝叶斯偏好学习 + ε-greedy + pattern 生命周期（自进化闭环）
-- 完整 diff + 提交命令见 `awesome-prs-ready-to-submit.md` 列表 2 章节
-
-### ☐ 12b. Day 6 · 再投 `hesreallyhim/awesome-claude-code`（Issue 通道）
-> ⚠️ **不要用 `gh` CLI 提 PR**——维护者在 README 明文禁止："the only person who is allowed to submit PRs is Claude"；`gh` CLI 提交会被反垃圾系统自动关闭
-- **正确通道**：在浏览器打开 Issues → New Issue → 选 "Recommend Resource" 模板
-- 按 `.github/ISSUE_TEMPLATE/recommend-resource.yml` 逐字段填
-- **pitch 重心**：BRAIN.HANDS.CALIB / JSON Schema / migrations（工程范式）
-- Issue body 和逐字段填值见 `awesome-prs-ready-to-submit.md` 列表 1 章节
-
-### ☐ 12c. Day 7 · 最后冲 `Shubhamsaboo/awesome-llm-apps`（接纳概率低，期望降低）
-> ⚠️ 该仓库**明文不收外链**："Hand-built, not curated — every template here is self-contained with full source code"
-- 要接纳必须贡献 **SKILL.md + scripts 的代码副本** 到 `awesome_agent_skills/shuling-xiaohongshu-skill/` 子目录
-- **pitch 重心**：3 命令可跑的 skill 模板（降垂类，升通用 pattern）
-- 投递不成功不必纠结——这是 nice-to-have，不是必拿
-
-### 🚨 投递前硬阻断（先完成 Day 0-2 才能投）
-- [ ] 线上 repo 有 `LICENSE` 文件（`raw.githubusercontent.com/.../LICENSE` 不能 404）
-- [ ] 线上 README badge 已同步 v2.3.0（当前仍是 v2.2.0）
-- [ ] GitHub Release v2.3.0 已发布
-- [ ] stars ≥ 20（建议先 Day 4-5 在中文社群拉一波）
-- [ ] 仓库龄 ≥ 7 天（awesome-claude-code 最低龄要求，2026-04-23 正好第 8 天，刚过）
+### 补 stars 的受限方式
+用户说"不发内容"——那么 stars 不能靠社群推广拉。可接受的做法：
+- 自己在同事/朋友群组里私信（非发帖）——不算"发内容推广"
+- 你自己的几个 GitHub 账号 star（如果有）
+- **或者**：承认 stars 低是事实，在 PR 描述里坦诚 "early-stage, seeking reviewers"——部分 awesome 维护者接受
 
 ---
 
-## Day 8 · B 站视频（可选，看精力）
+## 🎯 Step 1 · Day 1-2 · 补齐投稿前置
 
-### ☐ 13. 录 6 分钟技术 vlog（如有精力）
-- 脚本见 `social-posts.md` 第 7 条
-- 硬件：OBS 屏幕录制 + 普通麦克风
-- 后期：剪映简剪，加字幕
-- 上传：标签 `编程 AI 开源 Claude MCP 小红书`
+### 1.1 · 发 v2.4.0 GitHub Release
 
----
+按 `DAY-0-v2.4.0-PATCH.md` Step A-D 跑完：
+- ✅ commit & push 所有 docs/promotion/ 里未 commit 的物料
+- ✅ sed 改 README + landing badge 到 v2.4.0
+- ✅ 浏览器创建 Release v2.4.0（粘贴 `github-release-v2.4.0.md` 全文）
 
-## Day 10 · Anthropic Discord #skills
-
-### ☐ 14. Discord 发完整介绍贴
-- 使用 `social-posts.md` 第 5 条
-- 频道：Anthropic official server / Claude Code channel
-- 时间：周日午（欧美活跃时间，中国夜晚）
-
----
-
-## Day 11 · Twitter/X 英文 Thread
-
-### ☐ 15. 3-tweet thread
-- 使用 `social-posts.md` 第 3 条
-- 时间：周一上午（美东时间）
-- 转发：自己其他账号 + @ 几个相关 KOL（如 @simonw @karpathy 不强求 interaction）
-
----
-
-## Day 14 · Hacker News Show HN（最后冲刺）
-
-### ☐ 16. Show HN
-- 使用 `social-posts.md` 第 4 条
-- 时间：周二或周三美东早上 9 点（HN 流量峰值）
-- 注意：不要刷票、不要点赞党、不要评论区自我吹嘘
-- 准备：手机开通知，头 2 小时内要快速回所有评论
-
----
-
-## Day 14+ · T1 anthropics/skills 官方 PR
-
-### ☐ 17. 冲官方 skill 集合源
-前置条件（必须全勾才提交）：
-- [ ] 至少 1 个 T2 awesome 列表已 merge
-- [ ] Anthropic Discord 有反馈
-- [ ] Twitter thread 有 ≥ 50 like
-- [ ] GitHub stars ≥ 30
-- [ ] 至少 1 篇博客发了
-
-满足后：
-- 使用 `anthropics-skills-pr.md` 的完整 PR 描述
-- 提交到 https://github.com/anthropics/skills
-- 准备 review iteration（可能要改几轮）
-
----
-
-## 持续跟踪（每周一复盘）
-
-### 指标
-- GitHub stars 增长曲线
-- 官网 `shuling.pages.dev` 访问量
-- 各社群贴子的浏览/回复/转发
-- issue 和 PR 数（有人在看真实代码的信号）
-
-### 如果某些渠道没反应
-- V2EX 24 小时没 up 主动→ 换节点再发一次
-- 即刻没人点→ 配更好的封面图再发
-- awesome PR 被拒 → 看评论调整策略，2 周后再试
-- Discord 没回复 → 换个子频道 repost 一次（不要刷）
-
-### 如果火了
-- 把评论区最好的 5 个反馈写进 `docs/testimonials.md`
-- 准备好回答"你们会做 SaaS 吗？"—— 答：不会（要捍卫 Skill-as-Brain 叙事）
-- 所有媒体询问都回导向 GitHub，不接私下定制
-
----
-
-## 附录 A · 物料速查
-
-| 你要的东西 | 在哪 |
-|---|---|
-| 一行介绍（多语言多变体） | `awesome-listings.md` |
-| 官方 PR 描述 | `anthropics-skills-pr.md` |
-| 社群贴子（中英 7 平台） | `social-posts.md` |
-| 3 个 awesome PR 完整指令 | `awesome-prs-ready-to-submit.md` |
-| GitHub Release body | `github-release-v2.3.0.md` |
-| 核心博客 1 完整稿 | `blog-1-skill-as-brain.md` |
-| 博客 2 完整稿 | `blog-2-semver.md` |
-| 博客 3 大纲 | `blog-drafts.md` 第 3 段 |
-| 架构图源码（mermaid） | `architecture-diagram.md` |
-| LICENSE 全文 | `LICENSE` |
-| SECURITY.md | `SECURITY.md` |
-| 版本同步 patch | `patches/01-version-sync.patch` |
-
-## 附录 B · 一键全部 scp 到 Mac
+### 1.2 · 为 PR 准备 demo GIF
 
 ```bash
-scp -r /root/shuling-promotion weiyong@100.79.106.110:/Users/weiyong/Documents/10/shuling/docs/promotion/
+brew install vhs
+cd /path/to/shuling/docs/promotion
+vhs demo.tape    # 产生 demo.gif
+cp demo.gif ../../docs/images/demo.gif   # 放到项目里方便 PR 引用
+git add docs/images/demo.gif
+git commit -m "docs: add demo GIF for skill marketplace submissions"
+git push
 ```
 
-然后 Mac 上 commit 这个目录：
-```bash
-cd /Users/weiyong/Documents/10/shuling
-git add docs/promotion/
-git commit -m "docs: add promotion materials package"
+### 1.3 · 渲染 3 张架构图
+
+- 打开 `architecture-diagram.md`，三块 mermaid 逐个到 https://mermaid.live
+- 主题选 dark，导出 SVG
+- 保存到 `docs/images/architecture-{overview,routing,evolution}.svg`
+- README 顶部引用（如果还没）
+
+### 1.4 · README 顶部"为什么值得收录"区块
+
+投 awesome 列表时 reviewer 要 30 秒内看出卖点。在 README 顶部（badge 下面）加一段：
+
+```markdown
+## 🧭 Why this repo
+
+- **Skill-as-Brain architecture** — 1208-line SKILL.md drives business logic; `scripts/` are mechanical hands only
+- **Versioning designed for skills** — BRAIN.HANDS.CALIB semver
+- **JSON Schema contracts** — prevents AI drift on state writes
+- **Agent-native upgrade infrastructure** (v2.4.0) — `install.sh upgrade-all` with JSON observability
+- **Multi-platform** — Claude Code / Codex / Hermes
+- **Fully local, MIT, no telemetry**
 ```
+
+这一段等价于给 reviewer 递名片。
+
+---
+
+## 🎯 Step 2 · Day 3 · 先投 e2b-dev/awesome-ai-agents（最标准）
+
+### 为什么先投这个
+- 允许 PR 通道（vs awesome-claude-code 只能 Issue）
+- 按字母序 + `<details>` 块，格式最标准
+- 通用 AI agent 合集，受众广
+- 成功后作为其他列表的社会证明（"已被 XX 收录"）
+
+### 具体操作
+打开 `awesome-prs-ready-to-submit.md` 的 **列表 2** 章节，按里面的步骤：
+
+1. Fork e2b-dev/awesome-ai-agents → 你的账号
+2. clone → 新 branch → 在 README 正确位置插入 shuling 条目
+3. commit → push → 用 `gh pr create` 或浏览器创建 PR
+4. PR body 使用 awesome-prs-ready-to-submit.md 里 列表 2.4 节提供的完整 body
+
+**不要**：在 PR 描述里贴你的博客链接或社群贴子——reviewer 会视为 content spam。
+
+### 等待期
+PR 提交后 3-7 天内可能被 review。期间：
+- ⏸ 不要做任何"社交炒作"动作
+- ✅ 每天 check PR comments，有 reviewer 评论就**当天**回
+- ✅ 如果 reviewer 说"改下 description"之类，立刻改，不要争辩
+
+### 通过后
+- 立刻到 PR 里评论一句 "Thank you for the review, happy to help maintain" —— 为以后 awesome 扩展铺关系
+- 在你的 `docs/adr/` 里加一份 "2026-04-XX-awesome-ai-agents-accepted.md" 记录——为下次投其他源提供社会证明
+
+---
+
+## 🎯 Step 3 · Day 5-6 · 投 hesreallyhim/awesome-claude-code（Issue 通道）
+
+### 关键警告
+⚠️ **不能用 PR**。README 明文："the only person who is allowed to submit PRs is Claude"。违规提 PR 会被反垃圾系统自动关闭。**必须走 Issue 表单**。
+
+### 具体操作
+
+1. 打开 https://github.com/hesreallyhim/awesome-claude-code/issues/new/choose
+2. 选 "Recommend Resource" 模板
+3. 按 `awesome-prs-ready-to-submit.md` **列表 1.3-1.11** 节，每个字段填进去
+4. **不要**用 gh CLI 提交 Issue——用浏览器
+5. 提交后 watch 这个 Issue，reviewer 可能几天内回复
+
+### 等待期
+同 Step 2，不要做任何社交动作，只盯 Issue 回复。
+
+---
+
+## 🎯 Step 4 · Day 7+ · Shubhamsaboo/awesome-llm-apps（低期望）
+
+### 为什么低期望
+该仓库明文："Hand-built, not curated — every template here is self-contained with full source code."
+要接纳必须**贡献 SKILL.md + scripts 的代码副本**到 `awesome_agent_skills/shuling-xiaohongshu-skill/` 子目录。
+
+### 如果你愿意做
+按 `awesome-prs-ready-to-submit.md` **列表 3** 章节：
+1. Fork → 创建 `awesome_agent_skills/shuling-xiaohongshu-skill/`
+2. 精简版 SKILL.md（只留核心 §0a/§2/§4）
+3. 简化版 scripts（只留 xhs.sh + db.sh + image.py 的最小可运行版）
+4. 独立 README 讲 3 命令可跑
+5. PR
+
+### 如果不愿意
+**跳过就跳过**。不强求。单纯 awesome-claude-code + awesome-ai-agents + Anthropic 官方 已经是很强的组合。
+
+---
+
+## 🎯 Step 5 · Day 10+ · 冲 anthropics/skills 官方
+
+### 前置条件（比普通 awesome 严格）
+- [ ] 至少 1 个 awesome 列表已 merge（社会证明）
+- [ ] GitHub Release v2.4.0 已发
+- [ ] stars ≥ 20（官方 skill marketplace 通常看活跃度）
+- [ ] LICENSE / SECURITY / README 完整且专业
+- [ ] demo GIF 或架构图放在 README 顶部
+- [ ] CHANGELOG / UPGRADE / RELEASING 三件套齐全（薯灵已有）
+
+### 具体操作
+使用 `anthropics-skills-pr.md` 的完整 PR body。
+提交到 https://github.com/anthropics/skills（注意：最新接纳流程看仓库 README，可能是 contributor process 而非直接 PR）。
+
+### Review 周期
+Anthropic 官方仓库 review 可能需要 2-4 周。期间：
+- 准备好回应 reviewer 的问题（用 awesome-prs 里的"风险与对策"预案）
+- 不要催——官方 review 催了反而有负面印象
+
+---
+
+## 📊 指标跟踪（周复盘）
+
+每周一记录：
+- 提交的 PR/Issue 数（本周）
+- Merged / Closed / Pending 数
+- Stars 周增量
+- Issues 收到数（其他人看到后来 report bug）
+- 官方/非官方收录数
+
+### 成功阈值（2 周时）
+- 至少 1 个 awesome 列表 merge → ✅ 最低成功
+- 2 个 awesome + 1 个 anthropics/skills PR submitted → ✅ 好
+- 3+ awesome + anthropics/skills merged → 🏆 超预期
+
+---
+
+## 🚫 明确不做的事
+
+按用户本次调整，**以下全部不做**：
+- ❌ 不发博客（Medium / Dev.to / 少数派 / 掘金 / 知乎 / 个人博客）
+- ❌ 不发社群贴（V2EX / 即刻 / Anthropic Discord / 微信群 / B 站 / LinkedIn）
+- ❌ 不发推特/X thread
+- ❌ 不发 Hacker News Show HN
+- ❌ 不联系 KOL、influencer
+- ❌ 不投 Product Hunt
+
+完备的这些弹药在 `archived-content-campaign/` 里保底，未来策略变了随时取。
+
+---
+
+## 🔁 如果 2 周后 0 merge
+
+可能原因 + 应对：
+1. **stars 太低** → 前面说过的"受限拉 star"或接受现实
+2. **README 不够有说服力** → 加 demo GIF、架构图、testimonials（如果有）
+3. **投错通道**（比如在 awesome-claude-code 提了 PR 被关） → 重新按 Issue 表单来
+4. **维护者没看到** → 在 PR 里 ping 一次（不要连续 ping）
+
+实在全部 0 merge：考虑加**最轻量**的一条内容（比如在你个人 GitHub profile README 加一条 pinned repo 介绍），这不算"发内容推广"。
