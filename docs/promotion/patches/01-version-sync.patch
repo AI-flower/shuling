@@ -1,0 +1,87 @@
+# v2.3.0 版本同步 Patch（手工 apply）
+
+> ⚠️ 不要用 `git apply`——你当前工作区已脏，不同文件不同版本混用会冲突。按下面说明手工改。
+
+---
+
+## README.md 顶部 badge（3 处替换）
+
+### 当前（第 5-6 行）
+```markdown
+[![Version](https://img.shields.io/badge/version-2.2.0-blue)](VERSION)
+[![Codename](https://img.shields.io/badge/codename-Existing%20Creator%20Support-green)](CHANGELOG.md)
+```
+
+### 目标
+```markdown
+[![Version](https://img.shields.io/badge/version-2.3.0-blue)](VERSION)
+[![Codename](https://img.shields.io/badge/codename-Pure%20Image%20Pipeline-green)](CHANGELOG.md)
+```
+
+### 当前（第 12 行）
+```markdown
+📦 **v2.2.0** · 2026-04-21 · [CHANGELOG](CHANGELOG.md) · [UPGRADE](UPGRADE.md) · [RELEASING](RELEASING.md)
+```
+
+### 目标
+```markdown
+📦 **v2.3.0** · 2026-04-21 · [CHANGELOG](CHANGELOG.md) · [UPGRADE](UPGRADE.md) · [RELEASING](RELEASING.md)
+```
+
+---
+
+## landing/index.html 硬编码版本（8 处）
+
+> 原则：只改**硬编码的当前版本**，不改 `v2.2.0+`（表示 since v2.2.0 的功能标记）。
+
+### 一键替换命令（macOS）
+
+```bash
+cd /Users/weiyong/Documents/10/shuling && \
+sed -i '' \
+  -e 's|v2\.2\.0</span>|v2.3.0</span>|g' \
+  -e 's|v2\.2\.0 · CURRENT|v2.3.0 · CURRENT|g' \
+  -e 's|>Existing Creator Support<|>Pure Image Pipeline<|g' \
+  -e 's|BRIEFING · AGENT INSTALL · v2\.2\.0|BRIEFING · AGENT INSTALL · v2.3.0|g' \
+  landing/index.html
+```
+
+### 验证
+```bash
+# 应该只剩 v2.2.0+ 形式（since 语义），没有 v2.2.0</span> 或 v2.2.0 · CURRENT
+grep -c 'v2\.2\.0[^+]' landing/index.html
+grep -c 'v2\.3\.0' landing/index.html
+```
+
+### 时间线节点补充（需手工改 HTML）
+
+第 846 行附近当前结构：
+```html
+<b class="neon-green" data-ver="tag-current">v2.2.0 · CURRENT</b>
+<span class="text-xs neon-green" data-ver="codename">Existing Creator Support</span>
+```
+
+改为：
+```html
+<b class="neon-green" data-ver="tag-current">v2.3.0 · CURRENT</b>
+<span class="text-xs neon-green" data-ver="codename">Pure Image Pipeline</span>
+```
+
+**建议**：在这一行**之前**插入 v2.2.0 作为历史节点（✓ 状态），保持 roadmap 完整性：
+```html
+<div class="flex gap-5 items-center"><div class="relative z-10 w-8 h-8 border border-ink-300/30 bg-void-900 flex items-center justify-center text-[10px] font-mono neon-cyan">✓</div><div class="flex-1 hud px-4 py-2.5"><div class="flex justify-between items-center font-mono text-sm"><b class="text-ink-100">v2.2.0</b><span class="text-xs text-ink-300/60">Existing Creator Support</span></div></div></div>
+```
+
+---
+
+## Commit 信息建议
+
+```
+docs(v2.3.0): 同步 README/landing badge 到 Pure Image Pipeline
+
+- README.md 顶部 version/codename badge + 📦 行同步到 v2.3.0
+- landing/index.html 硬编码 v2.2.0 · CURRENT → v2.3.0 · CURRENT
+- landing 时间线补 v2.2.0 历史节点
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
