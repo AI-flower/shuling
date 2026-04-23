@@ -15,6 +15,65 @@
 
 ---
 
+## [2.4.1] - 2026-04-23 "Install Reliability Patch"
+
+社区验证复盘 bugfix：v2.4.0 提交到 cookbook 社区实测发现 4 处执行链路断点，**全部属于 install / preflight 路径的历史隐患**，与 v2.4.0 新增基础设施无关。SKILL.md / 业务流程 / 算法零变化。
+
+**版本位决策**：BRAIN +0 / HANDS +0 / CALIB +1 → v2.4.1
+
+### 🎛 Calib（bugfix）
+
+**1. `install.sh` 依赖检查补 `jq` + `rsync`**
+- **问题**：原脚本只查 `python3` / `sqlite3`；但 `install.sh` 自己在 upgrade-all 和初装都用 rsync 同步源码、大量脚本用 jq 解析 JSON，缺失会在执行到具体命令时直接崩
+- **修复**：预检加 jq + rsync，缺失直接 fail_fast + 给 brew/apt 命令提示；关键依赖缺失不再允许"继续安装"，改为硬停
+
+**2. Gemini Key 写入目标修正：根 `.env` → `config/runtime.env`**
+- **问题**：install.sh 把 `GEMINI_API_KEY=xxx` 追加到源目录根 `.env`；但运行时 `scripts/image.py` / `scripts/preflight.py` 读的是每个 target 的 `config/runtime.env` 的 `IMAGE_GEN_API_KEY` —— 两处完全断开，用户跑完 install 以为配好了，实际发帖时报"API key NOT configured"
+- **修复**：
+  - §6 改为只收集 `gemini_key` 变量（接受 `IMAGE_GEN_API_KEY` 或 `GEMINI_API_KEY` env var，向后兼容）
+  - §7.5 新增 `_runtime_env_set()` 幂等函数，循环把 `IMAGE_GEN_API_KEY=<key>` 写入每个 target 的 `config/runtime.env`（已有值则保留，不覆盖）
+  - 同步源目录 `config/runtime.env`，方便在源目录跑脚本验证
+- **MCP URL** 同样修正：从 `XHS_MCP_URL` 写入 `config/runtime.env` 的 `MCP_URL`
+
+**3. `preflight.py check_mcp` 严格判据**
+- **问题**：旧逻辑宽泛匹配 `login` / `ok` / `success` / `logged` 关键词 —— 这些词在 `check_login_status` 失败返回的 JSON 里也会出现（如 `"login_required": true`）；加上只要 state.mcp_configured=True 就把超时/异常/未知状态全部掩盖成 ok，导致 MCP 实际出错时 preflight 仍报"MCP 服务运行中"
+- **修复**：
+  - 否定信号优先（error/refused/unauthorized/未登录/401-5xx 等），命中则直接 `not_running`
+  - 肯定信号必须明确：`"logged_in": true` / `"success": true` / `"status": "ok"` / 中文「已登录/登录成功/在线」
+  - `state.mcp_configured` 不再改变判定结果，只影响错误消息措辞
+  - 超时 / 异常 / returncode != 0 / 无匹配 → 一律 `not_running` + 给 3 条可操作的引导（启动服务 / 重登录 / 查 MCP_URL）
+
+### ⬆️ 如何升级
+
+**v2.4.0 → v2.4.1 无缝升级，且强烈建议立即升级**（v2.4.0 的 install 链路有上述隐患）：
+
+```bash
+cd /path/to/shuling
+git pull
+bash install.sh upgrade-all --json   # v2.4.0 的 upgrade-all 本身正常，不受本版 bugfix 影响
+```
+
+**如果你是刚装完 v2.4.0 但没跑通发帖**，大概率是 Gemini Key 只写到了根 `.env`。修复方式：
+
+```bash
+# 方式 A（推荐）：升级到 v2.4.1 + 重跑 install
+git pull && bash install.sh
+# 会自动把 gemini_key 同步到各 target 的 config/runtime.env
+
+# 方式 B（不升级，手动同步）：
+python3 scripts/image.py --set-key <your-gemini-key>
+```
+
+### 🧠 Brain
+
+_无。本版 SKILL.md 完全不动。_
+
+### ✋ Hands
+
+_无。本版不改 scripts/ 行为（preflight 判据收紧属于 bugfix 归 Calib），不改 DB，不改 MCP 接口。_
+
+---
+
 ## [2.4.0] - 2026-04-23 "Agent-Friendly Upgrade Infrastructure"
 
 工程侧大修：把本次 v2.2.1→v2.3.0 升级 agent 手推 9 步的经验固化为可复用基础设施。**SKILL.md / 业务流程 / 自进化算法完全不变**，纯工程升级。

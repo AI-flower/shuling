@@ -1,5 +1,5 @@
-version: "2.4.0"
-codename: "Agent-Friendly Upgrade Infrastructure"
+version: "2.4.1"
+codename: "Install Reliability Patch"
 released: "2026-04-23"
 
 # ─── 版本号语义: BRAIN.HANDS.CALIB ──────────────────────────────────
@@ -12,11 +12,16 @@ released: "2026-04-23"
 # HANDS: scripts/ 新增或重写 / DB schema 迁移 / MCP 接口替换
 # CALIB: 阈值/关键词/节流参数调整 / bugfix / prompt 微调
 #
-# 版本位决策（本版 v2.4.0）:
-#   - SKILL.md 完全不动：业务流程 / 自进化算法 / AI 行为方式零变化
-#   - 纯工程基础设施：migrations/__migrations 表 + upgrade-hooks/ 新目录 + install.sh upgrade-all 聚合器 + schema drift 校验 + requirements.txt 依赖锁定 + docs/ 五子目录重组
-#   - 非 breaking：老部署跑 `bash install.sh upgrade-all` 平滑升级
-#   - 遂定 HANDS +1 → v2.4.0
+# 版本位决策（本版 v2.4.1）:
+#   - SKILL.md 完全不动；无新功能；纯 bugfix
+#   - 社区验证复盘 4 处断点修复：
+#     1. install.sh 依赖检查补 jq + rsync（避免 rsync 缺失直接崩）
+#     2. install.sh 把 Gemini Key 写入 config/runtime.env 的 IMAGE_GEN_API_KEY
+#        （过去写根 .env 的 GEMINI_API_KEY，运行时读不到 → 发帖无法生图）
+#     3. install.sh 把 MCP URL 同样写入 config/runtime.env 的 MCP_URL
+#     4. preflight.py check_mcp 收紧判据：否定信号优先、取消 state.mcp_configured
+#        掩盖失败的 lenient fallback，避免把 check_login_status 报错误判成 ok
+#   - 遂定 CALIB +1 → v2.4.1
 
 breaking_change_policy:
   brain:
@@ -113,3 +118,6 @@ calib:
   schema_drift_validation: "v2.4.0"                # v2.4.0 新增：激活 schemas/ + validate.py
   migration_idempotency: "v2.4.0"                  # v2.4.0 新增：__migrations 表 + _guard.sh
   dependencies_locked: "v2.4.0"                    # v2.4.0 新增：requirements.txt
+  install_dep_check: "v2.4.1"                      # v2.4.1 新增：install.sh 补 jq + rsync 依赖检查
+  install_env_write_target: "config/runtime.env"   # v2.4.1 修正：从根 .env 的 GEMINI_API_KEY → config/runtime.env 的 IMAGE_GEN_API_KEY
+  preflight_mcp_strict: "v2.4.1"                   # v2.4.1 修正：check_mcp 否定信号优先，去掉 state.mcp_configured 掩盖失败的 fallback

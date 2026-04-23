@@ -86,7 +86,17 @@ def check_sqlite():
 
 
 def check_mcp():
-    """检查 xiaohongshu-mcp 是否可用。已知曾就绪过则放宽：超时不视为失败。"""
+    """检查 xiaohongshu-mcp 是否可用。
+
+    v2.4.1+ 严格判据（修正历史误判）：
+    - xhs.sh status 底层调 MCP check_login_status。
+    - **否定信号**（error/refused/未登录/401/503 等）优先判失败，
+      不因 returncode==0 或 state.mcp_configured=True 被掩盖。
+    - **肯定信号**必须明确：`"logged_in": true` / `"success": true` /
+      `"status": "ok"` / 中文「已登录/登录成功/在线」。
+    - 超时 / 异常 / returncode!=0 / 无法匹配 → not_running；
+      state.mcp_configured 不再改变判定，只用于错误消息里的措辞。
+    """
     xhs_sh = SCRIPTS_DIR / "xhs.sh"
     if not xhs_sh.exists():
         return {
@@ -94,57 +104,81 @@ def check_mcp():
             "status": "missing",
             "detail": "xhs.sh 脚本未找到",
             "action": "ask_user",
-            "ask": "xiaohongshu-mcp 服务未安装。这是小红书操作的核心依赖。\n安装指南见 docs/mcp-setup.md\n安装完成后告诉我，我来验证。",
+            "ask": "xiaohongshu-mcp 服务未安装。这是小红书操作的核心依赖。\n安装指南见 docs/runbooks/mcp-setup.md\n安装完成后告诉我，我来验证。",
         }
 
     state = load_state()
     previously_ok = state.get("mcp_configured") is True
+    hint_suffix = "（曾就绪过，可能是 MCP 服务停了或登录失效）" if previously_ok else ""
+
+    def _not_running(detail, ask_extra=""):
+        return {
+            "name": "xiaohongshu-mcp",
+            "status": "not_running",
+            "detail": detail,
+            "action": "ask_user",
+            "ask": (
+                "xiaohongshu-mcp 未就绪。常见原因：\n"
+                "  1. MCP 服务未启动（`~/.local/bin/xiaohongshu-mcp &` 或检查 systemd/launchd）\n"
+                "  2. 小红书登录态失效（重新 `bash scripts/xhs.sh login` 或 import-cookie）\n"
+                "  3. MCP_URL 配置错误（查 config/runtime.env 的 MCP_URL）\n"
+                f"{ask_extra}"
+            ).rstrip(),
+        }
 
     try:
         result = subprocess.run(
             ["bash", str(xhs_sh), "status"],
             capture_output=True, text=True, timeout=30,
         )
-        output = result.stdout + result.stderr
-        out_lower = output.lower()
-        login_hit = any(kw in out_lower for kw in ("login", "ok", "success", "logged"))
-        zh_hit = any(kw in output for kw in ("已登录", "登录成功", "在线"))
-        if result.returncode == 0 and (login_hit or zh_hit):
-            update_state(mcp_configured=True)
-            return {"name": "xiaohongshu-mcp", "status": "ok", "detail": "MCP 服务运行中", "action": None}
-        if any(kw in out_lower for kw in ("connect", "refused", "error")):
-            return {
-                "name": "xiaohongshu-mcp",
-                "status": "not_running",
-                "detail": "MCP 服务未启动或无法连接",
-                "action": "ask_user",
-                "ask": "xiaohongshu-mcp 服务未运行。需要先启动 MCP 服务并确保小红书已登录。",
-            }
     except subprocess.TimeoutExpired:
-        if previously_ok:
-            return {"name": "xiaohongshu-mcp", "status": "ok", "detail": "检查超时，按 state 已就绪处理", "action": None}
+        return _not_running(f"status 检查超时（30s）{hint_suffix}")
     except FileNotFoundError:
-        pass
+        return _not_running("bash 不可用，无法运行 scripts/xhs.sh")
     except Exception as e:
-        if previously_ok:
-            return {"name": "xiaohongshu-mcp", "status": "ok", "detail": f"检查异常 {e}，按 state 已就绪处理", "action": None}
-        return {
-            "name": "xiaohongshu-mcp",
-            "status": "error",
-            "detail": str(e),
-            "action": "ask_user",
-            "ask": "检查 xiaohongshu-mcp 时出错。请确认是否已安装。",
-        }
+        return _not_running(f"检查异常：{e}{hint_suffix}")
 
-    if previously_ok:
-        return {"name": "xiaohongshu-mcp", "status": "ok", "detail": "状态未知，按 state 已就绪处理", "action": None}
-    return {
-        "name": "xiaohongshu-mcp",
-        "status": "unknown",
-        "detail": "无法确认 MCP 状态",
-        "action": "ask_user",
-        "ask": "无法确认 xiaohongshu-mcp 状态。请问 MCP 服务是否已安装并运行？",
-    }
+    output = (result.stdout or "") + (result.stderr or "")
+    out_lower = output.lower()
+
+    # 否定信号优先：出现这些词，哪怕 returncode==0 也不能当 ok。
+    negative_en = (
+        "error", "refused", "timeout", "unauthorized",
+        "not logged", "not_logged", "login required", "login failed",
+        "connection refused", "503", "502", "500", "401", "403", "404",
+    )
+    negative_zh = (
+        "未登录", "登录失败", "连接失败", "服务未启动",
+        "需要登录", "token 失效", "cookie 失效", "Cookie 失效",
+    )
+    if any(kw in out_lower for kw in negative_en) or any(kw in output for kw in negative_zh):
+        return _not_running(
+            f"status 输出含错误信号（returncode={result.returncode}）{hint_suffix}"
+        )
+
+    if result.returncode != 0:
+        return _not_running(f"status returncode={result.returncode}{hint_suffix}")
+
+    # 肯定信号必须明确 —— 不接受宽泛的 login / ok / logged 关键词
+    positive_zh = ("已登录", "登录成功", "在线", "登录有效")
+    positive_en = (
+        '"logged_in": true', '"logged_in":true',
+        '"success": true', '"success":true',
+        '"status": "ok"', '"status":"ok"',
+        'login_status: ok', 'logged in as',
+    )
+    has_positive = (
+        any(kw in output for kw in positive_zh)
+        or any(tok in out_lower for tok in positive_en)
+    )
+    if has_positive:
+        update_state(mcp_configured=True)
+        return {"name": "xiaohongshu-mcp", "status": "ok", "detail": "MCP 服务运行中且已登录", "action": None}
+
+    return _not_running(
+        f"status returncode=0 但输出无明确登录态信号{hint_suffix}",
+        ask_extra=(f"\n  原始输出前 200 字符：{output[:200].strip()!r}" if output.strip() else ""),
+    )
 
 
 def check_image_gen():
