@@ -51,3 +51,6 @@ node_modules/
 
 # 带时间戳的备份文件（如 xhs.sh.bak.20260421_023540）
 *.bak.*
+
+# v2.4.0 wip artifact
+.playwright-mcp/
