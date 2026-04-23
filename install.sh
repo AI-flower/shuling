@@ -685,17 +685,34 @@ else
     MISSING=1
 fi
 
-if [ "$MISSING" -eq 1 ]; then
-    warn "部分依赖缺失，安装后部分功能可能不可用"
-    if [ "$ASSUME_YES" = "1" ]; then
-        warn "非交互模式：继续安装（缺失依赖按需后补）"
+if command -v jq >/dev/null 2>&1; then
+    info "jq $(jq --version | sed 's/^jq-//')"
+else
+    fail "jq 未安装（脚本 JSON 解析需要）"
+    if [ "$(uname -s)" = "Darwin" ]; then
+        info "安装: brew install jq"
     else
-        prompt "  继续安装？[Y/n] " ans "Y"
-        if [ "${ans}" = "n" ] || [ "${ans}" = "N" ]; then
-            printf "已取消\n"
-            exit 1
-        fi
+        info "安装: apt install jq  或  yum install jq"
     fi
+    MISSING=1
+fi
+
+if command -v rsync >/dev/null 2>&1; then
+    info "rsync $(rsync --version 2>/dev/null | head -1 | awk '{print $3}')"
+else
+    fail "rsync 未安装（install / upgrade-all 同步源码需要）"
+    if [ "$(uname -s)" = "Darwin" ]; then
+        info "安装: brew install rsync"
+    else
+        info "安装: apt install rsync  或  yum install rsync"
+    fi
+    MISSING=1
+fi
+
+if [ "$MISSING" -eq 1 ]; then
+    fail "关键依赖缺失，无法继续安装"
+    info "装完缺失项后重跑 bash install.sh"
+    exit 1
 fi
 
 # ─── 2. 检测可用平台 ────────────────────────────────────────────────
@@ -801,52 +818,77 @@ fi
 run "建 knowledge-base/" mkdir -p "$SKILL_DIR/knowledge-base"
 info "knowledge-base/ 目录就绪"
 
-# ─── 6. 可选：配置 Gemini API Key ───────────────────────────────────
+# ─── 6. 可选：收集 Gemini API Key（实际写入在 §7.5 的 config/runtime.env）──
 printf "\n${BOLD}=== 可选配置 ===${RESET}\n\n"
 
-ENV_FILE="$SKILL_DIR/.env"
-
-if [ -f "$ENV_FILE" ] && grep -q "GEMINI_API_KEY" "$ENV_FILE"; then
-    info "Gemini API Key 已配置"
+# 优先读 env var（非交互模式下唯一通道）。变量名兼容历史：GEMINI_API_KEY (v2.3-)
+# 和运行时实际读取的 IMAGE_GEN_API_KEY (v2.3+)，任一提供即可。
+gemini_key="${IMAGE_GEN_API_KEY:-${GEMINI_API_KEY:-}}"
+if [ -z "$gemini_key" ] && [ "$ASSUME_YES" = "0" ]; then
+    printf "配置 Gemini API Key？（用于 AI 图片生成，留空跳过）\n"
+    printf "  获取地址: https://aistudio.google.com/api-keys\n"
+    prompt "  API Key: " gemini_key ""
+fi
+if [ -n "$gemini_key" ]; then
+    info "已收集 Gemini Key，稍后写入各 target 的 config/runtime.env"
 else
-    # 优先读 env var（非交互模式下唯一通道）
-    gemini_key="${GEMINI_API_KEY:-}"
-    if [ -z "$gemini_key" ] && [ "$ASSUME_YES" = "0" ]; then
-        printf "配置 Gemini API Key？（用于 AI 图片生成，留空跳过）\n"
-        printf "  获取地址: https://aistudio.google.com/api-keys\n"
-        prompt "  API Key: " gemini_key ""
-    fi
-    if [ -n "$gemini_key" ]; then
-        run "写入 GEMINI_API_KEY" bash -c "echo 'GEMINI_API_KEY=$gemini_key' >> '$ENV_FILE'"
-        info "Gemini API Key 已保存到 .env"
-    else
-        fail "未配置 Gemini Key —— 薯灵强制使用 Gemini 生图，没有 Key 将无法发帖"
-        info "获取 Key: https://aistudio.google.com/app/apikey"
-        info "之后可重跑 install 或运行: python3 scripts/image.py --set-key <KEY>"
-    fi
+    fail "未配置 Gemini Key —— 薯灵强制使用 Gemini 生图，没有 Key 将无法发帖"
+    info "获取 Key: https://aistudio.google.com/app/apikey"
+    info "之后可重跑 install 或运行: python3 scripts/image.py --set-key <KEY>"
 fi
 
-# ─── 7. 可选：配置 MCP URL ──────────────────────────────────────────
-if [ -f "$ENV_FILE" ] && grep -q "XHS_MCP_URL" "$ENV_FILE"; then
-    info "MCP URL 已配置"
+# ─── 7. 可选：收集 MCP URL（实际写入在 §7.5）─────────────────────────
+mcp_url="${XHS_MCP_URL:-${MCP_URL:-}}"
+if [ -z "$mcp_url" ] && [ "$ASSUME_YES" = "0" ]; then
+    printf "\n配置 MCP URL？（留空使用模板默认 http://localhost:18060/mcp）\n"
+    prompt "  MCP URL: " mcp_url ""
+fi
+if [ -n "$mcp_url" ]; then
+    info "已收集 MCP URL：$mcp_url"
 else
-    mcp_url="${XHS_MCP_URL:-}"
-    if [ -z "$mcp_url" ] && [ "$ASSUME_YES" = "0" ]; then
-        printf "\n配置 MCP URL？（留空使用本机默认地址）\n"
-        prompt "  MCP URL: " mcp_url ""
-    fi
-    if [ -n "$mcp_url" ]; then
-        run "写入 XHS_MCP_URL" bash -c "echo 'XHS_MCP_URL=$mcp_url' >> '$ENV_FILE'"
-        info "MCP URL 已保存到 .env"
-    else
-        info "使用本机默认 MCP 地址"
-    fi
+    info "将使用 runtime.env.example 模板里的默认 MCP 地址"
 fi
 
 
-# ─── 7.5 确保每个 target 有 config/runtime.env（无交互，仅初始化）──
+# ─── 7.5 为每个 target 落 config/runtime.env（含 IMAGE_GEN_API_KEY / MCP_URL）──
+# 这是运行时实际读取的配置位置（详见 scripts/image.py 和 scripts/preflight.py）。
+# install 只写"空字段"：如果 target 的 runtime.env 已经有值，不覆盖用户已配。
 # Telegram / IM 通讯凭证不在 skill 配置范围内 —— 由 hermes-agent 自己管理。
 RUNTIME_ENV_TEMPLATE="$SKILL_DIR/config/runtime.env.example"
+
+_runtime_env_set() {
+    # 幂等写入 KEY=VALUE：如果 key 存在但值为空则替换，有值则保留
+    local file="$1" key="$2" value="$3"
+    [ -z "$value" ] && return 0
+    [ -f "$file" ] || return 0
+    python3 - "$file" "$key" "$value" <<'PY'
+import sys, re, pathlib
+path, key, value = sys.argv[1], sys.argv[2], sys.argv[3]
+p = pathlib.Path(path)
+lines = p.read_text().splitlines()
+pat = re.compile(rf"^\s*{re.escape(key)}\s*=\s*(.*)$")
+new = []
+seen = False
+touched = False
+for ln in lines:
+    m = pat.match(ln)
+    if m and not seen:
+        seen = True
+        existing = m.group(1).strip().strip("'\"")
+        if not existing:
+            new.append(f"{key}={value}")
+            touched = True
+        else:
+            new.append(ln)
+    else:
+        new.append(ln)
+if not seen:
+    new.append(f"{key}={value}")
+    touched = True
+if touched:
+    p.write_text("\n".join(new) + "\n")
+PY
+}
 
 if [ -f "$RUNTIME_ENV_TEMPLATE" ]; then
     for entry in "${PLATFORMS[@]}"; do
@@ -860,7 +902,23 @@ if [ -f "$RUNTIME_ENV_TEMPLATE" ]; then
         else
             info "$target: config/runtime.env 已存在，保留"
         fi
+        if [ -n "$gemini_key" ]; then
+            _runtime_env_set "$runtime_env" "IMAGE_GEN_API_KEY" "$gemini_key"
+            info "$target: IMAGE_GEN_API_KEY 已写入（若之前为空）"
+        fi
+        if [ -n "$mcp_url" ]; then
+            _runtime_env_set "$runtime_env" "MCP_URL" "$mcp_url"
+            info "$target: MCP_URL 已写入（若之前为空）"
+        fi
     done
+
+    # 同步源目录自己的 config/runtime.env，方便在源目录跑 scripts/ 验证
+    src_runtime_env="$SKILL_DIR/config/runtime.env"
+    if [ ! -f "$src_runtime_env" ]; then
+        cp "$RUNTIME_ENV_TEMPLATE" "$src_runtime_env" 2>/dev/null || true
+    fi
+    [ -n "$gemini_key" ] && _runtime_env_set "$src_runtime_env" "IMAGE_GEN_API_KEY" "$gemini_key"
+    [ -n "$mcp_url" ]    && _runtime_env_set "$src_runtime_env" "MCP_URL"            "$mcp_url"
 fi
 
 # ─── 7.7 创作者模式（v2.2.0+）─────────────────────────────────────
