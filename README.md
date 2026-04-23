@@ -466,11 +466,12 @@ bash scripts/xhs.sh log --tool search_feeds --days 7
 | v2.1.1 | Request Log（MCP 调用全量落表） | ✅ |
 | v2.1.2 | Release Polish（CHANGELOG/UPGRADE/RELEASING 三件套 + migrations） | ✅ |
 | v2.1.3 | Friendly Onboarding（install.sh 六模式 + preflight --human + schemas + §0b） | ✅ |
-| **v2.2.0** | **Existing Creator Support（老博主接入 + 账号体检 + patterns 种子）** | ✅ **当前** |
-| v2.2.1 | `xhs.sh list-user-feeds` 子命令 / AI 分类 prompt 模板 | 规划中 |
-| v2.3.0 | Human Rhythm（行为节奏模拟 + 话题窗口冷却 + 冷启动重构） | 规划中 |
-| v2.3.x | 历史帖改写重发建议 / 评论回复助手（Layer 2） | 规划中 |
-| v3.0.0 | 视频笔记 / 多账号灰度 / 竞品对标（Layer 3） | 远期 |
+| v2.2.0 | Existing Creator Support（老博主接入 + 账号体检 + patterns 种子） | ✅ |
+| v2.2.1 | Migration Safety Fix（v2.1.1 迁移脚本在存量 v2.0 升级时阻断修复） | ✅ |
+| **v2.3.0** | **Pure Image Pipeline（去 HTML 截图降级 + Gemini 必需 + prompt 模板系统 + 封面参考图）** | ✅ **当前** |
+| v2.4.0 | Agent-Friendly Upgrade Infrastructure（`install.sh upgrade-all` + `upgrade-hooks/` + `__migrations` 表 + SKILL.md §1 preferences.json 模板 schema 对齐） | 规划中 |
+| v2.x 其他 | 历史帖改写重发建议 / 评论回复助手（Layer 2） | 规划中 |
+| v3.0.0 | 视频笔记 / 多账号灰度 / 竞品对标（Layer 3）；候选议题：Phase-Aware Weights（phase 权重自适应硬化）/ Pattern Confidence State Machine（low→medium→high 升级规则）——待真实数据量（20+ 帖、10+ 诊断）到位后再决定 | 远期 |
 
 ---
 

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ShuLing // 薯灵 — Xiaohongshu Creator OS</title>
-<meta name="description" content="Skill-as-Brain 架构的小红书博主 AI 助手：选题、写稿、发布、复盘一体化，越用越懂你。">
+<title>ShuLing // 薯灵 — A Xiaohongshu Skill Written For Your AI Agent</title>
+<meta name="description" content="Skill-as-Brain 架构的小红书博主 Skill，不是给人类装的，是给你的 AI 智能体读的——复制种子提示词，让你的 Claude / Codex / Hermes 接管选题、创作、发布、复盘。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230a0a0f'/%3E%3Ctext x='50' y='70' font-size='60' text-anchor='middle' fill='%2300ff88'%3E◆%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -81,6 +81,7 @@
   .neon-green { color: #00FF88; text-shadow: 0 0 8px rgba(0,255,136,.6), 0 0 18px rgba(0,255,136,.3); }
   .neon-cyan  { color: #00D4FF; text-shadow: 0 0 8px rgba(0,212,255,.6), 0 0 18px rgba(0,212,255,.3); }
   .neon-mag   { color: #FF00FF; text-shadow: 0 0 8px rgba(255,0,255,.5), 0 0 18px rgba(255,0,255,.25); }
+  .neon-amber { color: #FFB800; text-shadow: 0 0 8px rgba(255,184,0,.5), 0 0 18px rgba(255,184,0,.25); }
 
   /* HUD panel with chamfered corners */
   .hud {
@@ -98,6 +99,7 @@
   .hud:hover { border-color: rgba(0,255,136,.55); transform: translateY(-2px); }
   .hud-strong { border-color: rgba(0,255,136,.45); box-shadow: 0 0 30px rgba(0,255,136,.12), inset 0 0 0 1px rgba(0,255,136,.2); }
   .hud-magenta { border-color: rgba(255,0,255,.35); }
+  .hud-amber { border-color: rgba(255,184,0,.35); }
 
   /* HUD corner brackets */
   .brackets { position: relative; }
@@ -149,8 +151,40 @@
   .terminal-bar { background: linear-gradient(180deg,#12121A,#0A0A0F); padding: 8px 14px; border-bottom: 1px solid rgba(0,255,136,.15); display: flex; align-items: center; gap: 10px; font-size: 11px; color: #00D4FF; letter-spacing: .1em; }
   .terminal-dot { width: 10px; height: 10px; border-radius: 999px; }
 
+  /* Seed-prompt callout (the flagship element) */
+  .seed-box {
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(0,255,136,.04), rgba(10,10,15,.9)),
+      repeating-linear-gradient(0deg, rgba(0,255,136,.025) 0 2px, transparent 2px 4px);
+    border: 1px solid rgba(0,255,136,.45);
+    box-shadow: 0 0 40px rgba(0,255,136,.22), inset 0 0 60px rgba(0,255,136,.05);
+    clip-path: polygon(
+      18px 0, calc(100% - 18px) 0, 100% 18px,
+      100% calc(100% - 18px), calc(100% - 18px) 100%, 18px 100%,
+      0 calc(100% - 18px), 0 18px
+    );
+  }
+  .seed-box::before {
+    content: ''; position: absolute; top: -1px; left: 30%; right: 30%; height: 2px;
+    background: linear-gradient(90deg, transparent, #00FF88, transparent);
+  }
+  .copy-btn {
+    background: #00FF88;
+    color: #050509;
+    font-weight: 700;
+    letter-spacing: .1em;
+    padding: 10px 22px;
+    clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+    transition: transform .15s, box-shadow .2s;
+  }
+  .copy-btn:hover { transform: translateY(-1px); box-shadow: 0 0 22px rgba(0,255,136,.6); }
+  .copy-btn.copied { background: #FFB800; }
+
   /* Inline code chip */
   .chip { display: inline-block; padding: 1px 8px; background: rgba(0,212,255,.1); color: #00D4FF; border: 1px solid rgba(0,212,255,.3); font-family: 'JetBrains Mono', monospace; font-size: .85em; }
+  .chip-mag { color:#FF00FF; border-color:rgba(255,0,255,.3); background:rgba(255,0,255,.06); }
+  .chip-amber { color:#FFB800; border-color:rgba(255,184,0,.35); background:rgba(255,184,0,.06); }
 
   details > summary { list-style: none; cursor: pointer; }
   details > summary::-webkit-details-marker { display: none; }
@@ -186,11 +220,11 @@
       <span class="hidden sm:inline-block font-mono text-[10px] text-neon-cyan/70 border border-neon-cyan/30 px-1.5 py-0.5" data-ver="tag">v2.2.0</span>
     </a>
     <nav class="hidden md:flex items-center gap-6 text-xs font-mono uppercase tracking-widest">
-      <a href="#what" class="text-ink-300 hover:text-neon-green transition" data-i18n="nav.what">这是什么</a>
+      <a href="#seed" class="text-ink-300 hover:text-neon-green transition" data-i18n="nav.seed">种子提示词</a>
+      <a href="#what" class="text-ink-300 hover:text-neon-green transition" data-i18n="nav.what">任务类型</a>
       <a href="#capabilities" class="text-ink-300 hover:text-neon-green transition" data-i18n="nav.capabilities">能力</a>
-      <a href="#quickstart" class="text-ink-300 hover:text-neon-green transition" data-i18n="nav.quickstart">快速开始</a>
-      <a href="#platforms" class="text-ink-300 hover:text-neon-green transition" data-i18n="nav.platforms">支持平台</a>
-      <a href="#architecture" class="text-ink-300 hover:text-neon-green transition" data-i18n="nav.architecture">架构</a>
+      <a href="#quickstart" class="text-ink-300 hover:text-neon-green transition" data-i18n="nav.quickstart">执行序列</a>
+      <a href="#platforms" class="text-ink-300 hover:text-neon-green transition" data-i18n="nav.platforms">宿主</a>
       <a href="#docs" class="text-ink-300 hover:text-neon-green transition" data-i18n="nav.docs">文档</a>
     </nav>
     <div class="flex items-center gap-3">
@@ -207,103 +241,176 @@
   <!-- Ticker -->
   <div class="overflow-hidden border-t border-neon-cyan/10 bg-void-950">
     <div class="ticker-track flex gap-10 px-4 py-1.5 whitespace-nowrap text-[10px] font-mono tracking-widest text-neon-cyan/60">
-      <span>[ SYS.ONLINE ]</span><span>SKILL-AS-BRAIN · RUNTIME <span data-ver="tag">v2.2.0</span></span><span>◆ 7 CORE FLOWS</span><span>◆ 8 DB TABLES</span><span>◆ 9 MCP TOOLS</span><span>◆ 4 AI PLATFORMS</span><span>[ SYS.ONLINE ]</span><span>SKILL-AS-BRAIN · RUNTIME <span data-ver="tag">v2.2.0</span></span><span>◆ 7 CORE FLOWS</span><span>◆ 8 DB TABLES</span><span>◆ 9 MCP TOOLS</span><span>◆ 4 AI PLATFORMS</span>
+      <span>[ AGENT.READY ]</span><span>BRIEFING FOR AI AGENTS · RUNTIME <span data-ver="tag">v2.2.0</span></span><span>◆ SKILL-AS-BRAIN</span><span>◆ 7 ROUTING BRANCHES</span><span>◆ 8 DB TABLES</span><span>◆ 9 MCP TOOLS</span><span>◆ 4 HOSTS</span><span>[ AGENT.READY ]</span><span>BRIEFING FOR AI AGENTS · RUNTIME <span data-ver="tag">v2.2.0</span></span><span>◆ SKILL-AS-BRAIN</span><span>◆ 7 ROUTING BRANCHES</span><span>◆ 8 DB TABLES</span><span>◆ 9 MCP TOOLS</span><span>◆ 4 HOSTS</span>
     </div>
   </div>
 </header>
 
 <!-- ═════════ HERO ═════════ -->
 <section class="relative overflow-hidden">
-  <div class="max-w-7xl mx-auto px-6 pt-24 pb-28 text-center">
+  <div class="max-w-7xl mx-auto px-6 pt-24 pb-20 text-center">
     <div class="inline-flex items-center gap-3 border border-neon-green/40 bg-void-900/60 px-4 py-1.5 mb-10 font-mono text-xs tracking-widest uppercase">
       <span class="dot-live"></span>
-      <span data-ver="badge" class="neon-green">v2.2.0 "EXISTING CREATOR SUPPORT" · 2026-04-21</span>
+      <span data-ver="badge" class="neon-green">BRIEFING · AGENT INSTALL · v2.2.0</span>
     </div>
     <h1 class="font-display font-black text-5xl md:text-7xl leading-tight mb-8 uppercase">
-      <div class="text-ink-100 mb-3" data-i18n="hero.title1">让你的 AI 助手</div>
-      <div class="glitch neon-green" data-text="懂小红书的博主搭档"><span data-i18n="hero.title2">懂小红书的博主搭档</span></div>
+      <div class="text-ink-100 mb-3" data-i18n="hero.title1">这是给 AI 智能体读的</div>
+      <div class="glitch neon-green" data-text="小红书创作 SKILL"><span data-i18n="hero.title2">小红书创作 SKILL</span></div>
     </h1>
-    <p class="font-mono text-base md:text-lg text-ink-300/80 max-w-3xl mx-auto mb-12 leading-relaxed" data-i18n="hero.subtitle">
-      从选题、创作、发布到复盘形成闭环，历史数据驱动自进化，越用越懂你。基于 Skill-as-Brain 架构，一份 SKILL.md 通吃 Hermes / Claude Code / Codex。
+    <p class="font-mono text-base md:text-lg text-ink-300/80 max-w-3xl mx-auto mb-10 leading-relaxed" data-i18n="hero.subtitle">
+      你（AI 智能体）收到用户粘贴的种子提示词后，把 <span class="chip">SKILL.md</span> 吸收进上下文，就是你用户小红书账号的大脑；
+      <span class="chip chip-mag">scripts/</span> 是你的手脚，负责 HTTP / DB / 生图。下面是你的执行简报。
     </p>
+
+    <!-- Reading convention (addresses human visitor, declares pronoun scope) -->
+    <div class="max-w-3xl mx-auto mb-12 border border-neon-amber/40 bg-neon-amber/5 px-5 py-4 font-mono text-xs text-ink-300/90 flex items-start gap-3 text-left">
+      <span class="neon-amber font-bold mt-0.5 shrink-0">[ 阅读约定 ]</span>
+      <span data-i18n="hero.humanNote">人类访客无需自己安装：把下面的 <b class="neon-amber">种子提示词</b> 粘到任一 AI 智能体对话框（Claude Code / Codex / Hermes / OpenClaw），由它接手 clone、安装、读 SKILL.md、按 §0a 路由。<b class="text-ink-100">本页正文里的 "你" 一律指 AI 智能体，不是你（人类）</b>——看到"你读 X" / "你执行 Y" 时，读成"你的 AI 会读 X / 执行 Y"。</span>
+    </div>
+
     <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-      <a href="#quickstart" class="cta-neon px-10 py-3.5 text-sm font-mono flex items-center gap-3">
-        <span data-i18n="hero.cta1">INITIATE SEQUENCE</span>
+      <a href="#seed" class="cta-neon px-10 py-3.5 text-sm font-mono flex items-center gap-3">
+        <span data-i18n="hero.cta1">复制种子提示词</span>
         <span>▸</span>
       </a>
-      <a href="https://github.com/AI-flower/shuling" target="_blank" class="cta-ghost px-10 py-3.5 text-sm font-mono font-bold uppercase tracking-widest flex items-center gap-2">
-        <svg viewBox="0 0 24 24" class="w-4 h-4" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.4.6.1.82-.26.82-.58v-2.15c-3.34.73-4.04-1.4-4.04-1.4-.55-1.38-1.34-1.75-1.34-1.75-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.84 2.82 1.31 3.51 1 .11-.77.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.1-3.17 0 0 1.01-.32 3.3 1.23a11.48 11.48 0 016 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.87.12 3.17.77.84 1.24 1.91 1.24 3.22 0 4.61-2.8 5.63-5.47 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.83.57C20.56 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
-        <span data-i18n="hero.cta2">VIEW ON GITHUB</span>
+      <a href="https://github.com/AI-flower/shuling/blob/main/SKILL.md" target="_blank" class="cta-ghost px-10 py-3.5 text-sm font-mono font-bold uppercase tracking-widest flex items-center gap-2">
+        <span data-i18n="hero.cta2">直达 SKILL.md</span>
+        <span>▸</span>
       </a>
     </div>
 
     <!-- HUD stats -->
     <div class="mt-20 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
       <div class="hud brackets p-6 text-left">
-        <div class="label-section mb-2">//CORE</div>
+        <div class="label-section mb-2">//FLOWS</div>
         <div class="font-display text-4xl font-black neon-green">07</div>
-        <div class="text-xs text-ink-300/70 mt-1 font-mono uppercase tracking-wider" data-i18n="hero.stat1">核心业务流程</div>
+        <div class="text-xs text-ink-300/70 mt-1 font-mono uppercase tracking-wider" data-i18n="hero.stat1">业务流程你要编排</div>
       </div>
       <div class="hud brackets p-6 text-left">
-        <div class="label-section mb-2">//DATA</div>
+        <div class="label-section mb-2">//TABLES</div>
         <div class="font-display text-4xl font-black neon-cyan">08</div>
-        <div class="text-xs text-ink-300/70 mt-1 font-mono uppercase tracking-wider" data-i18n="hero.stat2">SQLite 数据表</div>
+        <div class="text-xs text-ink-300/70 mt-1 font-mono uppercase tracking-wider" data-i18n="hero.stat2">SQLite 表你要读写</div>
       </div>
       <div class="hud brackets p-6 text-left">
         <div class="label-section mb-2">//MCP</div>
         <div class="font-display text-4xl font-black neon-mag">09</div>
-        <div class="text-xs text-ink-300/70 mt-1 font-mono uppercase tracking-wider" data-i18n="hero.stat3">MCP 工具</div>
+        <div class="text-xs text-ink-300/70 mt-1 font-mono uppercase tracking-wider" data-i18n="hero.stat3">MCP 工具你可调用</div>
       </div>
       <div class="hud brackets p-6 text-left">
         <div class="label-section mb-2">//HOSTS</div>
-        <div class="font-display text-4xl font-black" style="color:#FFB800;text-shadow:0 0 10px rgba(255,184,0,.5)">04</div>
-        <div class="text-xs text-ink-300/70 mt-1 font-mono uppercase tracking-wider" data-i18n="hero.stat4">AI 平台支持</div>
+        <div class="font-display text-4xl font-black neon-amber">04</div>
+        <div class="text-xs text-ink-300/70 mt-1 font-mono uppercase tracking-wider" data-i18n="hero.stat4">宿主你都能跑</div>
       </div>
     </div>
   </div>
 </section>
 
+<!-- ═════════ SEED PROMPT (flagship) ═════════ -->
+<section id="seed" class="py-20 border-y border-neon-green/20">
+  <div class="max-w-5xl mx-auto px-6">
+    <div class="text-center mb-10">
+      <div class="label-section mb-3">◆ SEED.PROMPT / 00</div>
+      <h2 class="font-display text-3xl md:text-5xl font-black uppercase mb-4">
+        <span class="neon-green" data-i18n="seed.title">种子提示词</span>
+      </h2>
+      <p class="font-mono text-sm md:text-base text-ink-300/80 max-w-3xl mx-auto" data-i18n="seed.subtitle">
+        这是人类唯一要做的事：把下面这段原样粘给你的 AI 智能体。它会 clone、安装、预检、读 SKILL.md、然后按 §0a 路由待命。
+      </p>
+    </div>
+
+    <div class="seed-box p-7 md:p-9 relative">
+      <div class="flex items-center justify-between mb-5 gap-4 flex-wrap">
+        <div class="flex items-center gap-3 font-mono text-xs tracking-widest uppercase">
+          <span class="dot-live"></span>
+          <span class="neon-green font-bold" data-i18n="seed.label">PASTE-TO-AGENT · SHULING INSTALL BRIEF</span>
+        </div>
+        <button id="copy-seed" class="copy-btn font-mono text-xs uppercase flex items-center gap-2">
+          <span id="copy-seed-label" data-i18n="seed.copy">一键复制</span>
+          <span>▸</span>
+        </button>
+      </div>
+      <pre id="seed-prompt" class="text-[12.5px] md:text-sm font-mono leading-relaxed text-ink-100 whitespace-pre-wrap break-words overflow-x-auto"
+           data-i18n-pre="seed.body"
+      >请安装 shuling skill（小红书博主成长 Skill）并准备为我运营小红书账号。
+
+源码: https://github.com/AI-flower/shuling
+文档落地页: https://shuling.pages.dev
+
+请你按以下顺序执行，并在每一步结束时简短报告进度：
+
+1. 在我当前机器上执行：
+     git clone git@github.com:AI-flower/shuling.git
+     cd shuling
+2. 先跑 `bash install.sh --check` 看环境报告；如果有 FAIL，先向我说明并等我处理，不要擅自安装系统依赖。
+3. 通过 --check 后，跑 `bash install.sh`，按提示选择模式：
+     - 如果我是新博主（还没发过或刚起步）→ 选 new
+     - 如果我已经有 30 条以上笔记 → 选 existing-creator
+     我会在对话里告诉你我是哪种。
+4. 完整读 `SKILL.md`（从头到尾，不是只扫目录）。重点吃透：
+     §0a 业务路由 / §0b 写入校验 / §0c 老博主接入 / §1~§7 主循环 / §8 异常矩阵
+5. 读 `data/state.json` 和 `knowledge-base/profile.json`，按 §0a 判断我当前在哪一步。
+6. 就绪后回我一句话：
+     "已接入 shuling vX.Y.Z · BRAIN/HANDS/CALIB 已校验 · 按 §0a 待命"
+
+运营纪律（务必遵守，别即兴发挥）：
+- 所有 profile / state / preferences / audit-report 写入前，先过 `schemas/` 校验
+- 发布任何笔记前都要让我人工确认一次（§2~§6 最后一步）
+- 遇到风控限额 / preflight 返回 code=2 → 按 §8 异常矩阵处理
+- 不要绕 §5 合规规则（没有标题党 / 没有同质化 / 没有刷量）
+- §0b 说走哪条路你就走哪条，不要自己发明流程</pre>
+    </div>
+
+    <!-- Sub-tips below: each is explicitly role-tagged so pronoun never drifts -->
+    <div class="mt-6 grid md:grid-cols-3 gap-4 font-mono text-xs text-ink-300/80">
+      <div class="hud p-4"><div class="neon-amber mb-1 font-bold tracking-widest">▸ 01 · [HUMAN]</div><span data-i18n="seed.tip1">把这段粘到你的 AI 对话框——它会接手所有安装步骤，你不动终端。</span></div>
+      <div class="hud p-4"><div class="neon-amber mb-1 font-bold tracking-widest">▸ 02 · [HUMAN]</div><span data-i18n="seed.tip2">安装完成后，你只需自然语言："今天发什么" / "帮我发" / "复盘"。</span></div>
+      <div class="hud p-4"><div class="neon-green mb-1 font-bold tracking-widest">▸ 03 · [AGENT]</div><span data-i18n="seed.tip3">你按 §0a 路由自动判断执行哪一段，不等用户点菜——但发帖前必须人工确认。</span></div>
+    </div>
+  </div>
+</section>
+
 <!-- ═════════ WHAT ═════════ -->
-<section id="what" class="py-24 border-y border-neon-cyan/10 relative">
+<section id="what" class="py-24 border-b border-neon-cyan/10 relative">
   <div class="max-w-7xl mx-auto px-6">
     <div class="text-center mb-16">
-      <div class="label-section mb-3">◆ SYSTEM.OVERVIEW / 01</div>
-      <h2 class="font-display text-4xl md:text-5xl font-black mb-4 uppercase" data-i18n="what.title">这是什么</h2>
-      <p class="font-mono text-base text-ink-300/70 max-w-2xl mx-auto" data-i18n="what.subtitle">把你的 AI 助手变成懂小红书的博主搭档——从选题、创作、发布到复盘形成闭环，历史数据驱动自进化。</p>
+      <div class="label-section mb-3">◆ AGENT.MODES / 01</div>
+      <h2 class="font-display text-4xl md:text-5xl font-black mb-4 uppercase" data-i18n="what.title">你接到的三种任务类型</h2>
+      <p class="font-mono text-base text-ink-300/70 max-w-2xl mx-auto" data-i18n="what.subtitle">你被粘了种子提示词之后，根据用户回答和 state.json 自动路由到其中一种。</p>
     </div>
 
     <div class="grid md:grid-cols-3 gap-5 mb-12">
       <div class="hud brackets p-7 fade-up">
-        <div class="label-section neon-green mb-3">// PROFILE.NEW</div>
+        <div class="label-section neon-green mb-3">// MODE · ONBOARD_NEW_USER</div>
         <div class="text-5xl mb-4 neon-green font-display">◇</div>
-        <h3 class="font-display text-xl font-bold uppercase mb-3 text-ink-100" data-i18n="what.p1.title">新博主</h3>
-        <p class="font-mono text-sm text-ink-300/70 leading-relaxed" data-i18n="what.p1.desc">还没发或刚开始——三问对话建画像，竞品冷启动，每日选题/起稿/发布/复盘全流程。</p>
+        <h3 class="font-display text-xl font-bold uppercase mb-3 text-ink-100" data-i18n="what.p1.title">用户是新博主</h3>
+        <p class="font-mono text-sm text-ink-300/70 leading-relaxed" data-i18n="what.p1.desc">还没发过或刚起步——你需要：三问建画像（方向/受众/风格）、竞品冷启动、每日选题→起稿→配图→发布→复盘。</p>
       </div>
       <div class="hud brackets p-7 fade-up hud-strong">
-        <div class="label-section neon-green mb-3">// PROFILE.EXIST · v2.2.0</div>
+        <div class="label-section neon-green mb-3">// MODE · ONBOARD_EXISTING_CREATOR · v2.2.0+</div>
         <div class="text-5xl mb-4 neon-cyan font-display">◈</div>
-        <h3 class="font-display text-xl font-bold uppercase mb-3 text-ink-100" data-i18n="what.p2.title">老博主（v2.2.0+）</h3>
-        <p class="font-mono text-sm text-ink-300/70 leading-relaxed" data-i18n="what.p2.desc">已发 30~1000+ 条——批量导入历史，AI 反推画像，挖掘自己验证有效的 patterns，出账号体检报告。</p>
+        <h3 class="font-display text-xl font-bold uppercase mb-3 text-ink-100" data-i18n="what.p2.title">用户已有 30~1000+ 条历史</h3>
+        <p class="font-mono text-sm text-ink-300/70 leading-relaxed" data-i18n="what.p2.desc">走 §0c 老博主接入 5 步：确认登录 → 导入 200 条 → 自动分类 → 画像反推 → 体检报告。首条发帖即达用户历史 P50。</p>
       </div>
       <div class="hud brackets p-7 fade-up hud-magenta">
-        <div class="label-section neon-mag mb-3">// PROFILE.DEV</div>
+        <div class="label-section neon-mag mb-3">// MODE · ARCHITECTURE_STUDY</div>
         <div class="text-5xl mb-4 neon-mag font-display">◇</div>
-        <h3 class="font-display text-xl font-bold uppercase mb-3 text-ink-100" data-i18n="what.p3.title">AI 智能体开发者</h3>
-        <p class="font-mono text-sm text-ink-300/70 leading-relaxed" data-i18n="what.p3.desc">可借鉴的 Skill-as-Brain 架构、业务路由 §0a、JSON Schema 契约、反模式禁令工程化实践。</p>
+        <h3 class="font-display text-xl font-bold uppercase mb-3 text-ink-100" data-i18n="what.p3.title">用户是 AI 工程师在研究架构</h3>
+        <p class="font-mono text-sm text-ink-300/70 leading-relaxed" data-i18n="what.p3.desc">他在参考 Skill-as-Brain 做自己的 Skill——带他看 §0a 业务路由、§0b 写入校验、JSON Schema 契约、反模式禁令的工程化实现。</p>
       </div>
     </div>
 
-    <!-- NOT this / anti-patterns -->
+    <!-- Don't-do list for the agent -->
     <div class="hud p-8 max-w-4xl mx-auto">
       <h3 class="font-display text-xl font-bold uppercase mb-5 flex items-center gap-3">
         <span class="text-neon-red">⚠</span>
-        <span data-i18n="what.not.title">不是什么</span>
+        <span data-i18n="what.not.title">你（AI）不要做的事</span>
       </h3>
       <ul class="space-y-3 font-mono text-sm">
-        <li class="flex items-start gap-3"><span class="text-neon-red mt-0.5">[X]</span><span class="text-ink-300/80" data-i18n="what.not.1"><b class="text-ink-100">不是</b>小红书自动化工具（没有批量发布、不刷量、不绕风控）</span></li>
-        <li class="flex items-start gap-3"><span class="text-neon-red mt-0.5">[X]</span><span class="text-ink-300/80" data-i18n="what.not.2"><b class="text-ink-100">不是</b>内容农场（§5 合规规则兜底，不做标题党 / 同质化）</span></li>
-        <li class="flex items-start gap-3"><span class="text-neon-red mt-0.5">[X]</span><span class="text-ink-300/80" data-i18n="what.not.3"><b class="text-ink-100">不是</b>独立运行机器人（必须搭一个能读 SKILL.md 的 AI 助手）</span></li>
-        <li class="flex items-start gap-3"><span class="text-neon-red mt-0.5">[X]</span><span class="text-ink-300/80" data-i18n="what.not.4"><b class="text-ink-100">不假设</b>通讯渠道（Telegram / 微信等由 hermes-agent 或你自己配）</span></li>
+        <li class="flex items-start gap-3"><span class="text-neon-red mt-0.5">[X]</span><span class="text-ink-300/80" data-i18n="what.not.1"><b class="text-ink-100">不要</b>把 shuling 当自动化机器人跑（没有批量发、不刷量、不绕风控，§5 合规规则强制）</span></li>
+        <li class="flex items-start gap-3"><span class="text-neon-red mt-0.5">[X]</span><span class="text-ink-300/80" data-i18n="what.not.2"><b class="text-ink-100">不要</b>跳过 §0b 就写 profile.json / state.json / preferences.json（所有写入先过 schemas/）</span></li>
+        <li class="flex items-start gap-3"><span class="text-neon-red mt-0.5">[X]</span><span class="text-ink-300/80" data-i18n="what.not.3"><b class="text-ink-100">不要</b>忽略 §0a 擅自开始发帖——先读 state.json 再决定路由</span></li>
+        <li class="flex items-start gap-3"><span class="text-neon-red mt-0.5">[X]</span><span class="text-ink-300/80" data-i18n="what.not.4"><b class="text-ink-100">不要</b>假设通讯渠道（Telegram / 微信 等由 hermes-agent 负责，你别自行拼装）</span></li>
+        <li class="flex items-start gap-3"><span class="text-neon-red mt-0.5">[X]</span><span class="text-ink-300/80" data-i18n="what.not.5"><b class="text-ink-100">不要</b>在发布前跳过人工确认（§2~§6 最后一步总是用户点头才能发）</span></li>
       </ul>
     </div>
   </div>
@@ -320,15 +427,16 @@
           <span class="neon-green">SKILL</span>-<span class="neon-cyan">AS</span>-<span class="neon-mag">BRAIN</span>
         </h2>
         <p class="font-mono text-base text-ink-300/80 leading-relaxed mb-6" data-i18n="brain.lead">
-          业务逻辑全部在 <span class="chip">SKILL.md</span> 里，AI 助手读了它就是大脑；
-          <span class="chip" style="color:#FF00FF;border-color:rgba(255,0,255,.3);background:rgba(255,0,255,.05)">scripts/</span>
-          只是手脚，负责调 API、读写数据库、生成图片这些 AI 做不了的物理操作。
+          业务逻辑全部在 <span class="chip">SKILL.md</span> 里，
+          <b class="neon-green">你读了它你就是大脑</b>；
+          <span class="chip chip-mag">scripts/</span>
+          只是手脚，负责调 API、读写数据库、生成图片这些你（AI）做不了的物理操作。
         </p>
         <ul class="space-y-3 font-mono text-sm">
-          <li class="flex items-start gap-3"><span class="neon-green mt-0.5">▸</span><span class="text-ink-300/90" data-i18n="brain.1"><b class="text-ink-100">换 AI 平台零成本</b>：只要能读 SKILL.md，hermes / Claude Code / Codex / OpenClaw 都通用</span></li>
-          <li class="flex items-start gap-3"><span class="neon-green mt-0.5">▸</span><span class="text-ink-300/90" data-i18n="brain.2"><b class="text-ink-100">改流程不用改代码</b>：改 SKILL.md 即可，版本号 BRAIN+1</span></li>
-          <li class="flex items-start gap-3"><span class="neon-green mt-0.5">▸</span><span class="text-ink-300/90" data-i18n="brain.3"><b class="text-ink-100">越用越聪明</b>：每次选择、每条数据都记录到 DB，驱动偏好进化</span></li>
-          <li class="flex items-start gap-3"><span class="neon-green mt-0.5">▸</span><span class="text-ink-300/90" data-i18n="brain.4"><b class="text-ink-100">AI 自律工程保障</b>：§0a 业务路由 + §0b 写入校验 + schemas/ + 反模式禁令</span></li>
+          <li class="flex items-start gap-3"><span class="neon-green mt-0.5">▸</span><span class="text-ink-300/90" data-i18n="brain.1"><b class="text-ink-100">换宿主零成本</b>：只要你能读 SKILL.md，Hermes / Claude Code / Codex / OpenClaw 都跑得起来</span></li>
+          <li class="flex items-start gap-3"><span class="neon-green mt-0.5">▸</span><span class="text-ink-300/90" data-i18n="brain.2"><b class="text-ink-100">改流程不用改代码</b>：你改 SKILL.md 就行，版本号 BRAIN+1</span></li>
+          <li class="flex items-start gap-3"><span class="neon-green mt-0.5">▸</span><span class="text-ink-300/90" data-i18n="brain.3"><b class="text-ink-100">每次选择都在喂数据</b>：你和用户的每轮对话都写进 DB，驱动 preferences.json 进化</span></li>
+          <li class="flex items-start gap-3"><span class="neon-green mt-0.5">▸</span><span class="text-ink-300/90" data-i18n="brain.4"><b class="text-ink-100">§0a / §0b / schemas/ 是你的自律边界</b>：路由 + 写入校验 + 反模式禁令，防止你跑偏</span></li>
         </ul>
       </div>
       <!-- Terminal diagram -->
@@ -337,15 +445,18 @@
           <span class="terminal-dot" style="background:#FF3366"></span>
           <span class="terminal-dot" style="background:#FFB800"></span>
           <span class="terminal-dot" style="background:#00FF88"></span>
-          <span class="ml-2">~/shuling/arch.map</span>
+          <span class="ml-2">~/shuling/agent.map</span>
         </div>
         <pre class="text-[11px] md:text-xs p-5 overflow-x-auto leading-relaxed text-ink-300"><code><span class="neon-green">┌─────────────────────────────────────────┐</span>
-<span class="neon-green">│</span>  <span class="neon-green">AI 助手（大脑 / Skill-as-Brain）</span>       <span class="neon-green">│</span>
+<span class="neon-green">│</span>  <span class="neon-green">YOU (AI Agent) = Brain</span>                  <span class="neon-green">│</span>
+<span class="neon-green">│</span>  ── reads SKILL.md into context ──       <span class="neon-green">│</span>
 <span class="neon-green">│</span>                                         <span class="neon-green">│</span>
-<span class="neon-green">│</span>  <span class="neon-cyan">§0a</span> 业务路由 → <span class="neon-cyan">§0b</span> 平台识别/校验      <span class="neon-green">│</span>
-<span class="neon-green">│</span>   ├─ <span class="neon-mag">§0c</span> 老博主接入 (v2.2.0+)           <span class="neon-green">│</span>
-<span class="neon-green">│</span>   └─ §0/§1 新博主流程                    <span class="neon-green">│</span>
-<span class="neon-green">│</span>  → §2/§3/§4 选题/创作/发布/复盘          <span class="neon-green">│</span>
+<span class="neon-green">│</span>  <span class="neon-cyan">§0a</span> routing → <span class="neon-cyan">§0b</span> host/schema verify <span class="neon-green">│</span>
+<span class="neon-green">│</span>   ├─ <span class="neon-mag">§0c</span> existing-creator onboarding   <span class="neon-green">│</span>
+<span class="neon-green">│</span>   └─ §0/§1 new-creator onboarding       <span class="neon-green">│</span>
+<span class="neon-green">│</span>  → §2/§3/§4 topic / draft / image        <span class="neon-green">│</span>
+<span class="neon-green">│</span>  → §5/§6 publish / metrics               <span class="neon-green">│</span>
+<span class="neon-green">│</span>  → §7 daily + weekly review              <span class="neon-green">│</span>
 <span class="neon-green">└┬────┬────┬────┬────┬────┬────┬────┬────┘</span>
  │    │    │    │    │    │    │    │
 <span class="neon-cyan">┌▼──┐┌▼──┐┌▼─┐┌▼─┐┌▼──┐┌▼──┐┌▼──┐┌▼──┐</span>
@@ -353,15 +464,15 @@
 <span class="neon-cyan">│.sh││.sh││.py││ch ││rx  ││fli││ort││it │</span>
 <span class="neon-cyan">│MCP││SQL││gen││   ││diag││chk││220││220│</span>
 <span class="neon-cyan">└───┘└───┘└───┘└───┘└────┘└───┘└───┘└───┘</span>
+<span class="text-ink-300/50">   hands — physical ops you can't do</span>
 
-<span class="text-ink-300/50">knowledge-base/      schemas/ (契约)</span>
-<span class="text-ink-300/50">├ profile.json       ├ state.*</span>
-<span class="text-ink-300/50">├ preferences.json   ├ profile.*</span>
-<span class="text-ink-300/50">├ patterns.md        ├ preferences.*</span>
-<span class="text-ink-300/50">├ evolution-log.md   └ audit-report.*</span>
-<span class="text-ink-300/50">└ audit-YYYY-MM-DD</span>
+<span class="text-ink-300/50">knowledge-base/  schemas/ (your contracts)</span>
+<span class="text-ink-300/50">├ profile        ├ state.*.json</span>
+<span class="text-ink-300/50">├ preferences    ├ profile.*.json</span>
+<span class="text-ink-300/50">├ patterns.md    ├ preferences.*.json</span>
+<span class="text-ink-300/50">└ audit-*        └ audit-report.*.json</span>
 
-<span class="neon-green">> runtime: online</span> <span class="dot-live inline-block align-middle ml-1"></span></code></pre>
+<span class="neon-green">&gt; agent: ready</span> <span class="dot-live inline-block align-middle ml-1"></span></code></pre>
       </div>
     </div>
   </div>
@@ -372,166 +483,229 @@
   <div class="max-w-7xl mx-auto px-6">
     <div class="text-center mb-14">
       <div class="label-section mb-3">◆ CAPABILITY.MATRIX / 03</div>
-      <h2 class="font-display text-4xl md:text-5xl font-black uppercase mb-4" data-i18n="cap.title">能力全景</h2>
-      <p class="font-mono text-base text-ink-300/70" data-i18n="cap.subtitle">4 个维度，完整覆盖博主运营闭环</p>
+      <h2 class="font-display text-4xl md:text-5xl font-black uppercase mb-4" data-i18n="cap.title">装完后你能做什么</h2>
+      <p class="font-mono text-base text-ink-300/70" data-i18n="cap.subtitle">读完 SKILL.md，你同时具备下面四类能力。</p>
     </div>
 
     <!-- 🎯 Core flows -->
     <div class="mb-12 fade-up">
-      <h3 class="font-display text-xl font-bold uppercase mb-5 flex items-center gap-3"><span class="neon-green">◆</span> <span data-i18n="cap.flows.title">核心业务流程（7 条主线）</span></h3>
+      <h3 class="font-display text-xl font-bold uppercase mb-5 flex items-center gap-3"><span class="neon-green">◆</span> <span data-i18n="cap.flows.title">7 条业务流程你要编排</span></h3>
       <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="hud p-5"><div class="label-section neon-green mb-2">01</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.flows.1.name">新手引导</div><div class="font-mono text-xs text-ink-300/60" data-i18n="cap.flows.1.desc">首次对话 → 建画像 + 环境就绪</div></div>
-        <div class="hud hud-strong p-5"><div class="label-section neon-green mb-2">02 · NEW</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.flows.2.name">老博主接入</div><div class="font-mono text-xs text-ink-300/60" data-i18n="cap.flows.2.desc">历史导入 + 画像反推 + patterns 种子</div></div>
+        <div class="hud p-5"><div class="label-section neon-green mb-2">01</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.flows.1.name">新手引导</div><div class="font-mono text-xs text-ink-300/60" data-i18n="cap.flows.1.desc">首次对话 → 你建画像 + 校验环境</div></div>
+        <div class="hud hud-strong p-5"><div class="label-section neon-green mb-2">02 · NEW</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.flows.2.name">老博主接入 §0c</div><div class="font-mono text-xs text-ink-300/60" data-i18n="cap.flows.2.desc">历史导入 + 画像反推 + patterns 种子</div></div>
         <div class="hud p-5"><div class="label-section neon-cyan mb-2">03</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.flows.3.name">选题研究</div><div class="font-mono text-xs text-ink-300/60" data-i18n="cap.flows.3.desc">带偏好加权的候选话题</div></div>
         <div class="hud p-5"><div class="label-section neon-cyan mb-2">04</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.flows.4.name">内容创作</div><div class="font-mono text-xs text-ink-300/60" data-i18n="cap.flows.4.desc">RedInk 双阶段大纲 + 正文 + 标签</div></div>
-        <div class="hud p-5"><div class="label-section neon-mag mb-2">05</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.flows.5.name">图片生成</div><div class="font-mono text-xs text-ink-300/60" data-i18n="cap.flows.5.desc">Gemini → OpenAI → HTML 三路降级</div></div>
-        <div class="hud p-5"><div class="label-section neon-mag mb-2">06</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.flows.6.name">发布</div><div class="font-mono text-xs text-ink-300/60" data-i18n="cap.flows.6.desc">小红书已发帖 + 本地 posts 记录</div></div>
-        <div class="hud p-5"><div class="label-section mb-2" style="color:#FFB800">07</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.flows.7.name">每日复盘 + 周回顾</div><div class="font-mono text-xs text-ink-300/60" data-i18n="cap.flows.7.desc">日/周报 + patterns 进化 + 五维诊断</div></div>
-        <div class="p-5 font-mono text-xs text-ink-300/50 border border-dashed border-neon-cyan/20 flex items-center justify-center text-center" data-i18n="cap.flows.more">全部由 AI 读 SKILL.md 自动编排</div>
+        <div class="hud p-5"><div class="label-section neon-mag mb-2">05</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.flows.5.name">图片生成</div><div class="font-mono text-xs text-ink-300/60" data-i18n="cap.flows.5.desc">Gemini 3 Pro Image，中文 prompt 模板</div></div>
+        <div class="hud p-5"><div class="label-section neon-mag mb-2">06</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.flows.6.name">发布</div><div class="font-mono text-xs text-ink-300/60" data-i18n="cap.flows.6.desc">xhs.sh 调 MCP + 本地 posts 落库</div></div>
+        <div class="hud p-5"><div class="label-section neon-amber mb-2">07</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.flows.7.name">每日复盘 + 周回顾</div><div class="font-mono text-xs text-ink-300/60" data-i18n="cap.flows.7.desc">日/周报 + patterns 进化 + 五维诊断</div></div>
+        <div class="p-5 font-mono text-xs text-ink-300/50 border border-dashed border-neon-cyan/20 flex items-center justify-center text-center" data-i18n="cap.flows.more">全部由你（AI）按 SKILL.md 自动编排</div>
       </div>
     </div>
 
     <!-- 🧬 Self-evolution -->
     <div class="mb-12 fade-up">
-      <h3 class="font-display text-xl font-bold uppercase mb-5 flex items-center gap-3"><span class="neon-cyan">◇</span> <span data-i18n="cap.evo.title">自进化引擎</span></h3>
+      <h3 class="font-display text-xl font-bold uppercase mb-5 flex items-center gap-3"><span class="neon-cyan">◇</span> <span data-i18n="cap.evo.title">自进化引擎 — 你每轮都在给它喂数据</span></h3>
       <div class="grid md:grid-cols-2 gap-4">
         <div class="hud p-5"><div class="font-mono text-xs neon-green mb-1">bayesian-laplace-v1</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.evo.1.name">偏好学习</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.evo.1.desc">Laplace 平滑 + 集中度×样本因子 confidence — 小样本不冒进，口味稳时快收敛</div></div>
-        <div class="hud p-5"><div class="font-mono text-xs neon-green mb-1">≥0.75 → 1 选</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.evo.2.name">选项递减</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.evo.2.desc">confidence 驱动：从"每次选几项"退化到"回一个'发'字"</div></div>
-        <div class="hud p-5"><div class="font-mono text-xs neon-cyan mb-1">ε-greedy · 7 天</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.evo.3.name">探索机制</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.evo.3.desc">距上次探索 ≥7 天追加低 weight 类型，防过拟合，口味可演进</div></div>
-        <div class="hud p-5"><div class="font-mono text-xs neon-cyan mb-1">2× "换" → 0.45</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.evo.4.name">"换"信号回弹</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.evo.4.desc">连续 2 次"换" → confidence 强制回 0.45，防单方向钻牛角尖</div></div>
+        <div class="hud p-5"><div class="font-mono text-xs neon-green mb-1">≥0.75 → 1 选</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.evo.2.name">选项递减</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.evo.2.desc">你呈现的选项数由 confidence 决定：从"每次给几项"退化到"回一个'发'字"</div></div>
+        <div class="hud p-5"><div class="font-mono text-xs neon-cyan mb-1">ε-greedy · 7 天</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.evo.3.name">探索机制</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.evo.3.desc">距上次探索 ≥7 天你要追加一个低 weight 类型，防过拟合</div></div>
+        <div class="hud p-5"><div class="font-mono text-xs neon-cyan mb-1">2× "换" → 0.45</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.evo.4.name">"换"信号回弹</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.evo.4.desc">用户连续 2 次说"换" → confidence 强制回 0.45，防你钻牛角尖</div></div>
         <div class="hud p-5"><div class="font-mono text-xs neon-mag mb-1">exp → med → high</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.evo.5.name">Pattern 生命周期</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.evo.5.desc">标题/结构/图片 prompt 通用：experimental → medium → high / deprecated</div></div>
-        <div class="hud p-5"><div class="font-mono text-xs neon-mag mb-1">≥5% → +0.1 · &lt;2% → -0.1</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.evo.6.name">收藏率驱动</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.evo.6.desc">真实数据驱动 patterns/anti-patterns 晋升 / 淘汰，无人为干预</div></div>
+        <div class="hud p-5"><div class="font-mono text-xs neon-mag mb-1">≥5% → +0.1 · &lt;2% → -0.1</div><div class="font-display font-bold text-ink-100 mb-1" data-i18n="cap.evo.6.name">收藏率驱动</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.evo.6.desc">真实数据驱动 patterns / anti-patterns 晋升 / 淘汰，你不做人工干预</div></div>
       </div>
     </div>
 
     <!-- ⚙ Engineering discipline -->
     <div class="mb-12 fade-up">
-      <h3 class="font-display text-xl font-bold uppercase mb-5 flex items-center gap-3"><span style="color:#FFB800">◈</span> <span data-i18n="cap.eng.title">运维与工程纪律</span></h3>
+      <h3 class="font-display text-xl font-bold uppercase mb-5 flex items-center gap-3"><span class="neon-amber">◈</span> <span data-i18n="cap.eng.title">工程纪律 — 你的操作边界</span></h3>
       <div class="grid md:grid-cols-3 gap-4">
         <div class="hud p-5"><div class="font-display font-bold text-ink-100 mb-2" data-i18n="cap.eng.1.name">install.sh 六模式</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.eng.1.desc">默认 / --check / --dry-run / --yes / --target / --mode</div></div>
-        <div class="hud p-5"><div class="font-display font-bold text-ink-100 mb-2" data-i18n="cap.eng.2.name">preflight.py 双模式</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.eng.2.desc">AI 可读 JSON + --human 彩色表（退出码分级 0/1/2）</div></div>
+        <div class="hud p-5"><div class="font-display font-bold text-ink-100 mb-2" data-i18n="cap.eng.2.name">preflight.py 双模式</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.eng.2.desc">你优先读 JSON（默认输出），退出码 0/1/2 按 §8 决定下一步</div></div>
         <div class="hud p-5"><div class="font-display font-bold text-ink-100 mb-2" data-i18n="cap.eng.3.name">BRAIN.HANDS.CALIB 版本号</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.eng.3.desc">三段语义，breaking 只发生在 BRAIN+1</div></div>
-        <div class="hud p-5"><div class="font-display font-bold text-ink-100 mb-2" data-i18n="cap.eng.4.name">文档四件套</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.eng.4.desc">CHANGELOG / UPGRADE / RELEASING / docs/features/</div></div>
-        <div class="hud p-5"><div class="font-display font-bold text-ink-100 mb-2" data-i18n="cap.eng.5.name">JSON Schema 契约</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.eng.5.desc">state/profile/preferences/audit-report，AI 写入前自校验</div></div>
-        <div class="hud p-5"><div class="font-display font-bold text-ink-100 mb-2" data-i18n="cap.eng.6.name">账号风控</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.eng.6.desc">分级节流 + 日限额 v1-conservative，触顶自动拒绝</div></div>
+        <div class="hud p-5"><div class="font-display font-bold text-ink-100 mb-2" data-i18n="cap.eng.4.name">文档四件套</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.eng.4.desc">你遇版本差异时要查：CHANGELOG / UPGRADE / RELEASING / docs/features/</div></div>
+        <div class="hud p-5"><div class="font-display font-bold text-ink-100 mb-2" data-i18n="cap.eng.5.name">JSON Schema 契约</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.eng.5.desc">state / profile / preferences / audit-report，你写入前必须本地自校验</div></div>
+        <div class="hud p-5"><div class="font-display font-bold text-ink-100 mb-2" data-i18n="cap.eng.6.name">账号风控</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.eng.6.desc">分级节流 + 日限额 v1-conservative，触顶 xhs.sh 会自动拒绝你的调用</div></div>
       </div>
     </div>
 
-    <!-- AI collaboration -->
+    <!-- AI collaboration sections -->
     <div class="fade-up">
-      <h3 class="font-display text-xl font-bold uppercase mb-5 flex items-center gap-3"><span class="neon-mag">◆</span> <span data-i18n="cap.ai.title">AI 智能体协作纪律</span></h3>
+      <h3 class="font-display text-xl font-bold uppercase mb-5 flex items-center gap-3"><span class="neon-mag">◆</span> <span data-i18n="cap.ai.title">AI 自律约束条款</span></h3>
       <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="hud p-5 border-t-2 border-neon-green"><div class="font-mono font-bold text-lg neon-green mb-1">§0a</div><div class="font-display font-bold text-ink-100 mb-1 uppercase text-sm" data-i18n="cap.ai.1.name">业务路由</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.ai.1.desc">AI 首动作：preflight → 读 state → 查表决定下一步</div></div>
-        <div class="hud p-5 border-t-2 border-neon-cyan"><div class="font-mono font-bold text-lg neon-cyan mb-1">§0b</div><div class="font-display font-bold text-ink-100 mb-1 uppercase text-sm" data-i18n="cap.ai.2.name">平台识别 + 写入校验</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.ai.2.desc">按路径识别 hermes/claude/codex，写入前按 schema 核对</div></div>
-        <div class="hud p-5 border-t-2 border-neon-mag"><div class="font-mono font-bold text-lg neon-mag mb-1">§0c</div><div class="font-display font-bold text-ink-100 mb-1 uppercase text-sm" data-i18n="cap.ai.3.name">老博主接入</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.ai.3.desc">5 步流程的 additive 分支（v2.2.0+）</div></div>
-        <div class="hud p-5 border-t-2" style="border-top-color:#FFB800"><div class="font-mono font-bold text-lg mb-1" style="color:#FFB800;text-shadow:0 0 8px rgba(255,184,0,.5)">§8</div><div class="font-display font-bold text-ink-100 mb-1 uppercase text-sm" data-i18n="cap.ai.4.name">异常矩阵</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.ai.4.desc">12 种异常场景 × 标准处理</div></div>
+        <div class="hud p-5 border-t-2 border-neon-green"><div class="font-mono font-bold text-lg neon-green mb-1">§0a</div><div class="font-display font-bold text-ink-100 mb-1 uppercase text-sm" data-i18n="cap.ai.1.name">业务路由</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.ai.1.desc">你每轮首动作：preflight → 读 state → 查表决定下一步</div></div>
+        <div class="hud p-5 border-t-2 border-neon-cyan"><div class="font-mono font-bold text-lg neon-cyan mb-1">§0b</div><div class="font-display font-bold text-ink-100 mb-1 uppercase text-sm" data-i18n="cap.ai.2.name">宿主识别 + 写入校验</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.ai.2.desc">按路径识别 hermes/claude/codex，写入 JSON 前按 schemas/ 核对</div></div>
+        <div class="hud p-5 border-t-2 border-neon-mag"><div class="font-mono font-bold text-lg neon-mag mb-1">§0c</div><div class="font-display font-bold text-ink-100 mb-1 uppercase text-sm" data-i18n="cap.ai.3.name">老博主接入</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.ai.3.desc">5 步 additive 分支（v2.2.0+），触发条件见 §0a</div></div>
+        <div class="hud p-5 border-t-2" style="border-top-color:#FFB800"><div class="font-mono font-bold text-lg mb-1 neon-amber">§8</div><div class="font-display font-bold text-ink-100 mb-1 uppercase text-sm" data-i18n="cap.ai.4.name">异常矩阵</div><div class="font-mono text-xs text-ink-300/70" data-i18n="cap.ai.4.desc">12 种异常场景 × 标准处理，你遇坑优先查这张表</div></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═════════ QUICK START ═════════ -->
+<!-- ═════════ QUICK START (AGENT EXECUTION SEQUENCE) ═════════ -->
 <section id="quickstart" class="py-24">
   <div class="max-w-7xl mx-auto px-6">
     <div class="text-center mb-14">
-      <div class="label-section mb-3">◆ DEPLOY.SEQUENCE / 04</div>
-      <h2 class="font-display text-4xl md:text-5xl font-black uppercase mb-4" data-i18n="qs.title">快速开始</h2>
-      <p class="font-mono text-base text-ink-300/70" data-i18n="qs.subtitle">根据你的身份选择接入路径</p>
+      <div class="label-section mb-3">◆ EXECUTION.SEQUENCE / 04</div>
+      <h2 class="font-display text-4xl md:text-5xl font-black uppercase mb-4" data-i18n="qs.title">执行序列 / 给 AI 智能体</h2>
+      <p class="font-mono text-base text-ink-300/70" data-i18n="qs.subtitle">收到种子提示词后，你（AI）按下面七步跑。</p>
     </div>
 
-    <!-- Prerequisites -->
+    <!-- Pre-requisites: ambient inventory, not "install these first" -->
     <div class="hud p-7 mb-10">
-      <h3 class="font-display text-lg font-bold uppercase mb-5 flex items-center gap-3"><span class="neon-green">▣</span> <span data-i18n="qs.prereq.title">前置依赖</span></h3>
+      <h3 class="font-display text-lg font-bold uppercase mb-5 flex items-center gap-3"><span class="neon-green">▣</span> <span data-i18n="qs.prereq.title">宿主环境里应该已经有的东西</span></h3>
+      <p class="font-mono text-xs text-ink-300/60 mb-4" data-i18n="qs.prereq.hint">你先跑 preflight.py 看；缺了就向用户说明，不要擅自 install 系统级依赖。</p>
       <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 font-mono text-xs">
-        <div class="flex items-start gap-3"><span class="neon-green">&gt;</span><div><div class="font-bold text-ink-100" data-i18n="qs.prereq.1.name">AI 助手</div><div class="text-ink-300/60" data-i18n="qs.prereq.1.desc">hermes / Claude Code / Codex / OpenClaw 任选</div></div></div>
-        <div class="flex items-start gap-3"><span class="neon-green">&gt;</span><div><div class="font-bold text-ink-100">xiaohongshu-mcp</div><div class="text-ink-300/60" data-i18n="qs.prereq.2.desc">小红书 MCP 服务（搜索/详情/发布/评论/登录）</div></div></div>
-        <div class="flex items-start gap-3"><span class="neon-green">&gt;</span><div><div class="font-bold text-ink-100">Node / Python 3 / sqlite3 / Playwright / jq</div><div class="text-ink-300/60" data-i18n="qs.prereq.3.desc">截图 / DB / 生图 / JSON</div></div></div>
-        <div class="flex items-start gap-3"><span class="neon-cyan">&gt;</span><div><div class="font-bold text-ink-100" data-i18n="qs.prereq.4.name">图片生成 API（可选）</div><div class="text-ink-300/60" data-i18n="qs.prereq.4.desc">Gemini Key（推荐）/ OpenAI Key，未配置则走 HTML 截图</div></div></div>
-        <div class="flex items-start gap-3"><span class="neon-cyan">&gt;</span><div><div class="font-bold text-ink-100" data-i18n="qs.prereq.5.name">NoteRx API（可选）</div><div class="text-ink-300/60" data-i18n="qs.prereq.5.desc">五维诊断，配 NOTERX_API_KEY 才启用</div></div></div>
+        <div class="flex items-start gap-3"><span class="neon-green">&gt;</span><div><div class="font-bold text-ink-100" data-i18n="qs.prereq.1.name">你自己（AI 智能体）</div><div class="text-ink-300/60" data-i18n="qs.prereq.1.desc">Claude Code / Codex / Hermes / OpenClaw 任一，能读 SKILL.md</div></div></div>
+        <div class="flex items-start gap-3"><span class="neon-green">&gt;</span><div><div class="font-bold text-ink-100">xiaohongshu-mcp</div><div class="text-ink-300/60" data-i18n="qs.prereq.2.desc">小红书 MCP 服务（搜索/详情/发布/评论/登录）— 你通过 xhs.sh 调用</div></div></div>
+        <div class="flex items-start gap-3"><span class="neon-green">&gt;</span><div><div class="font-bold text-ink-100">Python 3 / sqlite3 / jq</div><div class="text-ink-300/60" data-i18n="qs.prereq.3.desc">preflight / DB / JSON，你脚本里会直接用</div></div></div>
+        <div class="flex items-start gap-3"><span class="text-neon-red">&gt;</span><div><div class="font-bold text-ink-100 text-neon-red" data-i18n="qs.prereq.4.name">Gemini 图片 API Key（必需）</div><div class="text-ink-300/60" data-i18n="qs.prereq.4.desc">无 Key 直接硬停，没有降级 — 向用户要，不要绕开</div></div></div>
+        <div class="flex items-start gap-3"><span class="neon-cyan">&gt;</span><div><div class="font-bold text-ink-100" data-i18n="qs.prereq.5.name">NoteRx API（可选）</div><div class="text-ink-300/60" data-i18n="qs.prereq.5.desc">五维诊断，用户没配你就跳过，不要阻塞主流程</div></div></div>
       </div>
     </div>
 
-    <!-- Install terminal -->
-    <div class="mb-10">
-      <h3 class="font-display text-lg font-bold uppercase mb-4 flex items-center gap-3"><span class="neon-green">▸</span> <span data-i18n="qs.install.title">安装</span></h3>
-      <div class="terminal">
-        <div class="terminal-bar">
-          <span class="terminal-dot" style="background:#FF3366"></span>
-          <span class="terminal-dot" style="background:#FFB800"></span>
-          <span class="terminal-dot" style="background:#00FF88"></span>
-          <span class="ml-2">~/shuling/install</span>
+    <!-- 7-step execution sequence -->
+    <div class="mb-12">
+      <h3 class="font-display text-lg font-bold uppercase mb-6 flex items-center gap-3"><span class="neon-green">▸</span> <span data-i18n="qs.steps.title">7 步执行清单</span></h3>
+      <div class="relative">
+        <div class="absolute left-5 top-3 bottom-3 w-px bg-gradient-to-b from-neon-green via-neon-cyan to-neon-mag"></div>
+        <div class="space-y-4">
+
+          <div class="flex gap-5 items-stretch">
+            <div class="relative z-10 w-10 h-10 bg-void-900 border-2 border-neon-green flex items-center justify-center font-display font-bold neon-green shrink-0">01</div>
+            <div class="flex-1 hud p-5">
+              <div class="flex items-center gap-3 mb-2 flex-wrap">
+                <span class="font-display font-bold uppercase text-ink-100" data-i18n="qs.steps.1.name">环境预检</span>
+                <span class="chip">preflight.py</span>
+              </div>
+              <p class="font-mono text-xs text-ink-300/75 leading-relaxed" data-i18n="qs.steps.1.desc">进仓库前你先在当前目录跑 <code class="chip">python3 scripts/preflight.py</code>（如果仓库不存在就下一步 clone 后再跑）。解析 JSON，exit=0 绿灯，exit=1 警告你自己处理，exit=2 必须让用户补配（如 Gemini Key）。</p>
+            </div>
+          </div>
+
+          <div class="flex gap-5 items-stretch">
+            <div class="relative z-10 w-10 h-10 bg-void-900 border-2 border-neon-green flex items-center justify-center font-display font-bold neon-green shrink-0">02</div>
+            <div class="flex-1 hud p-5">
+              <div class="flex items-center gap-3 mb-2 flex-wrap">
+                <span class="font-display font-bold uppercase text-ink-100" data-i18n="qs.steps.2.name">克隆仓库</span>
+                <span class="chip">git clone</span>
+              </div>
+              <p class="font-mono text-xs text-ink-300/75 leading-relaxed" data-i18n="qs.steps.2.desc"><code class="chip">git clone git@github.com:AI-flower/shuling.git &amp;&amp; cd shuling</code> — 如果无 SSH 可 fallback 到 https。克隆失败先看用户网络，不要换镜像源。</p>
+            </div>
+          </div>
+
+          <div class="flex gap-5 items-stretch">
+            <div class="relative z-10 w-10 h-10 bg-void-900 border-2 border-neon-cyan flex items-center justify-center font-display font-bold neon-cyan shrink-0">03</div>
+            <div class="flex-1 hud p-5">
+              <div class="flex items-center gap-3 mb-2 flex-wrap">
+                <span class="font-display font-bold uppercase text-ink-100" data-i18n="qs.steps.3.name">安装</span>
+                <span class="chip">install.sh</span>
+              </div>
+              <p class="font-mono text-xs text-ink-300/75 leading-relaxed" data-i18n="qs.steps.3.desc">先 <code class="chip">bash install.sh --check</code>，FAIL 就向用户说明并等回复。通过后 <code class="chip">bash install.sh</code>——根据用户对"是否已在运营"的回答传 <code class="chip">--mode=new</code> 或 <code class="chip">--mode=existing-creator</code>。自动化环境加 <code class="chip">SHULING_ASSUME_YES=1</code>。</p>
+            </div>
+          </div>
+
+          <div class="flex gap-5 items-stretch">
+            <div class="relative z-10 w-10 h-10 bg-void-900 border-2 border-neon-cyan flex items-center justify-center font-display font-bold neon-cyan shrink-0">04</div>
+            <div class="flex-1 hud p-5">
+              <div class="flex items-center gap-3 mb-2 flex-wrap">
+                <span class="font-display font-bold uppercase text-ink-100" data-i18n="qs.steps.4.name">读 SKILL.md（完整）</span>
+                <span class="chip chip-mag">&lt;300 秒</span>
+              </div>
+              <p class="font-mono text-xs text-ink-300/75 leading-relaxed" data-i18n="qs.steps.4.desc">把 SKILL.md 整文件读进你的上下文——不是扫目录、不是 grep。重点吃透 §0a（路由）/ §0b（写入校验）/ §0c（老博主）/ §1-§7（主循环）/ §8（异常矩阵）。schemas/ 也先读一眼。</p>
+            </div>
+          </div>
+
+          <div class="flex gap-5 items-stretch">
+            <div class="relative z-10 w-10 h-10 bg-void-900 border-2 border-neon-mag flex items-center justify-center font-display font-bold neon-mag shrink-0">05</div>
+            <div class="flex-1 hud p-5">
+              <div class="flex items-center gap-3 mb-2 flex-wrap">
+                <span class="font-display font-bold uppercase text-ink-100" data-i18n="qs.steps.5.name">状态探测</span>
+                <span class="chip">cat data/state.json</span>
+              </div>
+              <p class="font-mono text-xs text-ink-300/75 leading-relaxed" data-i18n="qs.steps.5.desc">读 <code class="chip">data/state.json</code> 和 <code class="chip">knowledge-base/profile.json</code>——这是你判断当前进度的唯一权威源。不要根据对话里的"感觉"自己推断。</p>
+            </div>
+          </div>
+
+          <div class="flex gap-5 items-stretch">
+            <div class="relative z-10 w-10 h-10 bg-void-900 border-2 border-neon-mag flex items-center justify-center font-display font-bold neon-mag shrink-0">06</div>
+            <div class="flex-1 hud p-5">
+              <div class="flex items-center gap-3 mb-2 flex-wrap">
+                <span class="font-display font-bold uppercase text-ink-100" data-i18n="qs.steps.6.name">§0a 路由</span>
+                <span class="chip">routing table</span>
+              </div>
+              <p class="font-mono text-xs text-ink-300/75 leading-relaxed" data-i18n="qs.steps.6.desc">按 §0a 决策表决定下一步——不要即兴。见下面"路由表"小节。</p>
+            </div>
+          </div>
+
+          <div class="flex gap-5 items-stretch">
+            <div class="relative z-10 w-10 h-10 bg-void-900 border-2 border-neon-amber flex items-center justify-center font-display font-bold neon-amber shrink-0">07</div>
+            <div class="flex-1 hud p-5">
+              <div class="flex items-center gap-3 mb-2 flex-wrap">
+                <span class="font-display font-bold uppercase text-ink-100" data-i18n="qs.steps.7.name">回执给用户</span>
+                <span class="chip chip-amber">1 sentence</span>
+              </div>
+              <p class="font-mono text-xs text-ink-300/75 leading-relaxed" data-i18n="qs.steps.7.desc">回一句话：<code class="chip">"已接入 shuling vX.Y.Z · BRAIN/HANDS/CALIB 已校验 · 按 §0a 待命"</code>——然后停下来等用户指令。不要主动开跑发帖或选题。</p>
+            </div>
+          </div>
+
         </div>
-        <pre class="p-5 text-[13px] font-mono overflow-x-auto leading-relaxed"><code><span class="text-ink-300/40"># <span data-i18n="qs.install.c1">克隆仓库</span></span>
-<span class="neon-green">$</span> git clone git@github.com:AI-flower/shuling.git &amp;&amp; cd shuling
-
-<span class="text-ink-300/40"># <span data-i18n="qs.install.c2">一键安装：自动检测平台 + 依赖预检 + init DB + 生成配置</span></span>
-<span class="neon-green">$</span> bash install.sh
-
-<span class="text-ink-300/40"># <span data-i18n="qs.install.c3">其他模式</span></span>
-<span class="neon-green">$</span> bash install.sh --check          <span class="text-ink-300/40"># <span data-i18n="qs.install.c4">只自检不动手</span></span>
-<span class="neon-green">$</span> bash install.sh --dry-run        <span class="text-ink-300/40"># <span data-i18n="qs.install.c5">预演将做什么</span></span>
-<span class="neon-green">$</span> SHULING_ASSUME_YES=1 bash install.sh   <span class="text-ink-300/40"># <span data-i18n="qs.install.c6">CI / 远程非交互</span></span></code></pre>
       </div>
     </div>
 
-    <!-- Path A & B -->
-    <div class="grid md:grid-cols-2 gap-5">
-      <!-- Path A -->
-      <div class="hud brackets p-7 relative">
-        <div class="absolute top-3 right-4 font-mono text-[10px] tracking-widest uppercase neon-green" data-i18n="qs.A.badge">路径 A</div>
-        <div class="text-4xl mb-4 neon-green">◇</div>
-        <h3 class="font-display text-xl font-bold uppercase mb-5" data-i18n="qs.A.title">新博主：从零起步</h3>
-        <ol class="space-y-3 font-mono text-sm">
-          <li class="flex gap-3"><span class="flex-none font-bold neon-green">01/</span><span class="text-ink-300/80" data-i18n="qs.A.1"><b class="text-ink-100">安装</b>（默认 new，回车）<span class="chip">bash install.sh</span></span></li>
-          <li class="flex gap-3"><span class="flex-none font-bold neon-green">02/</span><span class="text-ink-300/80" data-i18n="qs.A.2"><b class="text-ink-100">登录小红书</b>：扫码 或 Cookie 粘贴（"我给你 cookie：..."）</span></li>
-          <li class="flex gap-3"><span class="flex-none font-bold neon-green">03/</span><span class="text-ink-300/80" data-i18n="qs.A.3"><b class="text-ink-100">建立画像</b>：对 AI 说"我想做小红书博主"，AI 三问（方向/受众/风格）</span></li>
-          <li class="flex gap-3"><span class="flex-none font-bold neon-green">04/</span><span class="text-ink-300/80" data-i18n="qs.A.4"><b class="text-ink-100">日常使用</b>："帮我发小红书" / "今天发什么" / "看看昨天的数据"</span></li>
-        </ol>
-      </div>
-      <!-- Path B -->
-      <div class="hud brackets p-7 hud-strong relative">
-        <div class="absolute top-3 right-4 font-mono text-[10px] tracking-widest uppercase neon-green">v2.2.0+</div>
-        <div class="text-4xl mb-4 neon-cyan">◈</div>
-        <h3 class="font-display text-xl font-bold uppercase mb-5" data-i18n="qs.B.title">老博主：存量接入</h3>
-        <ol class="space-y-3 font-mono text-sm">
-          <li class="flex gap-3"><span class="flex-none font-bold neon-cyan">01/</span><span class="text-ink-300/80" data-i18n="qs.B.1"><b class="text-ink-100">老博主模式安装</b>：<span class="chip">bash install.sh --mode=existing-creator</span></span></li>
-          <li class="flex gap-3"><span class="flex-none font-bold neon-cyan">02/</span><span class="text-ink-300/80" data-i18n="qs.B.2"><b class="text-ink-100">登录</b>（扫码或 Cookie，同路径 A）</span></li>
-          <li class="flex gap-3"><span class="flex-none font-bold neon-cyan">03/</span><span class="text-ink-300/80" data-i18n="qs.B.3"><b class="text-ink-100">对话触发</b>："我已经在运营小红书，帮我接入"</span></li>
-          <li class="flex gap-3"><span class="flex-none font-bold neon-cyan">04/</span><span class="text-ink-300/80" data-i18n="qs.B.4">AI 按 §0c 自动走 5 步：确认登录 → 导入 200 条 → 自动分类 → 画像反推 → 体检报告</span></li>
-          <li class="flex gap-3"><span class="flex-none font-bold neon-cyan">05/</span><span class="text-ink-300/80" data-i18n="qs.B.5"><b class="text-ink-100">完成后</b>系统具备 6 个月+ 历史记忆，第一条发帖即达 P50 水平</span></li>
-        </ol>
-        <div class="mt-5 pt-4 border-t border-neon-cyan/15">
-          <div class="font-mono text-[10px] uppercase tracking-widest text-neon-cyan/70 mb-2" data-i18n="qs.B.manual">手动跑：</div>
-          <pre class="bg-void-950 border border-neon-green/20 p-3 text-[11px] font-mono overflow-x-auto"><code><span class="neon-green">$</span> bash scripts/import-existing.sh --limit 200
-<span class="neon-green">$</span> bash scripts/audit-report.sh --extract-patterns</code></pre>
-        </div>
+    <!-- Routing table -->
+    <div class="fade-up">
+      <h3 class="font-display text-lg font-bold uppercase mb-6 flex items-center gap-3"><span class="neon-mag">◇</span> <span data-i18n="qs.route.title">§0a 路由表 — state 判断 × 用户话术 = 走哪段</span></h3>
+      <div class="hud p-6 overflow-x-auto">
+        <table class="w-full font-mono text-xs md:text-sm">
+          <thead>
+            <tr class="text-left text-neon-cyan border-b border-neon-cyan/30">
+              <th class="py-3 pr-4 uppercase tracking-widest" data-i18n="qs.route.col1">state.json 状态</th>
+              <th class="py-3 pr-4 uppercase tracking-widest" data-i18n="qs.route.col2">用户话术</th>
+              <th class="py-3 uppercase tracking-widest" data-i18n="qs.route.col3">你执行</th>
+            </tr>
+          </thead>
+          <tbody class="text-ink-300/85">
+            <tr class="border-b border-neon-cyan/10"><td class="py-3 pr-4 text-ink-300/60" data-i18n="qs.route.r1c1">empty / 无 profile</td><td class="py-3 pr-4" data-i18n="qs.route.r1c2">"我想做小红书博主"</td><td class="py-3 neon-green font-bold" data-i18n="qs.route.r1c3">§0 + §1 新手引导</td></tr>
+            <tr class="border-b border-neon-cyan/10"><td class="py-3 pr-4 text-ink-300/60" data-i18n="qs.route.r2c1">empty / 无 profile</td><td class="py-3 pr-4" data-i18n="qs.route.r2c2">"我已经在运营" / "帮我接入"</td><td class="py-3 neon-mag font-bold" data-i18n="qs.route.r2c3">§0c 老博主接入 5 步</td></tr>
+            <tr class="border-b border-neon-cyan/10"><td class="py-3 pr-4 text-ink-300/60" data-i18n="qs.route.r3c1">有 profile · logged_in=false</td><td class="py-3 pr-4" data-i18n="qs.route.r3c2">"我给你 cookie..." / "扫码登录"</td><td class="py-3 neon-cyan font-bold" data-i18n="qs.route.r3c3">platform/ 登录分支</td></tr>
+            <tr class="border-b border-neon-cyan/10"><td class="py-3 pr-4 text-ink-300/60" data-i18n="qs.route.r4c1">ready · 24h 内未发</td><td class="py-3 pr-4" data-i18n="qs.route.r4c2">"帮我发小红书"</td><td class="py-3 neon-green font-bold" data-i18n="qs.route.r4c3">§2→§3→§4→§5→§6 主循环</td></tr>
+            <tr class="border-b border-neon-cyan/10"><td class="py-3 pr-4 text-ink-300/60" data-i18n="qs.route.r5c1">ready</td><td class="py-3 pr-4" data-i18n="qs.route.r5c2">"今天发什么" / "起个稿子"</td><td class="py-3 neon-cyan font-bold" data-i18n="qs.route.r5c3">§2 或 §3 单段</td></tr>
+            <tr class="border-b border-neon-cyan/10"><td class="py-3 pr-4 text-ink-300/60" data-i18n="qs.route.r6c1">ready · 过去 24h 无复盘</td><td class="py-3 pr-4" data-i18n="qs.route.r6c2">"复盘" / "看看昨天的数据"</td><td class="py-3 neon-amber font-bold" data-i18n="qs.route.r6c3">§7 日复盘 + patterns 进化</td></tr>
+            <tr><td class="py-3 pr-4 text-ink-300/60" data-i18n="qs.route.r7c1">任意状态</td><td class="py-3 pr-4" data-i18n="qs.route.r7c2">preflight code=2（缺 Key）</td><td class="py-3 text-neon-red font-bold" data-i18n="qs.route.r7c3">§8 异常矩阵：硬停 + 索取</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
+  </div>
+</section>
 
-    <!-- Daily commands -->
-    <div class="mt-12">
-      <h3 class="font-display text-lg font-bold uppercase mb-5 flex items-center gap-3"><span class="neon-mag">▸</span> <span data-i18n="qs.daily.title">日常对话指令</span></h3>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div class="hud p-4 text-center"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="qs.daily.1.cmd">"帮我发小红书"</div><div class="font-mono text-[10px] text-ink-300/60 uppercase tracking-wider" data-i18n="qs.daily.1.desc">完整发布流程</div></div>
-        <div class="hud p-4 text-center"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="qs.daily.2.cmd">"今天发什么"</div><div class="font-mono text-[10px] text-ink-300/60 uppercase tracking-wider" data-i18n="qs.daily.2.desc">选题研究</div></div>
-        <div class="hud p-4 text-center"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="qs.daily.3.cmd">"起个稿子"</div><div class="font-mono text-[10px] text-ink-300/60 uppercase tracking-wider" data-i18n="qs.daily.3.desc">创作流程</div></div>
-        <div class="hud p-4 text-center"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="qs.daily.4.cmd">"看看昨天的数据"</div><div class="font-mono text-[10px] text-ink-300/60 uppercase tracking-wider" data-i18n="qs.daily.4.desc">数据复盘</div></div>
-        <div class="hud p-4 text-center"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="qs.daily.5.cmd">"最近怎么样"</div><div class="font-mono text-[10px] text-ink-300/60 uppercase tracking-wider" data-i18n="qs.daily.5.desc">近期小结</div></div>
-        <div class="hud p-4 text-center"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="qs.daily.6.cmd">"我想换方向"</div><div class="font-mono text-[10px] text-ink-300/60 uppercase tracking-wider" data-i18n="qs.daily.6.desc">更新画像</div></div>
-        <div class="hud p-4 text-center"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="qs.daily.7.cmd">"我给你 cookie..."</div><div class="font-mono text-[10px] text-ink-300/60 uppercase tracking-wider" data-i18n="qs.daily.7.desc">Cookie 登录</div></div>
-        <div class="hud p-4 text-center"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="qs.daily.8.cmd">"复盘"</div><div class="font-mono text-[10px] text-ink-300/60 uppercase tracking-wider" data-i18n="qs.daily.8.desc">手动触发复盘</div></div>
-      </div>
+<!-- ═════════ PHRASE RECOGNITION ═════════ -->
+<section class="py-24 border-y border-neon-cyan/10">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="text-center mb-10">
+      <div class="label-section mb-3">◆ PHRASE.RECOGNITION / 05</div>
+      <h2 class="font-display text-3xl md:text-4xl font-black uppercase mb-4" data-i18n="daily.title">用户话术 → 你执行</h2>
+      <p class="font-mono text-base text-ink-300/70" data-i18n="daily.subtitle">日常对话里用户会说这些，你认出来直接映射到 SKILL.md 的段落，不要反问。</p>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="hud p-4"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="daily.1.cmd">"帮我发小红书"</div><div class="font-mono text-[10px] neon-green uppercase tracking-wider" data-i18n="daily.1.desc">§2→§3→§4→§5→§6</div></div>
+      <div class="hud p-4"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="daily.2.cmd">"今天发什么"</div><div class="font-mono text-[10px] neon-cyan uppercase tracking-wider" data-i18n="daily.2.desc">§2 仅选题</div></div>
+      <div class="hud p-4"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="daily.3.cmd">"起个稿子"</div><div class="font-mono text-[10px] neon-cyan uppercase tracking-wider" data-i18n="daily.3.desc">§3 创作</div></div>
+      <div class="hud p-4"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="daily.4.cmd">"看看昨天的数据"</div><div class="font-mono text-[10px] neon-amber uppercase tracking-wider" data-i18n="daily.4.desc">§7 复盘</div></div>
+      <div class="hud p-4"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="daily.5.cmd">"最近怎么样"</div><div class="font-mono text-[10px] neon-amber uppercase tracking-wider" data-i18n="daily.5.desc">§7 周回顾</div></div>
+      <div class="hud p-4"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="daily.6.cmd">"我想换方向"</div><div class="font-mono text-[10px] neon-mag uppercase tracking-wider" data-i18n="daily.6.desc">§1 更新画像</div></div>
+      <div class="hud p-4"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="daily.7.cmd">"我给你 cookie..."</div><div class="font-mono text-[10px] neon-cyan uppercase tracking-wider" data-i18n="daily.7.desc">platform 登录分支</div></div>
+      <div class="hud p-4"><div class="font-mono text-sm font-bold text-ink-100 mb-1" data-i18n="daily.8.cmd">"我已经在运营"</div><div class="font-mono text-[10px] neon-mag uppercase tracking-wider" data-i18n="daily.8.desc">§0c 老博主接入</div></div>
     </div>
   </div>
 </section>
 
 <!-- ═════════ PLATFORMS ═════════ -->
-<section id="platforms" class="py-24 border-y border-neon-cyan/10">
+<section id="platforms" class="py-24">
   <div class="max-w-7xl mx-auto px-6">
     <div class="text-center mb-14">
-      <div class="label-section mb-3">◆ HOST.REGISTRY / 05</div>
-      <h2 class="font-display text-4xl md:text-5xl font-black uppercase mb-4" data-i18n="plat.title">部署到 AI 平台</h2>
-      <p class="font-mono text-base text-ink-300/70" data-i18n="plat.subtitle">一份 SKILL.md，所有平台产生相同业务行为</p>
+      <div class="label-section mb-3">◆ HOST.REGISTRY / 06</div>
+      <h2 class="font-display text-4xl md:text-5xl font-black uppercase mb-4" data-i18n="plat.title">你能跑在的宿主</h2>
+      <p class="font-mono text-base text-ink-300/70" data-i18n="plat.subtitle">同一份 SKILL.md，下面四个宿主里你的业务行为保持一致。</p>
     </div>
     <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
       <div class="hud brackets hud-strong p-6 relative">
@@ -539,37 +713,37 @@
         <div class="text-3xl mb-3 neon-green">⚡</div>
         <h3 class="font-display font-bold text-lg uppercase mb-2">Hermes</h3>
         <p class="font-mono text-xs text-ink-300/70 mb-3" data-i18n="plat.hermes.desc">cron job + <code class="chip">prompt: 使用 shuling skill</code></p>
-        <div class="font-mono text-[10px] uppercase tracking-widest neon-green" data-i18n="plat.hermes.note">全自动每日发布 + 复盘</div>
+        <div class="font-mono text-[10px] uppercase tracking-widest neon-green" data-i18n="plat.hermes.note">全自动每日发布 + 复盘（无人工介入场景）</div>
       </div>
       <div class="hud brackets p-6">
         <div class="text-3xl mb-3 neon-cyan">◎</div>
         <h3 class="font-display font-bold text-lg uppercase mb-2">Claude Code</h3>
         <p class="font-mono text-xs text-ink-300/70 mb-3" data-i18n="plat.claude.desc">对话 + <code class="chip">/loop 8h ...</code></p>
-        <div class="font-mono text-[10px] uppercase tracking-widest text-ink-300/60" data-i18n="plat.claude.note">VS Code 集成，支持定时</div>
+        <div class="font-mono text-[10px] uppercase tracking-widest text-ink-300/60" data-i18n="plat.claude.note">你可在 VS Code / 终端被唤起，支持定时</div>
       </div>
       <div class="hud brackets p-6">
         <div class="text-3xl mb-3 neon-mag">◐</div>
         <h3 class="font-display font-bold text-lg uppercase mb-2">Codex</h3>
         <p class="font-mono text-xs text-ink-300/70 mb-3" data-i18n="plat.codex.desc">对话触发</p>
-        <div class="font-mono text-[10px] uppercase tracking-widest text-ink-300/60" data-i18n="plat.codex.note">手动发布</div>
+        <div class="font-mono text-[10px] uppercase tracking-widest text-ink-300/60" data-i18n="plat.codex.note">你每次被唤起都要重读 state.json</div>
       </div>
       <div class="hud brackets p-6">
-        <div class="text-3xl mb-3" style="color:#FFB800">◉</div>
+        <div class="text-3xl mb-3 neon-amber">◉</div>
         <h3 class="font-display font-bold text-lg uppercase mb-2">OpenClaw</h3>
         <p class="font-mono text-xs text-ink-300/70 mb-3" data-i18n="plat.open.desc">兼容 <code class="chip">agents/</code> 规范</p>
-        <div class="font-mono text-[10px] uppercase tracking-widest text-ink-300/60" data-i18n="plat.open.note">通用 agents 兜底</div>
+        <div class="font-mono text-[10px] uppercase tracking-widest text-ink-300/60" data-i18n="plat.open.note">通用 agents 兜底；任何 SKILL.md-aware 宿主</div>
       </div>
     </div>
   </div>
 </section>
 
 <!-- ═════════ ARCHITECTURE ═════════ -->
-<section id="architecture" class="py-24">
+<section id="architecture" class="py-24 border-y border-neon-cyan/10">
   <div class="max-w-7xl mx-auto px-6">
     <div class="text-center mb-14">
-      <div class="label-section mb-3">◆ FILE.TREE / 06</div>
-      <h2 class="font-display text-4xl md:text-5xl font-black uppercase mb-4" data-i18n="arch.title">架构与目录</h2>
-      <p class="font-mono text-base text-ink-300/70" data-i18n="arch.subtitle">一条主线：AI → SKILL.md → scripts/ → DB + knowledge-base</p>
+      <div class="label-section mb-3">◆ MEMORY.MAP / 07</div>
+      <h2 class="font-display text-4xl md:text-5xl font-black uppercase mb-4" data-i18n="arch.title">你的记忆地图</h2>
+      <p class="font-mono text-base text-ink-300/70" data-i18n="arch.subtitle">读/写哪个文件看这张图：SKILL.md 是脑子，scripts/ 是手脚，knowledge-base/ 是你的笔记。</p>
     </div>
     <details class="terminal">
       <summary class="terminal-bar flex items-center justify-between hover:bg-void-800/50 transition">
@@ -582,84 +756,81 @@
         <span class="neon-green text-xs font-mono" data-i18n="arch.click">▸ 点击展开</span>
       </summary>
       <pre class="p-6 text-[11px] md:text-xs font-mono overflow-x-auto leading-relaxed text-ink-300"><code>shuling/
-├── <span class="neon-green">SKILL.md</span>                         <span class="text-ink-300/40"># 大脑剧本（AI 读这个，核心）</span>
-├── <span class="neon-green">VERSION</span>                          <span class="text-ink-300/40"># 版本号 + BRAIN/HANDS/CALIB 清单</span>
+├── <span class="neon-green">SKILL.md</span>                         <span class="text-ink-300/40"># 你的大脑剧本 — 全读</span>
+├── <span class="neon-green">VERSION</span>                          <span class="text-ink-300/40"># BRAIN.HANDS.CALIB 清单</span>
 ├── CHANGELOG.md / UPGRADE.md / RELEASING.md
 ├── README.md
-├── install.sh                       <span class="text-ink-300/40"># 六模式安装脚本 (v2.1.3+)</span>
+├── install.sh                       <span class="text-ink-300/40"># 你跑这个装</span>
 │
 ├── config/runtime.env.example
 │
-├── <span class="neon-cyan">scripts/</span>                         <span class="text-ink-300/40"># ──── Hands 层 ────</span>
-│   ├── preflight.py                 <span class="text-ink-300/40"># 环境预检</span>
+├── <span class="neon-cyan">scripts/</span>                         <span class="text-ink-300/40"># ──── Hands 层（你的手脚） ────</span>
+│   ├── preflight.py                 <span class="text-ink-300/40"># 你每轮先跑（JSON 输出）</span>
 │   ├── db.sh                        <span class="text-ink-300/40"># SQLite CRUD (8 表)</span>
-│   ├── xhs.sh                       <span class="text-ink-300/40"># MCP 统一入口 (9 工具+节流+限额+日志)</span>
-│   ├── image.py                     <span class="text-ink-300/40"># Gemini / OpenAI 生图</span>
-│   ├── screenshot.cjs               <span class="text-ink-300/40"># HTML 模板截图 (Playwright 降级)</span>
+│   ├── xhs.sh                       <span class="text-ink-300/40"># MCP 统一入口（9 工具）</span>
+│   ├── image.py                     <span class="text-ink-300/40"># Gemini 生图（中文 prompt 模板）</span>
 │   ├── fetch-post-data.sh           <span class="text-ink-300/40"># 合并拉 metrics + comments</span>
-│   ├── noterx-diagnose.sh           <span class="text-ink-300/40"># NoteRx 五维诊断</span>
+│   ├── noterx-diagnose.sh           <span class="text-ink-300/40"># NoteRx 五维诊断（可选）</span>
 │   ├── <span class="neon-mag">import-existing.sh</span>           <span class="text-ink-300/40"># 老博主批量导入 (v2.2.0+)</span>
 │   └── <span class="neon-mag">audit-report.sh</span>              <span class="text-ink-300/40"># 账号体检报告 (v2.2.0+)</span>
 │
-├── <span class="neon-cyan">schemas/</span>                         <span class="text-ink-300/40"># ──── AI 写入契约 (v2.1.3+) ────</span>
+├── <span class="neon-cyan">schemas/</span>                         <span class="text-ink-300/40"># ──── 你写入前必须校验 ────</span>
 │   ├── state.schema.json
 │   ├── profile.schema.json
 │   ├── preferences.schema.json
-│   └── <span class="neon-mag">audit-report.schema.json</span>     <span class="text-ink-300/40"># v2.2.0+</span>
+│   └── <span class="neon-mag">audit-report.schema.json</span>
 │
-├── migrations/                      <span class="text-ink-300/40"># DB 迁移（幂等）</span>
-│   ├── v2.1.1.sh / v2.1.2.sh / v2.1.3.sh
-│   └── <span class="neon-mag">v2.2.0.sh</span>                    <span class="text-ink-300/40"># ALTER posts + CREATE historical_stats</span>
+├── migrations/                      <span class="text-ink-300/40"># DB 迁移（幂等，由 install.sh 触发）</span>
 │
-├── <span class="neon-cyan">knowledge-base/</span>                  <span class="text-ink-300/40"># ──── 运行时生成（私有） ────</span>
-│   ├── profile.json                 <span class="text-ink-300/40"># 博主画像</span>
+├── <span class="neon-cyan">knowledge-base/</span>                  <span class="text-ink-300/40"># ──── 你的笔记（运行时生成） ────</span>
+│   ├── profile.json                 <span class="text-ink-300/40"># 博主画像 — 你的身份档</span>
 │   ├── preferences.json             <span class="text-ink-300/40"># 偏好权重（自进化）</span>
 │   ├── patterns.md / anti-patterns.md
 │   ├── image-patterns.md / image-anti-*
 │   ├── evolution-log.md
 │   ├── reviews/&lt;YYYY-W##&gt;.md
-│   └── <span class="neon-mag">audit-&lt;YYYY-MM-DD&gt;.(md|json)</span> <span class="text-ink-300/40"># 老博主体检报告 (v2.2.0+)</span>
+│   └── <span class="neon-mag">audit-&lt;YYYY-MM-DD&gt;.(md|json)</span>
 │
-├── data/xhs.db                      <span class="text-ink-300/40"># SQLite 8 表</span>
-├── templates/post.html              <span class="text-ink-300/40"># 小红书风格 HTML 模板</span>
+├── data/xhs.db                      <span class="text-ink-300/40"># SQLite 8 表（你读写这个）</span>
+├── prompts/                         <span class="text-ink-300/40"># 图片生成中文 prompt 模板</span>
 ├── docs/                            <span class="text-ink-300/40"># mcp-setup / features/</span>
-└── platform/                        <span class="text-ink-300/40"># hermes / claude-code / codex</span></code></pre>
+└── platform/                        <span class="text-ink-300/40"># hermes / claude-code / codex 宿主适配</span></code></pre>
     </details>
   </div>
 </section>
 
 <!-- ═════════ DOCS ═════════ -->
-<section id="docs" class="py-24 border-y border-neon-cyan/10">
+<section id="docs" class="py-24">
   <div class="max-w-7xl mx-auto px-6">
     <div class="text-center mb-14">
-      <div class="label-section mb-3">◆ KNOWLEDGE.INDEX / 07</div>
-      <h2 class="font-display text-4xl md:text-5xl font-black uppercase mb-4" data-i18n="docs.title">文档地图</h2>
-      <p class="font-mono text-base text-ink-300/70" data-i18n="docs.subtitle">按你的需求找到对应文档</p>
+      <div class="label-section mb-3">◆ READING.LIST / 08</div>
+      <h2 class="font-display text-4xl md:text-5xl font-black uppercase mb-4" data-i18n="docs.title">你要读的文档</h2>
+      <p class="font-mono text-base text-ink-300/70" data-i18n="docs.subtitle">按重要度排序；SKILL.md 是必读，其他按需查阅。</p>
     </div>
     <div class="grid md:grid-cols-2 gap-4">
       <a href="https://github.com/AI-flower/shuling/blob/main/SKILL.md" target="_blank" class="hud p-5 flex items-center gap-4 group">
-        <div class="text-3xl neon-green">◆</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.1.name">SKILL.md（必读）</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.1.desc">AI 读这个运行整个业务</div></div><div class="neon-green opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
-      </a>
-      <a href="https://github.com/AI-flower/shuling/blob/main/CHANGELOG.md" target="_blank" class="hud p-5 flex items-center gap-4 group">
-        <div class="text-3xl neon-cyan">▣</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.2.name">CHANGELOG.md</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.2.desc">每次发版有什么变化</div></div><div class="neon-cyan opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
-      </a>
-      <a href="https://github.com/AI-flower/shuling/blob/main/UPGRADE.md" target="_blank" class="hud p-5 flex items-center gap-4 group">
-        <div class="text-3xl neon-cyan">↑</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.3.name">UPGRADE.md</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.3.desc">从 vX.Y.Z 升到新版怎么做</div></div><div class="neon-cyan opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
-      </a>
-      <a href="https://github.com/AI-flower/shuling/blob/main/RELEASING.md" target="_blank" class="hud p-5 flex items-center gap-4 group">
-        <div class="text-3xl neon-green">⬈</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.4.name">RELEASING.md</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.4.desc">自己发版 SOP + 版本号决策树</div></div><div class="neon-green opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
-      </a>
-      <a href="https://github.com/AI-flower/shuling/blob/main/docs/mcp-setup.md" target="_blank" class="hud p-5 flex items-center gap-4 group">
-        <div class="text-3xl neon-mag">◎</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.5.name">docs/mcp-setup.md</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.5.desc">xiaohongshu-mcp 安装 + cookie 图文</div></div><div class="neon-mag opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
-      </a>
-      <a href="https://github.com/AI-flower/shuling/blob/main/docs/features/existing-creator-onboarding.md" target="_blank" class="hud p-5 flex items-center gap-4 group">
-        <div class="text-3xl neon-mag">◈</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.6.name">老博主接入完整 spec</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.6.desc">v2.2.0+ 设计文档</div></div><div class="neon-mag opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
+        <div class="text-3xl neon-green">◆</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.1.name">SKILL.md（必读整文件）</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.1.desc">你读完整个它才能运行业务</div></div><div class="neon-green opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
       </a>
       <a href="https://github.com/AI-flower/shuling/tree/main/schemas" target="_blank" class="hud p-5 flex items-center gap-4 group">
-        <div class="text-3xl" style="color:#FFB800">◇</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.7.name">schemas/ 契约</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.7.desc">AI 写 JSON 要遵守的 Schema</div></div><div class="opacity-0 group-hover:opacity-100 transition font-mono" style="color:#FFB800">▸</div>
+        <div class="text-3xl neon-amber">◇</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.2.name">schemas/ 写入契约</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.2.desc">你写任何 JSON 前都要对照这些 Schema</div></div><div class="neon-amber opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
+      </a>
+      <a href="https://github.com/AI-flower/shuling/blob/main/CHANGELOG.md" target="_blank" class="hud p-5 flex items-center gap-4 group">
+        <div class="text-3xl neon-cyan">▣</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.3.name">CHANGELOG.md</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.3.desc">用户说"我本地版本是 v2.x.y"时查这个</div></div><div class="neon-cyan opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
+      </a>
+      <a href="https://github.com/AI-flower/shuling/blob/main/UPGRADE.md" target="_blank" class="hud p-5 flex items-center gap-4 group">
+        <div class="text-3xl neon-cyan">↑</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.4.name">UPGRADE.md</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.4.desc">用户从旧版跨版本升级你走这个流程</div></div><div class="neon-cyan opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
+      </a>
+      <a href="https://github.com/AI-flower/shuling/blob/main/docs/mcp-setup.md" target="_blank" class="hud p-5 flex items-center gap-4 group">
+        <div class="text-3xl neon-mag">◎</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.5.name">docs/mcp-setup.md</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.5.desc">xiaohongshu-mcp 没装时你带用户走这个</div></div><div class="neon-mag opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
+      </a>
+      <a href="https://github.com/AI-flower/shuling/blob/main/docs/features/existing-creator-onboarding.md" target="_blank" class="hud p-5 flex items-center gap-4 group">
+        <div class="text-3xl neon-mag">◈</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.6.name">老博主接入完整 spec</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.6.desc">§0c 的设计底稿（v2.2.0+）</div></div><div class="neon-mag opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
+      </a>
+      <a href="https://github.com/AI-flower/shuling/blob/main/RELEASING.md" target="_blank" class="hud p-5 flex items-center gap-4 group">
+        <div class="text-3xl neon-green">⬈</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.7.name">RELEASING.md</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.7.desc">你要帮开发者发版时用（BRAIN/HANDS/CALIB 决策树）</div></div><div class="neon-green opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
       </a>
       <a href="https://github.com/AI-flower/shuling/tree/main/platform" target="_blank" class="hud p-5 flex items-center gap-4 group">
-        <div class="text-3xl" style="color:#FFB800">⚙</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.8.name">platform/ 适配指南</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.8.desc">hermes / claude-code / codex 配置</div></div><div class="opacity-0 group-hover:opacity-100 transition font-mono" style="color:#FFB800">▸</div>
+        <div class="text-3xl neon-amber">⚙</div><div class="flex-1"><div class="font-display font-bold text-ink-100 uppercase text-sm mb-1" data-i18n="docs.8.name">platform/ 宿主适配</div><div class="font-mono text-xs text-ink-300/60" data-i18n="docs.8.desc">hermes / claude-code / codex 在各宿主下的特定行为</div></div><div class="neon-amber opacity-0 group-hover:opacity-100 transition font-mono">▸</div>
       </a>
     </div>
 
@@ -673,7 +844,7 @@
           <div class="flex gap-5 items-center"><div class="relative z-10 w-8 h-8 border border-ink-300/30 bg-void-900 flex items-center justify-center text-[10px] font-mono neon-cyan">✓</div><div class="flex-1 hud px-4 py-2.5"><div class="flex justify-between items-center font-mono text-sm"><b class="text-ink-100">v2.1.0</b><span class="text-xs text-ink-300/60">Anti-Ban Shield 节流+限额</span></div></div></div>
           <div class="flex gap-5 items-center"><div class="relative z-10 w-8 h-8 border border-ink-300/30 bg-void-900 flex items-center justify-center text-[10px] font-mono neon-cyan">✓</div><div class="flex-1 hud px-4 py-2.5"><div class="flex justify-between items-center font-mono text-sm"><b class="text-ink-100">v2.1.3</b><span class="text-xs text-ink-300/60">Friendly Onboarding</span></div></div></div>
           <div class="flex gap-5 items-center"><div class="relative z-10 w-8 h-8 bg-neon-green text-void-900 flex items-center justify-center text-[10px] font-mono font-bold shadow-lg shadow-neon-green/40">●</div><div class="flex-1 hud hud-strong px-4 py-2.5"><div class="flex justify-between items-center font-mono text-sm"><b class="neon-green" data-ver="tag-current">v2.2.0 · CURRENT</b><span class="text-xs neon-green" data-ver="codename">Existing Creator Support</span></div></div></div>
-          <div class="flex gap-5 items-center opacity-50"><div class="relative z-10 w-8 h-8 border border-dashed border-ink-300/40 bg-void-900 flex items-center justify-center text-[10px] font-mono">○</div><div class="flex-1 hud px-4 py-2.5"><div class="flex justify-between items-center font-mono text-sm"><b class="text-ink-100">v2.3.0</b><span class="text-xs text-ink-300/60" data-i18n="roadmap.v23">Human Rhythm 行为节奏模拟</span></div></div></div>
+          <div class="flex gap-5 items-center opacity-50"><div class="relative z-10 w-8 h-8 border border-dashed border-ink-300/40 bg-void-900 flex items-center justify-center text-[10px] font-mono">○</div><div class="flex-1 hud px-4 py-2.5"><div class="flex justify-between items-center font-mono text-sm"><b class="text-ink-100">v2.4.0</b><span class="text-xs text-ink-300/60" data-i18n="roadmap.v24">Agent-Friendly Upgrade 智能体友好升级</span></div></div></div>
           <div class="flex gap-5 items-center opacity-50"><div class="relative z-10 w-8 h-8 border border-dashed border-ink-300/40 bg-void-900 flex items-center justify-center text-[10px] font-mono">○</div><div class="flex-1 hud px-4 py-2.5"><div class="flex justify-between items-center font-mono text-sm"><b class="text-ink-100">v3.0.0</b><span class="text-xs text-ink-300/60" data-i18n="roadmap.v30">视频笔记 + 多账号 + 竞品对标</span></div></div></div>
         </div>
       </div>
@@ -681,21 +852,22 @@
   </div>
 </section>
 
-<!-- ═════════ CTA ═════════ -->
-<section class="py-24 relative overflow-hidden">
+<!-- ═════════ CTA — audience switches back to human; explicit label ═════════ -->
+<section class="py-24 relative overflow-hidden border-t border-neon-cyan/10">
   <div class="max-w-4xl mx-auto px-6 text-center relative z-10">
-    <div class="label-section mb-4">◆ SYSTEM.READY</div>
+    <div class="inline-flex items-center gap-2 border border-neon-amber/40 bg-neon-amber/5 px-3 py-1 mb-5 font-mono text-[10px] tracking-[0.3em] text-neon-amber uppercase" data-i18n="cta.audience">[ 观众切回：人类访客 ]</div>
+    <div class="label-section mb-4">◆ FOR.HUMAN.VISITORS / 09</div>
     <h2 class="font-display text-4xl md:text-6xl font-black uppercase mb-6 leading-tight">
-      <span class="text-ink-100" data-i18n="cta.title">让 AI 当你的小红书搭档</span>
+      <span class="text-ink-100" data-i18n="cta.title">把这页发给你的 AI</span>
     </h2>
-    <p class="font-mono text-base text-ink-300/70 mb-10" data-i18n="cta.subtitle">开源 · MIT 许可 · 欢迎借鉴 Skill-as-Brain 架构</p>
+    <p class="font-mono text-base text-ink-300/70 mb-10" data-i18n="cta.subtitle">开源 · MIT · 你（人类）只需复制种子提示词，剩下的交给你的 AI 智能体</p>
     <div class="flex flex-col sm:flex-row gap-4 justify-center">
+      <a href="#seed" class="cta-neon px-10 py-3.5 text-sm font-mono flex items-center gap-3 justify-center">
+        <span data-i18n="cta.seed">回到种子提示词 ▸</span>
+      </a>
       <a href="https://github.com/AI-flower/shuling" target="_blank" class="cta-ghost px-10 py-3.5 text-sm font-mono font-bold uppercase tracking-widest flex items-center gap-2 justify-center">
         <svg viewBox="0 0 24 24" class="w-4 h-4" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.4.6.1.82-.26.82-.58v-2.15c-3.34.73-4.04-1.4-4.04-1.4-.55-1.38-1.34-1.75-1.34-1.75-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.84 2.82 1.31 3.51 1 .11-.77.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.1-3.17 0 0 1.01-.32 3.3 1.23a11.48 11.48 0 016 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.87.12 3.17.77.84 1.24 1.91 1.24 3.22 0 4.61-2.8 5.63-5.47 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.83.57C20.56 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z"/></svg>
         <span data-i18n="cta.github">★ STAR ON GITHUB</span>
-      </a>
-      <a href="#quickstart" class="cta-neon px-10 py-3.5 text-sm font-mono">
-        <span data-i18n="cta.start">INITIATE SEQUENCE ▸</span>
       </a>
     </div>
   </div>
@@ -710,7 +882,7 @@
         <span class="font-display font-bold uppercase tracking-widest">SHULING</span>
         <span class="font-mono text-[10px] text-neon-cyan/70 border border-neon-cyan/30 px-1.5 py-0.5" data-ver="tag">v2.2.0</span>
       </div>
-      <div class="font-mono text-xs uppercase tracking-widest text-ink-300/50" data-i18n="footer.tagline">小红书博主成长助手 · Skill-as-Brain 架构</div>
+      <div class="font-mono text-xs uppercase tracking-widest text-ink-300/50" data-i18n="footer.tagline">A XIAOHONGSHU SKILL FOR YOUR AI AGENT · SKILL-AS-BRAIN</div>
       <div class="flex gap-5 font-mono text-xs uppercase tracking-widest">
         <a href="https://github.com/AI-flower/shuling" target="_blank" class="text-ink-300/70 hover:text-neon-green transition">GITHUB</a>
         <a href="https://github.com/AI-flower/shuling/blob/main/CHANGELOG.md" target="_blank" class="text-ink-300/70 hover:text-neon-green transition" data-i18n="footer.changelog">CHANGELOG</a>
@@ -723,217 +895,330 @@
 </div><!-- /crt wrapper -->
 
 <script>
+// ──────────────── Seed prompt bodies (for i18n) ────────────────
+const SEED_BODY = {
+  zh: `请安装 shuling skill（小红书博主成长 Skill）并准备为我运营小红书账号。
+
+源码: https://github.com/AI-flower/shuling
+文档落地页: https://shuling.pages.dev
+
+请你按以下顺序执行，并在每一步结束时简短报告进度：
+
+1. 在我当前机器上执行：
+     git clone git@github.com:AI-flower/shuling.git
+     cd shuling
+2. 先跑 \`bash install.sh --check\` 看环境报告；如果有 FAIL，先向我说明并等我处理，不要擅自安装系统依赖。
+3. 通过 --check 后，跑 \`bash install.sh\`，按提示选择模式：
+     - 如果我是新博主（还没发过或刚起步）→ 选 new
+     - 如果我已经有 30 条以上笔记 → 选 existing-creator
+     我会在对话里告诉你我是哪种。
+4. 完整读 \`SKILL.md\`（从头到尾，不是只扫目录）。重点吃透：
+     §0a 业务路由 / §0b 写入校验 / §0c 老博主接入 / §1~§7 主循环 / §8 异常矩阵
+5. 读 \`data/state.json\` 和 \`knowledge-base/profile.json\`，按 §0a 判断我当前在哪一步。
+6. 就绪后回我一句话：
+     "已接入 shuling vX.Y.Z · BRAIN/HANDS/CALIB 已校验 · 按 §0a 待命"
+
+运营纪律（务必遵守，别即兴发挥）：
+- 所有 profile / state / preferences / audit-report 写入前，先过 \`schemas/\` 校验
+- 发布任何笔记前都要让我人工确认一次（§2~§6 最后一步）
+- 遇到风控限额 / preflight 返回 code=2 → 按 §8 异常矩阵处理
+- 不要绕 §5 合规规则（没有标题党 / 没有同质化 / 没有刷量）
+- §0b 说走哪条路你就走哪条，不要自己发明流程`,
+  en: `Please install the shuling skill (a Xiaohongshu creator-growth skill) and get ready to operate my Xiaohongshu account on my behalf.
+
+Source: https://github.com/AI-flower/shuling
+Landing: https://shuling.pages.dev
+
+Execute the steps below in order, reporting briefly after each:
+
+1. On my current machine:
+     git clone git@github.com:AI-flower/shuling.git
+     cd shuling
+2. Run \`bash install.sh --check\` first. If anything FAILs, explain and wait for me — don't silently install system-level deps.
+3. Once --check passes, run \`bash install.sh\`, then pick the mode:
+     - If I'm a new creator (no posts or just starting) → new
+     - If I already have 30+ posts → existing-creator
+     I will tell you which in chat.
+4. Read \`SKILL.md\` in full — the whole file, not just the TOC. Internalize:
+     §0a routing / §0b write validation / §0c existing-creator / §1~§7 main loop / §8 exceptions
+5. Read \`data/state.json\` and \`knowledge-base/profile.json\`; use §0a to decide where I stand.
+6. When ready, reply with exactly one line:
+     "shuling vX.Y.Z absorbed · BRAIN/HANDS/CALIB verified · standing by per §0a"
+
+Operational discipline (non-negotiable, do not improvise):
+- All writes to profile / state / preferences / audit-report must pass \`schemas/\` first.
+- Every publish must get my explicit human approval (last step of §2~§6).
+- On rate-limit or preflight code=2 → handle per §8 exception matrix.
+- Do not bypass §5 compliance rules (no clickbait / no sameness / no fake engagement).
+- Follow the routing §0b prescribes — don't invent your own flow.`
+};
+
 // ──────────────── i18n ────────────────
 const I18N = {
   zh: {
-    "nav.what":"这是什么","nav.capabilities":"能力","nav.quickstart":"快速开始","nav.platforms":"支持平台","nav.architecture":"架构","nav.docs":"文档",
-    "hero.title1":"让你的 AI 助手","hero.title2":"懂小红书的博主搭档",
-    "hero.subtitle":"从选题、创作、发布到复盘形成闭环，历史数据驱动自进化，越用越懂你。基于 Skill-as-Brain 架构，一份 SKILL.md 通吃 Hermes / Claude Code / Codex。",
-    "hero.cta1":"立即开始","hero.cta2":"GITHUB 查看",
-    "hero.stat1":"核心业务流程","hero.stat2":"SQLite 数据表","hero.stat3":"MCP 工具","hero.stat4":"AI 平台支持",
-    "what.title":"这是什么","what.subtitle":"把你的 AI 助手变成懂小红书的博主搭档——从选题、创作、发布到复盘形成闭环，历史数据驱动自进化。",
-    "what.p1.title":"新博主","what.p1.desc":"还没发或刚开始——三问对话建画像，竞品冷启动，每日选题/起稿/发布/复盘全流程。",
-    "what.p2.title":"老博主（v2.2.0+）","what.p2.desc":"已发 30~1000+ 条——批量导入历史，AI 反推画像，挖掘自己验证有效的 patterns，出账号体检报告。",
-    "what.p3.title":"AI 智能体开发者","what.p3.desc":"可借鉴的 Skill-as-Brain 架构、业务路由 §0a、JSON Schema 契约、反模式禁令工程化实践。",
-    "what.not.title":"不是什么",
-    "what.not.1":"<b class='text-ink-100'>不是</b>小红书自动化工具（没有批量发布、不刷量、不绕风控）",
-    "what.not.2":"<b class='text-ink-100'>不是</b>内容农场（§5 合规规则兜底，不做标题党 / 同质化）",
-    "what.not.3":"<b class='text-ink-100'>不是</b>独立运行机器人（必须搭一个能读 SKILL.md 的 AI 助手）",
-    "what.not.4":"<b class='text-ink-100'>不假设</b>通讯渠道（Telegram / 微信等由 hermes-agent 或你自己配）",
+    "nav.seed":"种子提示词","nav.what":"任务类型","nav.capabilities":"能力","nav.quickstart":"执行序列","nav.platforms":"宿主","nav.docs":"文档",
+    "hero.title1":"这是给 AI 智能体读的","hero.title2":"小红书创作 SKILL",
+    "hero.subtitle":"你（AI 智能体）收到用户粘贴的种子提示词后，把 <span class='chip'>SKILL.md</span> 吸收进上下文，就是你用户小红书账号的大脑；<span class='chip chip-mag'>scripts/</span> 是你的手脚，负责 HTTP / DB / 生图。下面是你的执行简报。",
+    "hero.humanNote":"人类访客无需自己安装：把下面的 <b class='neon-amber'>种子提示词</b> 粘到任一 AI 智能体对话框（Claude Code / Codex / Hermes / OpenClaw），由它接手 clone、安装、读 SKILL.md、按 §0a 路由。<b class='text-ink-100'>本页正文里的 \"你\" 一律指 AI 智能体，不是你（人类）</b>——看到\"你读 X\" / \"你执行 Y\" 时，读成\"你的 AI 会读 X / 执行 Y\"。",
+    "hero.cta1":"复制种子提示词","hero.cta2":"直达 SKILL.md",
+    "hero.stat1":"业务流程你要编排","hero.stat2":"SQLite 表你要读写","hero.stat3":"MCP 工具你可调用","hero.stat4":"宿主你都能跑",
+
+    "seed.title":"种子提示词",
+    "seed.subtitle":"这是人类唯一要做的事：把下面这段原样粘给你的 AI 智能体。它会 clone、安装、预检、读 SKILL.md、然后按 §0a 路由待命。",
+    "seed.label":"PASTE-TO-AGENT · SHULING INSTALL BRIEF",
+    "seed.copy":"一键复制",
+    "seed.copied":"已复制 ✓",
+    "seed.tip1":"把这段粘到你的 AI 对话框——它会接手所有安装步骤，你不动终端。",
+    "seed.tip2":"安装完成后，你只需自然语言：\"今天发什么\" / \"帮我发\" / \"复盘\"。",
+    "seed.tip3":"你按 §0a 路由自动判断执行哪一段，不等用户点菜——但发帖前必须人工确认。",
+
+    "what.title":"你接到的三种任务类型","what.subtitle":"你被粘了种子提示词之后，根据用户回答和 state.json 自动路由到其中一种。",
+    "what.p1.title":"用户是新博主","what.p1.desc":"还没发过或刚起步——你需要：三问建画像（方向/受众/风格）、竞品冷启动、每日选题→起稿→配图→发布→复盘。",
+    "what.p2.title":"用户已有 30~1000+ 条历史","what.p2.desc":"走 §0c 老博主接入 5 步：确认登录 → 导入 200 条 → 自动分类 → 画像反推 → 体检报告。首条发帖即达用户历史 P50。",
+    "what.p3.title":"用户是 AI 工程师在研究架构","what.p3.desc":"他在参考 Skill-as-Brain 做自己的 Skill——带他看 §0a 业务路由、§0b 写入校验、JSON Schema 契约、反模式禁令的工程化实现。",
+    "what.not.title":"你（AI）不要做的事",
+    "what.not.1":"<b class='text-ink-100'>不要</b>把 shuling 当自动化机器人跑（没有批量发、不刷量、不绕风控，§5 合规规则强制）",
+    "what.not.2":"<b class='text-ink-100'>不要</b>跳过 §0b 就写 profile.json / state.json / preferences.json（所有写入先过 schemas/）",
+    "what.not.3":"<b class='text-ink-100'>不要</b>忽略 §0a 擅自开始发帖——先读 state.json 再决定路由",
+    "what.not.4":"<b class='text-ink-100'>不要</b>假设通讯渠道（Telegram / 微信 等由 hermes-agent 负责，你别自行拼装）",
+    "what.not.5":"<b class='text-ink-100'>不要</b>在发布前跳过人工确认（§2~§6 最后一步总是用户点头才能发）",
+
     "brain.tag":"核心理念",
-    "brain.lead":"业务逻辑全部在 <span class='chip'>SKILL.md</span> 里，AI 助手读了它就是大脑；<span class='chip' style='color:#FF00FF;border-color:rgba(255,0,255,.3);background:rgba(255,0,255,.05)'>scripts/</span> 只是手脚，负责调 API、读写数据库、生成图片这些 AI 做不了的物理操作。",
-    "brain.1":"<b class='text-ink-100'>换 AI 平台零成本</b>：只要能读 SKILL.md，hermes / Claude Code / Codex / OpenClaw 都通用",
-    "brain.2":"<b class='text-ink-100'>改流程不用改代码</b>：改 SKILL.md 即可，版本号 BRAIN+1",
-    "brain.3":"<b class='text-ink-100'>越用越聪明</b>：每次选择、每条数据都记录到 DB，驱动偏好进化",
-    "brain.4":"<b class='text-ink-100'>AI 自律工程保障</b>：§0a 业务路由 + §0b 写入校验 + schemas/ + 反模式禁令",
-    "cap.title":"能力全景","cap.subtitle":"4 个维度，完整覆盖博主运营闭环",
-    "cap.flows.title":"核心业务流程（7 条主线）",
-    "cap.flows.1.name":"新手引导","cap.flows.1.desc":"首次对话 → 建画像 + 环境就绪",
-    "cap.flows.2.name":"老博主接入","cap.flows.2.desc":"历史导入 + 画像反推 + patterns 种子",
+    "brain.lead":"业务逻辑全部在 <span class='chip'>SKILL.md</span> 里，<b class='neon-green'>你读了它你就是大脑</b>；<span class='chip chip-mag'>scripts/</span> 只是手脚，负责调 API、读写数据库、生成图片这些你（AI）做不了的物理操作。",
+    "brain.1":"<b class='text-ink-100'>换宿主零成本</b>：只要你能读 SKILL.md，Hermes / Claude Code / Codex / OpenClaw 都跑得起来",
+    "brain.2":"<b class='text-ink-100'>改流程不用改代码</b>：你改 SKILL.md 就行，版本号 BRAIN+1",
+    "brain.3":"<b class='text-ink-100'>每次选择都在喂数据</b>：你和用户的每轮对话都写进 DB，驱动 preferences.json 进化",
+    "brain.4":"<b class='text-ink-100'>§0a / §0b / schemas/ 是你的自律边界</b>：路由 + 写入校验 + 反模式禁令，防止你跑偏",
+
+    "cap.title":"装完后你能做什么","cap.subtitle":"读完 SKILL.md，你同时具备下面四类能力。",
+    "cap.flows.title":"7 条业务流程你要编排",
+    "cap.flows.1.name":"新手引导","cap.flows.1.desc":"首次对话 → 你建画像 + 校验环境",
+    "cap.flows.2.name":"老博主接入 §0c","cap.flows.2.desc":"历史导入 + 画像反推 + patterns 种子",
     "cap.flows.3.name":"选题研究","cap.flows.3.desc":"带偏好加权的候选话题",
     "cap.flows.4.name":"内容创作","cap.flows.4.desc":"RedInk 双阶段大纲 + 正文 + 标签",
-    "cap.flows.5.name":"图片生成","cap.flows.5.desc":"Gemini → OpenAI → HTML 三路降级",
-    "cap.flows.6.name":"发布","cap.flows.6.desc":"小红书已发帖 + 本地 posts 记录",
+    "cap.flows.5.name":"图片生成","cap.flows.5.desc":"Gemini 3 Pro Image，中文 prompt 模板",
+    "cap.flows.6.name":"发布","cap.flows.6.desc":"xhs.sh 调 MCP + 本地 posts 落库",
     "cap.flows.7.name":"每日复盘 + 周回顾","cap.flows.7.desc":"日/周报 + patterns 进化 + 五维诊断",
-    "cap.flows.more":"全部由 AI 读 SKILL.md 自动编排",
-    "cap.evo.title":"自进化引擎",
+    "cap.flows.more":"全部由你（AI）按 SKILL.md 自动编排",
+    "cap.evo.title":"自进化引擎 — 你每轮都在给它喂数据",
     "cap.evo.1.name":"偏好学习","cap.evo.1.desc":"Laplace 平滑 + 集中度×样本因子 confidence — 小样本不冒进，口味稳时快收敛",
-    "cap.evo.2.name":"选项递减","cap.evo.2.desc":"confidence 驱动：从\"每次选几项\"退化到\"回一个'发'字\"",
-    "cap.evo.3.name":"探索机制","cap.evo.3.desc":"距上次探索 ≥7 天追加低 weight 类型，防过拟合，口味可演进",
-    "cap.evo.4.name":"\"换\"信号回弹","cap.evo.4.desc":"连续 2 次\"换\" → confidence 强制回 0.45，防单方向钻牛角尖",
+    "cap.evo.2.name":"选项递减","cap.evo.2.desc":"你呈现的选项数由 confidence 决定：从\"每次给几项\"退化到\"回一个'发'字\"",
+    "cap.evo.3.name":"探索机制","cap.evo.3.desc":"距上次探索 ≥7 天你要追加一个低 weight 类型，防过拟合",
+    "cap.evo.4.name":"\"换\"信号回弹","cap.evo.4.desc":"用户连续 2 次说\"换\" → confidence 强制回 0.45，防你钻牛角尖",
     "cap.evo.5.name":"Pattern 生命周期","cap.evo.5.desc":"标题/结构/图片 prompt 通用：experimental → medium → high / deprecated",
-    "cap.evo.6.name":"收藏率驱动","cap.evo.6.desc":"真实数据驱动 patterns/anti-patterns 晋升 / 淘汰，无人为干预",
-    "cap.eng.title":"运维与工程纪律",
+    "cap.evo.6.name":"收藏率驱动","cap.evo.6.desc":"真实数据驱动 patterns / anti-patterns 晋升 / 淘汰，你不做人工干预",
+    "cap.eng.title":"工程纪律 — 你的操作边界",
     "cap.eng.1.name":"install.sh 六模式","cap.eng.1.desc":"默认 / --check / --dry-run / --yes / --target / --mode",
-    "cap.eng.2.name":"preflight.py 双模式","cap.eng.2.desc":"AI 可读 JSON + --human 彩色表（退出码分级 0/1/2）",
+    "cap.eng.2.name":"preflight.py 双模式","cap.eng.2.desc":"你优先读 JSON（默认输出），退出码 0/1/2 按 §8 决定下一步",
     "cap.eng.3.name":"BRAIN.HANDS.CALIB 版本号","cap.eng.3.desc":"三段语义，breaking 只发生在 BRAIN+1",
-    "cap.eng.4.name":"文档四件套","cap.eng.4.desc":"CHANGELOG / UPGRADE / RELEASING / docs/features/",
-    "cap.eng.5.name":"JSON Schema 契约","cap.eng.5.desc":"state/profile/preferences/audit-report，AI 写入前自校验",
-    "cap.eng.6.name":"账号风控","cap.eng.6.desc":"分级节流 + 日限额 v1-conservative，触顶自动拒绝",
-    "cap.ai.title":"AI 智能体协作纪律",
-    "cap.ai.1.name":"业务路由","cap.ai.1.desc":"AI 首动作：preflight → 读 state → 查表决定下一步",
-    "cap.ai.2.name":"平台识别 + 写入校验","cap.ai.2.desc":"按路径识别 hermes/claude/codex，写入前按 schema 核对",
-    "cap.ai.3.name":"老博主接入","cap.ai.3.desc":"5 步流程的 additive 分支（v2.2.0+）",
-    "cap.ai.4.name":"异常矩阵","cap.ai.4.desc":"12 种异常场景 × 标准处理",
-    "qs.title":"快速开始","qs.subtitle":"根据你的身份选择接入路径",
-    "qs.prereq.title":"前置依赖",
-    "qs.prereq.1.name":"AI 助手","qs.prereq.1.desc":"hermes / Claude Code / Codex / OpenClaw 任选",
-    "qs.prereq.2.desc":"小红书 MCP 服务（搜索/详情/发布/评论/登录）",
-    "qs.prereq.3.desc":"截图 / DB / 生图 / JSON",
-    "qs.prereq.4.name":"图片生成 API（可选）","qs.prereq.4.desc":"Gemini Key（推荐）/ OpenAI Key，未配置则走 HTML 截图",
-    "qs.prereq.5.name":"NoteRx API（可选）","qs.prereq.5.desc":"五维诊断，配 NOTERX_API_KEY 才启用",
-    "qs.install.title":"安装",
-    "qs.install.c1":"克隆仓库","qs.install.c2":"一键安装：自动检测平台 + 依赖预检 + init DB + 生成配置",
-    "qs.install.c3":"其他模式","qs.install.c4":"只自检不动手","qs.install.c5":"预演将做什么","qs.install.c6":"CI / 远程非交互",
-    "qs.A.badge":"路径 A","qs.A.title":"新博主：从零起步",
-    "qs.A.1":"<b class='text-ink-100'>安装</b>（默认 new，回车）<span class='chip'>bash install.sh</span>",
-    "qs.A.2":"<b class='text-ink-100'>登录小红书</b>：扫码 或 Cookie 粘贴（\"我给你 cookie：...\"）",
-    "qs.A.3":"<b class='text-ink-100'>建立画像</b>：对 AI 说\"我想做小红书博主\"，AI 三问（方向/受众/风格）",
-    "qs.A.4":"<b class='text-ink-100'>日常使用</b>：\"帮我发小红书\" / \"今天发什么\" / \"看看昨天的数据\"",
-    "qs.B.title":"老博主：存量接入",
-    "qs.B.1":"<b class='text-ink-100'>老博主模式安装</b>：<span class='chip'>bash install.sh --mode=existing-creator</span>",
-    "qs.B.2":"<b class='text-ink-100'>登录</b>（扫码或 Cookie，同路径 A）",
-    "qs.B.3":"<b class='text-ink-100'>对话触发</b>：\"我已经在运营小红书，帮我接入\"",
-    "qs.B.4":"AI 按 §0c 自动走 5 步：确认登录 → 导入 200 条 → 自动分类 → 画像反推 → 体检报告",
-    "qs.B.5":"<b class='text-ink-100'>完成后</b>系统具备 6 个月+ 历史记忆，第一条发帖即达 P50 水平",
-    "qs.B.manual":"手动跑：",
-    "qs.daily.title":"日常对话指令",
-    "qs.daily.1.cmd":"\"帮我发小红书\"","qs.daily.1.desc":"完整发布流程",
-    "qs.daily.2.cmd":"\"今天发什么\"","qs.daily.2.desc":"选题研究",
-    "qs.daily.3.cmd":"\"起个稿子\"","qs.daily.3.desc":"创作流程",
-    "qs.daily.4.cmd":"\"看看昨天的数据\"","qs.daily.4.desc":"数据复盘",
-    "qs.daily.5.cmd":"\"最近怎么样\"","qs.daily.5.desc":"近期小结",
-    "qs.daily.6.cmd":"\"我想换方向\"","qs.daily.6.desc":"更新画像",
-    "qs.daily.7.cmd":"\"我给你 cookie...\"","qs.daily.7.desc":"Cookie 登录",
-    "qs.daily.8.cmd":"\"复盘\"","qs.daily.8.desc":"手动触发复盘",
-    "plat.title":"部署到 AI 平台","plat.subtitle":"一份 SKILL.md，所有平台产生相同业务行为",
+    "cap.eng.4.name":"文档四件套","cap.eng.4.desc":"你遇版本差异时要查：CHANGELOG / UPGRADE / RELEASING / docs/features/",
+    "cap.eng.5.name":"JSON Schema 契约","cap.eng.5.desc":"state / profile / preferences / audit-report，你写入前必须本地自校验",
+    "cap.eng.6.name":"账号风控","cap.eng.6.desc":"分级节流 + 日限额 v1-conservative，触顶 xhs.sh 会自动拒绝你的调用",
+    "cap.ai.title":"AI 自律约束条款",
+    "cap.ai.1.name":"业务路由","cap.ai.1.desc":"你每轮首动作：preflight → 读 state → 查表决定下一步",
+    "cap.ai.2.name":"宿主识别 + 写入校验","cap.ai.2.desc":"按路径识别 hermes/claude/codex，写入 JSON 前按 schemas/ 核对",
+    "cap.ai.3.name":"老博主接入","cap.ai.3.desc":"5 步 additive 分支（v2.2.0+），触发条件见 §0a",
+    "cap.ai.4.name":"异常矩阵","cap.ai.4.desc":"12 种异常场景 × 标准处理，你遇坑优先查这张表",
+
+    "qs.title":"执行序列 / 给 AI 智能体","qs.subtitle":"收到种子提示词后，你（AI）按下面七步跑。",
+    "qs.prereq.title":"宿主环境里应该已经有的东西",
+    "qs.prereq.hint":"你先跑 preflight.py 看；缺了就向用户说明，不要擅自 install 系统级依赖。",
+    "qs.prereq.1.name":"你自己（AI 智能体）","qs.prereq.1.desc":"Claude Code / Codex / Hermes / OpenClaw 任一，能读 SKILL.md",
+    "qs.prereq.2.desc":"小红书 MCP 服务（搜索/详情/发布/评论/登录）— 你通过 xhs.sh 调用",
+    "qs.prereq.3.desc":"preflight / DB / JSON，你脚本里会直接用",
+    "qs.prereq.4.name":"Gemini 图片 API Key（必需）","qs.prereq.4.desc":"无 Key 直接硬停，没有降级 — 向用户要，不要绕开",
+    "qs.prereq.5.name":"NoteRx API（可选）","qs.prereq.5.desc":"五维诊断，用户没配你就跳过，不要阻塞主流程",
+
+    "qs.steps.title":"7 步执行清单",
+    "qs.steps.1.name":"环境预检","qs.steps.1.desc":"进仓库前你先在当前目录跑 <code class='chip'>python3 scripts/preflight.py</code>（如果仓库不存在就下一步 clone 后再跑）。解析 JSON，exit=0 绿灯，exit=1 警告你自己处理，exit=2 必须让用户补配（如 Gemini Key）。",
+    "qs.steps.2.name":"克隆仓库","qs.steps.2.desc":"<code class='chip'>git clone git@github.com:AI-flower/shuling.git &amp;&amp; cd shuling</code> — 如果无 SSH 可 fallback 到 https。克隆失败先看用户网络，不要换镜像源。",
+    "qs.steps.3.name":"安装","qs.steps.3.desc":"先 <code class='chip'>bash install.sh --check</code>，FAIL 就向用户说明并等回复。通过后 <code class='chip'>bash install.sh</code>——根据用户对\"是否已在运营\"的回答传 <code class='chip'>--mode=new</code> 或 <code class='chip'>--mode=existing-creator</code>。自动化环境加 <code class='chip'>SHULING_ASSUME_YES=1</code>。",
+    "qs.steps.4.name":"读 SKILL.md（完整）","qs.steps.4.desc":"把 SKILL.md 整文件读进你的上下文——不是扫目录、不是 grep。重点吃透 §0a（路由）/ §0b（写入校验）/ §0c（老博主）/ §1-§7（主循环）/ §8（异常矩阵）。schemas/ 也先读一眼。",
+    "qs.steps.5.name":"状态探测","qs.steps.5.desc":"读 <code class='chip'>data/state.json</code> 和 <code class='chip'>knowledge-base/profile.json</code>——这是你判断当前进度的唯一权威源。不要根据对话里的\"感觉\"自己推断。",
+    "qs.steps.6.name":"§0a 路由","qs.steps.6.desc":"按 §0a 决策表决定下一步——不要即兴。见下面\"路由表\"小节。",
+    "qs.steps.7.name":"回执给用户","qs.steps.7.desc":"回一句话：<code class='chip'>\"已接入 shuling vX.Y.Z · BRAIN/HANDS/CALIB 已校验 · 按 §0a 待命\"</code>——然后停下来等用户指令。不要主动开跑发帖或选题。",
+
+    "qs.route.title":"§0a 路由表 — state 判断 × 用户话术 = 走哪段",
+    "qs.route.col1":"state.json 状态","qs.route.col2":"用户话术","qs.route.col3":"你执行",
+    "qs.route.r1c1":"empty / 无 profile","qs.route.r1c2":"\"我想做小红书博主\"","qs.route.r1c3":"§0 + §1 新手引导",
+    "qs.route.r2c1":"empty / 无 profile","qs.route.r2c2":"\"我已经在运营\" / \"帮我接入\"","qs.route.r2c3":"§0c 老博主接入 5 步",
+    "qs.route.r3c1":"有 profile · logged_in=false","qs.route.r3c2":"\"我给你 cookie...\" / \"扫码登录\"","qs.route.r3c3":"platform/ 登录分支",
+    "qs.route.r4c1":"ready · 24h 内未发","qs.route.r4c2":"\"帮我发小红书\"","qs.route.r4c3":"§2→§3→§4→§5→§6 主循环",
+    "qs.route.r5c1":"ready","qs.route.r5c2":"\"今天发什么\" / \"起个稿子\"","qs.route.r5c3":"§2 或 §3 单段",
+    "qs.route.r6c1":"ready · 过去 24h 无复盘","qs.route.r6c2":"\"复盘\" / \"看看昨天的数据\"","qs.route.r6c3":"§7 日复盘 + patterns 进化",
+    "qs.route.r7c1":"任意状态","qs.route.r7c2":"preflight code=2（缺 Key）","qs.route.r7c3":"§8 异常矩阵：硬停 + 索取",
+
+    "daily.title":"用户话术 → 你执行","daily.subtitle":"日常对话里用户会说这些，你认出来直接映射到 SKILL.md 的段落，不要反问。",
+    "daily.1.cmd":"\"帮我发小红书\"","daily.1.desc":"§2→§3→§4→§5→§6",
+    "daily.2.cmd":"\"今天发什么\"","daily.2.desc":"§2 仅选题",
+    "daily.3.cmd":"\"起个稿子\"","daily.3.desc":"§3 创作",
+    "daily.4.cmd":"\"看看昨天的数据\"","daily.4.desc":"§7 复盘",
+    "daily.5.cmd":"\"最近怎么样\"","daily.5.desc":"§7 周回顾",
+    "daily.6.cmd":"\"我想换方向\"","daily.6.desc":"§1 更新画像",
+    "daily.7.cmd":"\"我给你 cookie...\"","daily.7.desc":"platform 登录分支",
+    "daily.8.cmd":"\"我已经在运营\"","daily.8.desc":"§0c 老博主接入",
+
+    "plat.title":"你能跑在的宿主","plat.subtitle":"同一份 SKILL.md，下面四个宿主里你的业务行为保持一致。",
     "plat.rec":"推荐",
     "plat.hermes.desc":"cron job + <code class='chip'>prompt: 使用 shuling skill</code>",
-    "plat.hermes.note":"全自动每日发布 + 复盘",
+    "plat.hermes.note":"全自动每日发布 + 复盘（无人工介入场景）",
     "plat.claude.desc":"对话 + <code class='chip'>/loop 8h ...</code>",
-    "plat.claude.note":"VS Code 集成，支持定时",
-    "plat.codex.desc":"对话触发","plat.codex.note":"手动发布",
-    "plat.open.desc":"兼容 <code class='chip'>agents/</code> 规范","plat.open.note":"通用 agents 兜底",
-    "arch.title":"架构与目录","arch.subtitle":"一条主线：AI → SKILL.md → scripts/ → DB + knowledge-base",
-    "arch.toggle":"查看完整目录结构","arch.click":"▸ 点击展开",
-    "docs.title":"文档地图","docs.subtitle":"按你的需求找到对应文档",
-    "docs.1.name":"SKILL.md（必读）","docs.1.desc":"AI 读这个运行整个业务",
-    "docs.2.name":"CHANGELOG.md","docs.2.desc":"每次发版有什么变化",
-    "docs.3.name":"UPGRADE.md","docs.3.desc":"从 vX.Y.Z 升到新版怎么做",
-    "docs.4.name":"RELEASING.md","docs.4.desc":"自己发版 SOP + 版本号决策树",
-    "docs.5.name":"docs/mcp-setup.md","docs.5.desc":"xiaohongshu-mcp 安装 + cookie 图文",
-    "docs.6.name":"老博主接入完整 spec","docs.6.desc":"v2.2.0+ 设计文档",
-    "docs.7.name":"schemas/ 契约","docs.7.desc":"AI 写 JSON 要遵守的 Schema",
-    "docs.8.name":"platform/ 适配指南","docs.8.desc":"hermes / claude-code / codex 配置",
-    "roadmap.title":"路线图","roadmap.v23":"Human Rhythm 行为节奏模拟","roadmap.v30":"视频笔记 + 多账号 + 竞品对标",
-    "cta.title":"让 AI 当你的小红书搭档","cta.subtitle":"开源 · MIT 许可 · 欢迎借鉴 Skill-as-Brain 架构",
-    "cta.github":"★ 在 GITHUB STAR","cta.start":"立即开始 ▸",
-    "footer.tagline":"小红书博主成长助手 · Skill-as-Brain 架构","footer.changelog":"CHANGELOG"
+    "plat.claude.note":"你可在 VS Code / 终端被唤起，支持定时",
+    "plat.codex.desc":"对话触发","plat.codex.note":"你每次被唤起都要重读 state.json",
+    "plat.open.desc":"兼容 <code class='chip'>agents/</code> 规范","plat.open.note":"通用 agents 兜底；任何 SKILL.md-aware 宿主",
+
+    "arch.title":"你的记忆地图","arch.subtitle":"读/写哪个文件看这张图：SKILL.md 是脑子，scripts/ 是手脚，knowledge-base/ 是你的笔记。",
+    "arch.click":"▸ 点击展开",
+
+    "docs.title":"你要读的文档","docs.subtitle":"按重要度排序；SKILL.md 是必读，其他按需查阅。",
+    "docs.1.name":"SKILL.md（必读整文件）","docs.1.desc":"你读完整个它才能运行业务",
+    "docs.2.name":"schemas/ 写入契约","docs.2.desc":"你写任何 JSON 前都要对照这些 Schema",
+    "docs.3.name":"CHANGELOG.md","docs.3.desc":"用户说\"我本地版本是 v2.x.y\"时查这个",
+    "docs.4.name":"UPGRADE.md","docs.4.desc":"用户从旧版跨版本升级你走这个流程",
+    "docs.5.name":"docs/mcp-setup.md","docs.5.desc":"xiaohongshu-mcp 没装时你带用户走这个",
+    "docs.6.name":"老博主接入完整 spec","docs.6.desc":"§0c 的设计底稿（v2.2.0+）",
+    "docs.7.name":"RELEASING.md","docs.7.desc":"你要帮开发者发版时用（BRAIN/HANDS/CALIB 决策树）",
+    "docs.8.name":"platform/ 宿主适配","docs.8.desc":"hermes / claude-code / codex 在各宿主下的特定行为",
+
+    "roadmap.title":"路线图","roadmap.v24":"Agent-Friendly Upgrade 智能体友好升级","roadmap.v30":"视频笔记 + 多账号 + 竞品对标",
+
+    "cta.audience":"[ 观众切回：人类访客 ]",
+    "cta.title":"把这页发给你的 AI","cta.subtitle":"开源 · MIT · 你（人类）只需复制种子提示词，剩下的交给你的 AI 智能体",
+    "cta.seed":"回到种子提示词 ▸","cta.github":"★ 在 GITHUB STAR",
+
+    "footer.tagline":"给 AI 智能体读的小红书 Skill · Skill-as-Brain","footer.changelog":"CHANGELOG"
   },
   en: {
-    "nav.what":"Overview","nav.capabilities":"Capabilities","nav.quickstart":"Deploy","nav.platforms":"Hosts","nav.architecture":"Architecture","nav.docs":"Docs",
-    "hero.title1":"Turn your AI assistant into","hero.title2":"a Xiaohongshu creator sidekick",
-    "hero.subtitle":"A closed loop from topic → drafting → publishing → review, driven by your own history for self-evolution. Built on the Skill-as-Brain architecture — one SKILL.md runs on Hermes / Claude Code / Codex.",
-    "hero.cta1":"INITIATE SEQUENCE","hero.cta2":"VIEW ON GITHUB",
-    "hero.stat1":"Core Flows","hero.stat2":"SQLite Tables","hero.stat3":"MCP Tools","hero.stat4":"AI Platforms",
-    "what.title":"System Overview","what.subtitle":"Turn your AI assistant into a creator sidekick that understands Xiaohongshu — closing the loop from topic to review, driven by real history.",
-    "what.p1.title":"New Creators","what.p1.desc":"Haven't posted or just starting — a 3-question interview builds your profile, competitor-based cold start, full daily loop: topic/draft/publish/review.",
-    "what.p2.title":"Established Creators (v2.2.0+)","what.p2.desc":"30 to 1000+ posts — batch import history, AI infers profile, mines patterns you've already validated, produces account audit.",
-    "what.p3.title":"AI Agent Developers","what.p3.desc":"A reference architecture: Skill-as-Brain, §0a business routing, JSON Schema contracts, engineered anti-pattern discipline.",
-    "what.not.title":"What it isn't",
-    "what.not.1":"<b class='text-ink-100'>Not</b> a Xiaohongshu automation tool (no bulk posting, no faking stats, no bypassing moderation)",
-    "what.not.2":"<b class='text-ink-100'>Not</b> a content farm (§5 compliance rules prevent clickbait / sameness)",
-    "what.not.3":"<b class='text-ink-100'>Not</b> a standalone bot (requires an AI assistant that can read SKILL.md)",
-    "what.not.4":"<b class='text-ink-100'>Does not</b> assume the messaging channel (Telegram / WeChat etc. are handled by hermes-agent or you)",
-    "brain.tag":"Core Philosophy",
-    "brain.lead":"All business logic lives in <span class='chip'>SKILL.md</span> — the AI that reads it <i>is</i> the brain. <span class='chip' style='color:#FF00FF;border-color:rgba(255,0,255,.3);background:rgba(255,0,255,.05)'>scripts/</span> are just the hands: physical ops the AI can't do (APIs, DB, images).",
-    "brain.1":"<b class='text-ink-100'>Zero-cost AI platform switch</b>: if it can read SKILL.md — hermes / Claude Code / Codex / OpenClaw — it works.",
-    "brain.2":"<b class='text-ink-100'>Change the flow without changing code</b>: edit SKILL.md, BRAIN+1.",
-    "brain.3":"<b class='text-ink-100'>Gets smarter with use</b>: every choice & metric recorded to DB, driving preference evolution.",
-    "brain.4":"<b class='text-ink-100'>Engineered AI discipline</b>: §0a routing + §0b schema-checked writes + schemas/ + anti-pattern rules.",
-    "cap.title":"Capability Matrix","cap.subtitle":"Four dimensions covering the full creator loop",
-    "cap.flows.title":"Core Business Flows (7 lines)",
-    "cap.flows.1.name":"Onboarding","cap.flows.1.desc":"First chat → build profile + env ready",
-    "cap.flows.2.name":"Creator Onboarding","cap.flows.2.desc":"Import history + infer profile + seed patterns",
-    "cap.flows.3.name":"Topic Research","cap.flows.3.desc":"Preference-weighted topic candidates",
+    "nav.seed":"Seed Prompt","nav.what":"Agent Modes","nav.capabilities":"Capabilities","nav.quickstart":"Execution","nav.platforms":"Hosts","nav.docs":"Docs",
+    "hero.title1":"A Xiaohongshu creator skill","hero.title2":"written for your AI agent",
+    "hero.subtitle":"You — the AI agent — once your user pastes the seed prompt, you absorb <span class='chip'>SKILL.md</span> into your context and become the brain of their Xiaohongshu account. <span class='chip chip-mag'>scripts/</span> are your hands: HTTP / DB / image gen you can't do yourself. What follows is your execution brief.",
+    "hero.humanNote":"Human visitors don't install this themselves. Paste the <b class='neon-amber'>seed prompt</b> below into any AI agent (Claude Code / Codex / Hermes / OpenClaw); it'll clone, install, read SKILL.md, and route per §0a. <b class='text-ink-100'>Note: every \"you\" from here on addresses the AI agent, not you (the human)</b> — read \"you run X\" as \"your AI will run X\".",
+    "hero.cta1":"COPY SEED PROMPT","hero.cta2":"JUMP TO SKILL.md",
+    "hero.stat1":"business flows you'll run","hero.stat2":"SQLite tables you read/write","hero.stat3":"MCP tools you can call","hero.stat4":"hosts you can live in",
+
+    "seed.title":"SEED PROMPT",
+    "seed.subtitle":"The one thing humans do: paste the block below, verbatim, into their AI agent. It'll clone, install, preflight, read SKILL.md, and stand by per §0a.",
+    "seed.label":"PASTE-TO-AGENT · SHULING INSTALL BRIEF",
+    "seed.copy":"COPY",
+    "seed.copied":"COPIED ✓",
+    "seed.tip1":"Paste the block into your AI's chat box — the agent handles all install steps; you touch no terminal.",
+    "seed.tip2":"After install, speak naturally: \"what should I post today\" / \"post for me\" / \"review\".",
+    "seed.tip3":"You auto-route per §0a — don't wait to be told — but every publish still needs human approval.",
+
+    "what.title":"The 3 agent modes you'll land in","what.subtitle":"Once pasted, you route into one of three modes based on the user's answer and state.json.",
+    "what.p1.title":"User is a new creator","what.p1.desc":"No posts, or just starting — you: 3-question interview (niche/audience/tone), competitor cold start, daily topic→draft→image→publish→review loop.",
+    "what.p2.title":"User has 30~1000+ posts already","what.p2.desc":"Run §0c (existing-creator onboarding, 5 steps): confirm login → import 200 posts → auto-classify → infer profile → audit report. First auto-post hits user's historical P50.",
+    "what.p3.title":"User is an AI engineer studying this skill","what.p3.desc":"They're borrowing the Skill-as-Brain pattern — walk them through §0a routing, §0b write validation, JSON Schema contracts, and engineered anti-pattern discipline.",
+    "what.not.title":"What you (the agent) must NOT do",
+    "what.not.1":"<b class='text-ink-100'>Don't</b> run shuling as an autonomous bot (no bulk posting, no faking stats, no moderation bypass — §5 compliance is mandatory).",
+    "what.not.2":"<b class='text-ink-100'>Don't</b> write profile.json / state.json / preferences.json without going through §0b (all writes must pass schemas/ first).",
+    "what.not.3":"<b class='text-ink-100'>Don't</b> skip §0a and start posting on your own — read state.json first, then route.",
+    "what.not.4":"<b class='text-ink-100'>Don't</b> assume a messaging channel (Telegram / WeChat etc. are hermes-agent's job — don't stitch them yourself).",
+    "what.not.5":"<b class='text-ink-100'>Don't</b> skip the human confirmation before publishing (last step of §2~§6 is always user-approved).",
+
+    "brain.tag":"Core philosophy",
+    "brain.lead":"All business logic lives in <span class='chip'>SKILL.md</span>. <b class='neon-green'>Read it, and you ARE the brain.</b> <span class='chip chip-mag'>scripts/</span> are just the hands — APIs, DB, image gen, things you (an AI) can't do physically.",
+    "brain.1":"<b class='text-ink-100'>Zero-cost host switch</b>: if you can read SKILL.md, Hermes / Claude Code / Codex / OpenClaw all work.",
+    "brain.2":"<b class='text-ink-100'>Change flow without changing code</b>: edit SKILL.md, bump BRAIN+1.",
+    "brain.3":"<b class='text-ink-100'>Every choice is training data</b>: every turn writes to DB and drives preferences.json evolution.",
+    "brain.4":"<b class='text-ink-100'>§0a / §0b / schemas/ are your guardrails</b>: routing + write validation + anti-patterns keep you on track.",
+
+    "cap.title":"What you can do once installed","cap.subtitle":"After reading SKILL.md, you have all four capability buckets at once.",
+    "cap.flows.title":"7 business flows you'll orchestrate",
+    "cap.flows.1.name":"Onboarding","cap.flows.1.desc":"First chat → you build profile + verify env",
+    "cap.flows.2.name":"§0c Creator Onboarding","cap.flows.2.desc":"Import history + infer profile + seed patterns",
+    "cap.flows.3.name":"Topic Research","cap.flows.3.desc":"Preference-weighted candidates",
     "cap.flows.4.name":"Content Creation","cap.flows.4.desc":"RedInk two-stage outline + copy + tags",
-    "cap.flows.5.name":"Image Generation","cap.flows.5.desc":"Gemini → OpenAI → HTML 3-tier fallback",
-    "cap.flows.6.name":"Publish","cap.flows.6.desc":"Posted live + local `posts` record",
+    "cap.flows.5.name":"Image Generation","cap.flows.5.desc":"Gemini 3 Pro Image, Chinese prompt template",
+    "cap.flows.6.name":"Publish","cap.flows.6.desc":"xhs.sh → MCP + local posts row",
     "cap.flows.7.name":"Daily/Weekly Review","cap.flows.7.desc":"Reports + patterns evolution + 5D diagnosis",
-    "cap.flows.more":"All orchestrated by AI reading SKILL.md",
-    "cap.evo.title":"Self-Evolution Engine",
-    "cap.evo.1.name":"Preference Learning","cap.evo.1.desc":"Laplace smoothing + concentration×sample factor confidence — cautious on small samples, fast to converge when stable",
-    "cap.evo.2.name":"Option Reduction","cap.evo.2.desc":"Confidence-driven: from \"pick several\" down to \"just reply 'post'\"",
-    "cap.evo.3.name":"Exploration","cap.evo.3.desc":"Add a low-weight type every 7 days — prevents overfit, keeps taste evolving",
-    "cap.evo.4.name":"\"Swap\" Signal Rebound","cap.evo.4.desc":"Two \"swap\" in a row → confidence forced back to 0.45, breaking tunnel vision",
-    "cap.evo.5.name":"Pattern Lifecycle","cap.evo.5.desc":"Shared by titles/structure/image prompts: experimental → medium → high / deprecated",
-    "cap.evo.6.name":"Save-Rate Driven","cap.evo.6.desc":"Real data drives pattern promotion/retirement, no manual tuning",
-    "cap.eng.title":"Ops & Engineering Discipline",
-    "cap.eng.1.name":"install.sh 6 Modes","cap.eng.1.desc":"default / --check / --dry-run / --yes / --target / --mode",
-    "cap.eng.2.name":"preflight.py Dual Mode","cap.eng.2.desc":"AI-readable JSON + --human color table (exit codes 0/1/2)",
-    "cap.eng.3.name":"BRAIN.HANDS.CALIB Versioning","cap.eng.3.desc":"Three-part semantics — breaking only in BRAIN+1",
-    "cap.eng.4.name":"Doc Quartet","cap.eng.4.desc":"CHANGELOG / UPGRADE / RELEASING / docs/features/",
-    "cap.eng.5.name":"JSON Schema Contracts","cap.eng.5.desc":"state/profile/preferences/audit-report — AI self-validates before write",
-    "cap.eng.6.name":"Account Risk Shield","cap.eng.6.desc":"Tiered throttle + daily quotas (v1-conservative profile), auto-reject when capped",
-    "cap.ai.title":"AI Agent Collaboration Discipline",
-    "cap.ai.1.name":"Business Routing","cap.ai.1.desc":"AI's first move: preflight → read state → table-decide next step",
-    "cap.ai.2.name":"Platform ID + Write Validation","cap.ai.2.desc":"Identify hermes/claude/codex by path, check schema before write",
-    "cap.ai.3.name":"Creator Onboarding","cap.ai.3.desc":"5-step additive branch (v2.2.0+)",
-    "cap.ai.4.name":"Exception Matrix","cap.ai.4.desc":"12 exception scenarios × standard handling",
-    "qs.title":"Deploy Sequence","qs.subtitle":"Pick your path",
-    "qs.prereq.title":"Prerequisites",
-    "qs.prereq.1.name":"AI Assistant","qs.prereq.1.desc":"hermes / Claude Code / Codex / OpenClaw — pick any",
-    "qs.prereq.2.desc":"Xiaohongshu MCP service (search/detail/publish/comment/login)",
-    "qs.prereq.3.desc":"screenshot / DB / images / JSON",
-    "qs.prereq.4.name":"Image API (optional)","qs.prereq.4.desc":"Gemini Key (recommended) / OpenAI Key — falls back to HTML screenshot if unset",
-    "qs.prereq.5.name":"NoteRx API (optional)","qs.prereq.5.desc":"5D diagnosis — requires NOTERX_API_KEY",
-    "qs.install.title":"Install",
-    "qs.install.c1":"Clone the repo","qs.install.c2":"One-click install: detect platform + deps check + init DB + config",
-    "qs.install.c3":"Other modes","qs.install.c4":"Self-check only","qs.install.c5":"Dry run: list what would happen","qs.install.c6":"CI / remote non-interactive",
-    "qs.A.badge":"PATH A","qs.A.title":"New Creator: From Zero",
-    "qs.A.1":"<b class='text-ink-100'>Install</b> (default new, press Enter) <span class='chip'>bash install.sh</span>",
-    "qs.A.2":"<b class='text-ink-100'>Log in to Xiaohongshu</b>: QR code or Cookie paste (\"here's my cookie: ...\")",
-    "qs.A.3":"<b class='text-ink-100'>Build your profile</b>: tell the AI \"I want to be a Xiaohongshu creator\" — 3 questions (niche/audience/tone)",
-    "qs.A.4":"<b class='text-ink-100'>Daily use</b>: \"post for me\" / \"what should I post today\" / \"how did yesterday do\"",
-    "qs.B.title":"Established Creator: Import Account",
-    "qs.B.1":"<b class='text-ink-100'>Install in creator mode</b>: <span class='chip'>bash install.sh --mode=existing-creator</span>",
-    "qs.B.2":"<b class='text-ink-100'>Log in</b> (QR or cookie, same as Path A)",
-    "qs.B.3":"<b class='text-ink-100'>Trigger via chat</b>: \"I already run a Xiaohongshu account, onboard me\"",
-    "qs.B.4":"AI runs §0c 5 steps: confirm login → import 200 posts → auto-classify → infer profile → audit report",
-    "qs.B.5":"<b class='text-ink-100'>When done</b>, the system has 6+ months of memory; first auto-post hits your historical P50 level",
-    "qs.B.manual":"Manual run:",
-    "qs.daily.title":"Daily Chat Commands",
-    "qs.daily.1.cmd":"\"post for me\"","qs.daily.1.desc":"Full publish loop",
-    "qs.daily.2.cmd":"\"what should I post\"","qs.daily.2.desc":"Topic research",
-    "qs.daily.3.cmd":"\"write a draft\"","qs.daily.3.desc":"Creation only",
-    "qs.daily.4.cmd":"\"how did yesterday do\"","qs.daily.4.desc":"Data review",
-    "qs.daily.5.cmd":"\"how are things\"","qs.daily.5.desc":"Recap",
-    "qs.daily.6.cmd":"\"change direction\"","qs.daily.6.desc":"Update profile",
-    "qs.daily.7.cmd":"\"here's my cookie...\"","qs.daily.7.desc":"Cookie login",
-    "qs.daily.8.cmd":"\"review\"","qs.daily.8.desc":"Manual review",
-    "plat.title":"Host Registry","plat.subtitle":"One SKILL.md, same behavior on every platform",
+    "cap.flows.more":"All orchestrated by you (the AI) reading SKILL.md",
+    "cap.evo.title":"Self-evolution engine — every turn feeds it",
+    "cap.evo.1.name":"Preference Learning","cap.evo.1.desc":"Laplace smoothing + concentration×sample factor — cautious on small n, converges when stable",
+    "cap.evo.2.name":"Option Reduction","cap.evo.2.desc":"Your option count tracks confidence: from \"pick several\" down to \"just reply 'post'\"",
+    "cap.evo.3.name":"Exploration","cap.evo.3.desc":"Every 7 days you add a low-weight type to avoid overfit",
+    "cap.evo.4.name":"\"Swap\" Signal Rebound","cap.evo.4.desc":"Two \"swaps\" in a row → confidence forced back to 0.45, breaks tunnel vision",
+    "cap.evo.5.name":"Pattern Lifecycle","cap.evo.5.desc":"Titles / structure / image prompts share: experimental → medium → high / deprecated",
+    "cap.evo.6.name":"Save-Rate Driven","cap.evo.6.desc":"Real data promotes/retires patterns — you do no manual tuning",
+    "cap.eng.title":"Engineering discipline — your operating bounds",
+    "cap.eng.1.name":"install.sh 6 modes","cap.eng.1.desc":"default / --check / --dry-run / --yes / --target / --mode",
+    "cap.eng.2.name":"preflight.py dual mode","cap.eng.2.desc":"Prefer JSON (default); exit 0/1/2 drives §8 routing",
+    "cap.eng.3.name":"BRAIN.HANDS.CALIB versioning","cap.eng.3.desc":"Three-part semantics — breaking only in BRAIN+1",
+    "cap.eng.4.name":"Doc quartet","cap.eng.4.desc":"When versions diverge, consult: CHANGELOG / UPGRADE / RELEASING / docs/features/",
+    "cap.eng.5.name":"JSON Schema contracts","cap.eng.5.desc":"state / profile / preferences / audit-report — you self-validate before write",
+    "cap.eng.6.name":"Account Risk Shield","cap.eng.6.desc":"Tiered throttle + v1-conservative daily quotas; xhs.sh auto-rejects when capped",
+    "cap.ai.title":"Self-discipline clauses",
+    "cap.ai.1.name":"Business routing","cap.ai.1.desc":"Your first action every turn: preflight → read state → table-decide next step",
+    "cap.ai.2.name":"Host ID + write validation","cap.ai.2.desc":"Identify hermes/claude/codex by path; check schemas/ before JSON write",
+    "cap.ai.3.name":"Existing-creator onboarding","cap.ai.3.desc":"5-step additive branch (v2.2.0+), triggered per §0a",
+    "cap.ai.4.name":"Exception matrix","cap.ai.4.desc":"12 scenarios × standard handling — consult when you hit trouble",
+
+    "qs.title":"Execution sequence — for the AI agent","qs.subtitle":"Once you receive the seed prompt, run the 7 steps below.",
+    "qs.prereq.title":"What the host environment should already have",
+    "qs.prereq.hint":"Run preflight.py first. If something's missing, ask the user — don't silently install system deps.",
+    "qs.prereq.1.name":"You (the AI agent)","qs.prereq.1.desc":"Claude Code / Codex / Hermes / OpenClaw — any that can read SKILL.md",
+    "qs.prereq.2.desc":"Xiaohongshu MCP (search/detail/publish/comment/login) — you call via xhs.sh",
+    "qs.prereq.3.desc":"preflight / DB / JSON — used directly by your scripts",
+    "qs.prereq.4.name":"Gemini image API key (required)","qs.prereq.4.desc":"No key = hard stop, no fallback. Ask the user — don't work around it.",
+    "qs.prereq.5.name":"NoteRx API (optional)","qs.prereq.5.desc":"5D diagnosis — if unset, skip without blocking the main loop",
+
+    "qs.steps.title":"7-step execution checklist",
+    "qs.steps.1.name":"Preflight","qs.steps.1.desc":"Before entering the repo, in your current dir run <code class='chip'>python3 scripts/preflight.py</code> (if the repo isn't cloned yet, do it after step 2). Parse JSON: exit=0 green, exit=1 you handle, exit=2 ask the user (e.g. Gemini key).",
+    "qs.steps.2.name":"Clone","qs.steps.2.desc":"<code class='chip'>git clone git@github.com:AI-flower/shuling.git &amp;&amp; cd shuling</code> — fallback to https if no SSH. On failure, check the user's network — don't swap mirrors.",
+    "qs.steps.3.name":"Install","qs.steps.3.desc":"First <code class='chip'>bash install.sh --check</code>. On FAIL, explain and wait. On pass, <code class='chip'>bash install.sh</code> with <code class='chip'>--mode=new</code> or <code class='chip'>--mode=existing-creator</code> based on the user's answer. In CI add <code class='chip'>SHULING_ASSUME_YES=1</code>.",
+    "qs.steps.4.name":"Read SKILL.md (in full)","qs.steps.4.desc":"Absorb the whole SKILL.md into context — not a scan, not a grep. Internalize §0a (routing) / §0b (write validation) / §0c (existing creator) / §1-§7 (main loop) / §8 (exceptions). Glance at schemas/ too.",
+    "qs.steps.5.name":"State probe","qs.steps.5.desc":"Read <code class='chip'>data/state.json</code> and <code class='chip'>knowledge-base/profile.json</code> — the only source of truth for where the user stands. Don't infer from the chat vibe.",
+    "qs.steps.6.name":"§0a routing","qs.steps.6.desc":"Use the §0a table to decide what's next. Don't improvise. See the routing table below.",
+    "qs.steps.7.name":"Reply to user","qs.steps.7.desc":"One line: <code class='chip'>\"shuling vX.Y.Z absorbed · BRAIN/HANDS/CALIB verified · standing by per §0a\"</code>. Then stop. Don't start picking topics or posting unprompted.",
+
+    "qs.route.title":"§0a routing table — state × phrase = which section","qs.route.col1":"state.json","qs.route.col2":"User phrase","qs.route.col3":"You run",
+    "qs.route.r1c1":"empty / no profile","qs.route.r1c2":"\"I want to be a Xiaohongshu creator\"","qs.route.r1c3":"§0 + §1 new-creator onboarding",
+    "qs.route.r2c1":"empty / no profile","qs.route.r2c2":"\"I'm already running an account\" / \"onboard me\"","qs.route.r2c3":"§0c 5-step existing-creator",
+    "qs.route.r3c1":"has profile · logged_in=false","qs.route.r3c2":"\"here's my cookie...\" / \"QR login\"","qs.route.r3c3":"platform/ login branch",
+    "qs.route.r4c1":"ready · no post in last 24h","qs.route.r4c2":"\"post for me\"","qs.route.r4c3":"§2→§3→§4→§5→§6 main loop",
+    "qs.route.r5c1":"ready","qs.route.r5c2":"\"what should I post\" / \"write a draft\"","qs.route.r5c3":"§2 or §3 standalone",
+    "qs.route.r6c1":"ready · no review in 24h","qs.route.r6c2":"\"review\" / \"how did yesterday do\"","qs.route.r6c3":"§7 daily review + patterns evolution",
+    "qs.route.r7c1":"any","qs.route.r7c2":"preflight code=2 (missing key)","qs.route.r7c3":"§8 exception matrix: hard-stop + request",
+
+    "daily.title":"User phrase → your action","daily.subtitle":"These are what the user will say day to day. Recognize → map directly to SKILL.md sections. Don't reinterview.",
+    "daily.1.cmd":"\"post for me\"","daily.1.desc":"§2→§3→§4→§5→§6",
+    "daily.2.cmd":"\"what should I post\"","daily.2.desc":"§2 topic only",
+    "daily.3.cmd":"\"write a draft\"","daily.3.desc":"§3 creation",
+    "daily.4.cmd":"\"how did yesterday do\"","daily.4.desc":"§7 review",
+    "daily.5.cmd":"\"how are things lately\"","daily.5.desc":"§7 weekly recap",
+    "daily.6.cmd":"\"I want to change direction\"","daily.6.desc":"§1 update profile",
+    "daily.7.cmd":"\"here's my cookie...\"","daily.7.desc":"platform login branch",
+    "daily.8.cmd":"\"I'm already running it\"","daily.8.desc":"§0c existing-creator onboarding",
+
+    "plat.title":"Hosts you can run in","plat.subtitle":"Same SKILL.md, same behavior across all four hosts.",
     "plat.rec":"RECOMMENDED",
     "plat.hermes.desc":"cron job + <code class='chip'>prompt: use shuling skill</code>",
-    "plat.hermes.note":"Full-auto daily publish + review",
+    "plat.hermes.note":"Full-auto daily publish + review (no-human scenario)",
     "plat.claude.desc":"Chat + <code class='chip'>/loop 8h ...</code>",
-    "plat.claude.note":"VS Code integrated, supports scheduling",
-    "plat.codex.desc":"Chat trigger","plat.codex.note":"Manual publish",
-    "plat.open.desc":"Compatible with <code class='chip'>agents/</code> spec","plat.open.note":"Generic agents fallback",
-    "arch.title":"Architecture & Layout","arch.subtitle":"One path: AI → SKILL.md → scripts/ → DB + knowledge-base",
-    "arch.toggle":"View full directory tree","arch.click":"▸ Click to expand",
-    "docs.title":"Knowledge Index","docs.subtitle":"Find the right doc for your need",
-    "docs.1.name":"SKILL.md (Essential)","docs.1.desc":"AI reads this to run the whole business",
-    "docs.2.name":"CHANGELOG.md","docs.2.desc":"What changed in each release",
-    "docs.3.name":"UPGRADE.md","docs.3.desc":"How to upgrade from vX.Y.Z",
-    "docs.4.name":"RELEASING.md","docs.4.desc":"Your own release SOP + version decision tree",
-    "docs.5.name":"docs/mcp-setup.md","docs.5.desc":"xiaohongshu-mcp install + cookie guide",
-    "docs.6.name":"Established-creator full spec","docs.6.desc":"v2.2.0+ design doc",
-    "docs.7.name":"schemas/ contracts","docs.7.desc":"Schemas AI must follow when writing JSON",
-    "docs.8.name":"platform/ guides","docs.8.desc":"hermes / claude-code / codex config",
-    "roadmap.title":"Roadmap","roadmap.v23":"Human Rhythm behavioral pacing","roadmap.v30":"Video notes + multi-account + competitor benchmarking",
-    "cta.title":"Let AI be your Xiaohongshu co-pilot","cta.subtitle":"Open source · MIT · Feel free to borrow the Skill-as-Brain pattern",
-    "cta.github":"★ STAR ON GITHUB","cta.start":"INITIATE SEQUENCE ▸",
-    "footer.tagline":"Xiaohongshu Creator Assistant · Skill-as-Brain","footer.changelog":"CHANGELOG"
+    "plat.claude.note":"You can be invoked in VS Code or terminal; supports scheduling",
+    "plat.codex.desc":"Chat trigger","plat.codex.note":"You must re-read state.json every invocation",
+    "plat.open.desc":"Compatible with <code class='chip'>agents/</code> spec","plat.open.note":"Generic fallback for any SKILL.md-aware host",
+
+    "arch.title":"Your memory map","arch.subtitle":"Where to read/write: SKILL.md is the brain, scripts/ the hands, knowledge-base/ your notebook.",
+    "arch.click":"▸ Click to expand",
+
+    "docs.title":"Your reading list","docs.subtitle":"Sorted by priority. SKILL.md is mandatory; the rest are reference.",
+    "docs.1.name":"SKILL.md (must-read in full)","docs.1.desc":"You can't run the business without absorbing the whole file",
+    "docs.2.name":"schemas/ write contracts","docs.2.desc":"Validate every JSON write against these first",
+    "docs.3.name":"CHANGELOG.md","docs.3.desc":"Consult when the user says \"my local version is v2.x.y\"",
+    "docs.4.name":"UPGRADE.md","docs.4.desc":"Follow when the user crosses a major version",
+    "docs.5.name":"docs/mcp-setup.md","docs.5.desc":"Walk the user through this if xiaohongshu-mcp isn't installed",
+    "docs.6.name":"Existing-creator full spec","docs.6.desc":"Design source for §0c (v2.2.0+)",
+    "docs.7.name":"RELEASING.md","docs.7.desc":"Use when helping the developer cut a release (BRAIN/HANDS/CALIB tree)",
+    "docs.8.name":"platform/ host adapters","docs.8.desc":"Host-specific behavior for hermes / claude-code / codex",
+
+    "roadmap.title":"Roadmap","roadmap.v24":"Agent-friendly upgrade infrastructure","roadmap.v30":"Video notes + multi-account + competitor benchmarking",
+
+    "cta.audience":"[ AUDIENCE: SWITCHED BACK TO HUMAN ]",
+    "cta.title":"Hand this page to your AI","cta.subtitle":"Open source · MIT · You (the human) just copy the seed prompt — the rest is your AI's job",
+    "cta.seed":"BACK TO SEED PROMPT ▸","cta.github":"★ STAR ON GITHUB",
+
+    "footer.tagline":"A XIAOHONGSHU SKILL FOR YOUR AI AGENT · SKILL-AS-BRAIN","footer.changelog":"CHANGELOG"
   }
 };
 
@@ -944,6 +1229,8 @@ function setLang(lang) {
     const key = el.getAttribute('data-i18n');
     if (dict[key] !== undefined) el.innerHTML = dict[key];
   });
+  const seedEl = document.getElementById('seed-prompt');
+  if (seedEl && SEED_BODY[lang]) seedEl.textContent = SEED_BODY[lang];
   ['zh','en'].forEach(k => {
     const btn = document.getElementById('lang-' + k);
     if (!btn) return;
@@ -968,6 +1255,34 @@ const io = new IntersectionObserver((entries) => {
   entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
 }, { threshold: 0.1 });
 document.querySelectorAll('.fade-up').forEach(el => io.observe(el));
+
+// ──────────────── Copy seed prompt ────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('copy-seed');
+  const label = document.getElementById('copy-seed-label');
+  if (!btn || !label) return;
+  btn.addEventListener('click', async () => {
+    const pre = document.getElementById('seed-prompt');
+    if (!pre) return;
+    const text = pre.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      // fallback: temp textarea
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position='fixed'; ta.style.left='-9999px';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch(_) {}
+      document.body.removeChild(ta);
+    }
+    const lang = (document.documentElement.lang || 'zh').startsWith('en') ? 'en' : 'zh';
+    const copied = (I18N[lang] && I18N[lang]['seed.copied']) || '已复制 ✓';
+    const orig = (I18N[lang] && I18N[lang]['seed.copy']) || '一键复制';
+    label.textContent = copied;
+    btn.classList.add('copied');
+    setTimeout(() => { label.textContent = orig; btn.classList.remove('copied'); }, 1800);
+  });
+});
 </script>
 <script>
 (function () {
@@ -988,7 +1303,7 @@ document.querySelectorAll('.fade-up').forEach(el => io.observe(el));
       document.querySelectorAll("[data-ver=\"codename\"]").forEach(el => el.textContent = codename);
       document.querySelectorAll("[data-ver=\"date\"]").forEach(el => el.textContent = date);
       document.querySelectorAll("[data-ver=\"badge\"]").forEach(el =>
-        el.textContent = tag + " \"" + codeUp + "\" · " + date);
+        el.textContent = "BRIEFING · AGENT INSTALL · " + tag);
     } catch (_) { /* keep fallback */ }
   }
   document.addEventListener("DOMContentLoaded", loadLatest);
