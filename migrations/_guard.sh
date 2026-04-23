@@ -15,9 +15,11 @@ _GUARD_DB="${SHULING_DB:-$SKILL_DIR/data/xhs.db}"
 _GUARD_APPLIED_SQL="$SKILL_DIR/migrations/_applied_table.sql"
 
 # 若 DB 不存在, 初始化. 若 db.sh init 失败则静默让首个 migration 自己处理.
+# v2.4.2: 把 _GUARD_DB 通过 SHULING_DB env var 透传给 db.sh, 避免 db.sh 用自己的
+# SKILL_DIR 推导出来的源 DB 路径, 导致 target 的 migration 调用反而 init 源 DB.
 if [ ! -f "$_GUARD_DB" ]; then
     if [ -x "$SKILL_DIR/scripts/db.sh" ]; then
-        bash "$SKILL_DIR/scripts/db.sh" init >/dev/null 2>&1 || true
+        SHULING_DB="$_GUARD_DB" bash "$SKILL_DIR/scripts/db.sh" init >/dev/null 2>&1 || true
     fi
 fi
 

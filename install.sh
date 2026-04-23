@@ -429,8 +429,13 @@ ua_step_migrations() {
         fi
         # migration 脚本自身通过 _guard.sh 查 __migrations 表做幂等
         # 我们检测退出码 + 输出关键字来判定 ok/skipped
+        #
+        # v2.4.2: 同时传 SHULING_DB, 让 _guard.sh 里的 _GUARD_DB 指向 target DB 而非源 DB.
+        # 旧版仅传 SKILL_DIR 会被 migration/v*.sh 的 `SKILL_DIR="$(cd "$(dirname "$0")/..")` 覆盖,
+        # 导致 migration 永远写源仓库 data/xhs.db, target 的 __migrations 永远空.
+        # _guard.sh 的 DB 解析优先级: SHULING_DB > $SKILL_DIR/data/xhs.db
         local out rc
-        out="$(SKILL_DIR="$path" bash "$m" 2>&1)" && rc=0 || rc=$?
+        out="$(env SHULING_DB="$path/data/xhs.db" SKILL_DIR="$path" bash "$m" 2>&1)" && rc=0 || rc=$?
         if [ "$rc" = "0" ]; then
             # 脚本打印 "already applied" 视为 skipped；其余视为 ok
             if echo "$out" | grep -qiE "already[ _-]?applied|skipped|no_schema_change"; then
@@ -536,11 +541,23 @@ ua_step_preflight() {
         step_record "preflight" "planned" "script" "$pf"
         return 0
     fi
-    if (cd "$path" && python3 scripts/preflight.py >/dev/null 2>&1); then
-        step_record "preflight" "ok"
-    else
-        step_record "preflight" "failed" "reason" "preflight_nonzero"
-    fi
+    # v2.4.2: preflight 退出码分级 (见 scripts/preflight.py _exit_code):
+    #   0 = 全绿; 1 = auto_fixable; 2 = need_user (用户需补 MCP/key/profile)
+    # upgrade-all 只对"代码/DB 升级"负责, 运行时配置就绪不是 upgrade 的责任.
+    # 所以 exit 0/1/2 都视为 upgrade 成功, 只有脚本 crash / 非 0/1/2 才算 failed.
+    (cd "$path" && python3 scripts/preflight.py >/dev/null 2>&1)
+    local pf_rc=$?
+    case "$pf_rc" in
+        0)
+            step_record "preflight" "ok"
+            ;;
+        1|2)
+            step_record "preflight" "ok" "note" "runtime_config_incomplete_rc${pf_rc}"
+            ;;
+        *)
+            step_record "preflight" "failed" "reason" "preflight_crashed_rc${pf_rc}"
+            ;;
+    esac
 }
 
 # ─── 升级单个 target ───────────────────────────────────────────────
@@ -863,30 +880,24 @@ _runtime_env_set() {
     [ -f "$file" ] || return 0
     python3 - "$file" "$key" "$value" <<'PY'
 import sys, re, pathlib
+# v2.4.2: force override. 调用者仅在用户显式提供值（env var 或 prompt 非空）时才调这里,
+# 所以进入此函数 = 强意图; 无条件覆盖模板默认值.
+# 旧版(v2.4.1)"非空保留"策略会被 runtime.env.example 的模板默认值(如 MCP_URL=http://localhost:18060/mcp)顶掉用户传入的 XHS_MCP_URL, 已通过社区 verify 复盘移除.
 path, key, value = sys.argv[1], sys.argv[2], sys.argv[3]
 p = pathlib.Path(path)
 lines = p.read_text().splitlines()
-pat = re.compile(rf"^\s*{re.escape(key)}\s*=\s*(.*)$")
+pat = re.compile(rf"^\s*{re.escape(key)}\s*=\s*.*$")
 new = []
 seen = False
-touched = False
 for ln in lines:
-    m = pat.match(ln)
-    if m and not seen:
+    if pat.match(ln) and not seen:
         seen = True
-        existing = m.group(1).strip().strip("'\"")
-        if not existing:
-            new.append(f"{key}={value}")
-            touched = True
-        else:
-            new.append(ln)
+        new.append(f"{key}={value}")
     else:
         new.append(ln)
 if not seen:
     new.append(f"{key}={value}")
-    touched = True
-if touched:
-    p.write_text("\n".join(new) + "\n")
+p.write_text("\n".join(new) + "\n")
 PY
 }
 
@@ -904,11 +915,19 @@ if [ -f "$RUNTIME_ENV_TEMPLATE" ]; then
         fi
         if [ -n "$gemini_key" ]; then
             _runtime_env_set "$runtime_env" "IMAGE_GEN_API_KEY" "$gemini_key"
-            info "$target: IMAGE_GEN_API_KEY 已写入（若之前为空）"
+            info "$target: IMAGE_GEN_API_KEY 已写入"
         fi
         if [ -n "$mcp_url" ]; then
             _runtime_env_set "$runtime_env" "MCP_URL" "$mcp_url"
-            info "$target: MCP_URL 已写入（若之前为空）"
+            info "$target: MCP_URL 已写入"
+        fi
+
+        # v2.4.2: 在 target 自己的路径上跑 db.sh init, 让 target data/xhs.db 真实初始化
+        # 包含 __migrations 台账(供后续 upgrade-all 幂等判定使用)。
+        # 旧版本(v2.4.1 及以前)只 init 源目录 DB, target preflight 会报 not_initialized.
+        if [ -x "$target/scripts/db.sh" ]; then
+            run "$target: db.sh init" env SHULING_DB="$target/data/xhs.db" bash "$target/scripts/db.sh" init
+            info "$target: data/xhs.db 已初始化"
         fi
     done
 

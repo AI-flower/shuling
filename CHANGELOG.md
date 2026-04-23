@@ -15,6 +15,93 @@
 
 ---
 
+## [2.4.2] - 2026-04-23 "Source-Target Isolation Patch"
+
+社区二次验证复盘 bugfix：v2.4.1 修了表层 4 处 install 断点，但社区 codex verifier 跑 Phase 2 又暴露一组更深层问题——**install / upgrade 流程对 source tree 和 target install 的路径区分不清**，导致 MCP_URL 未覆写、target DB 未初始化、migrations 误写源仓库 DB。本版 5 处定点修复 + 1 个预防性工具，**SKILL.md / 业务能力 / 算法零变化**。
+
+**版本位决策**：BRAIN +0 / HANDS +0 / CALIB +1 → v2.4.2
+
+### 🎛 Calib（bugfix）
+
+**1. `install.sh _runtime_env_set` 改 force override**
+- 问题：v2.4.1 的函数是"空值才写，非空保留"；但 `config/runtime.env.example` 里 `MCP_URL=http://localhost:18060/mcp` 本身就是非空默认值 → 用户传入的 `XHS_MCP_URL=http://127.0.0.1:...` 被模板顶掉，不落到 target
+- 修复：函数被调用 = 用户显式提供了值 = 强意图 → 无条件覆盖模板行
+- 影响：自定义 MCP_URL 真正生效；IMAGE_GEN_API_KEY 行为不变（因为模板里是空的）
+
+**2. `install.sh §7.5` 每 target 循环追加 `db.sh init`**
+- 问题：v2.4.1 及以前只对源 `$SKILL_DIR` 跑 db.sh init；target 的 `data/` 留空 → target preflight 报 `SQLite 数据库 not_initialized`
+- 修复：target 循环里追加 `env SHULING_DB="$target/data/xhs.db" bash "$target/scripts/db.sh" init`，让 target 自己的 DB 被创建 + 11 张表（含 `__migrations`）建好
+
+**3. `install.sh ua_step_migrations` 传 `SHULING_DB` 环境变量**
+- 问题：upgrade-all 调 `migrations/v*.sh` 只传 `SKILL_DIR="$path"`，但 migration 脚本一进入就 `SKILL_DIR="$(cd "$(dirname "$0")/..")` 覆盖成**源**目录；`_guard.sh` 的 `_GUARD_DB=$SKILL_DIR/data/xhs.db` 于是永远指源 DB；migration 实际在源仓库 DB 上跑，target DB 的 `__migrations` 永远空
+- 修复：`ua_step_migrations` 行 433 改为 `env SHULING_DB="$path/data/xhs.db" SKILL_DIR="$path" bash "$m"`；`_guard.sh` 的 DB 解析优先级 `SHULING_DB > $SKILL_DIR/data/xhs.db` 已经支持这个 env var，只差 install.sh 没传
+
+**4. `scripts/db.sh` 支持 `SHULING_DB` env var override**
+- 问题：原 db.sh 只按 `$(dirname "$0")/../data/xhs.db` 推导 DB；调用方想让它操作别处 DB 没法子（Fix 2 和 Fix 5 都需要这个能力）
+- 修复：DB_PATH 解析优先 `$SHULING_DB`，否则退回旧推导；`DB_DIR` 同步
+
+**5. `migrations/_guard.sh` 调 db.sh init 时透传 `SHULING_DB`**
+- 问题：target DB 首次运行 migration 时 `_GUARD_DB` 不存在，_guard.sh 会 fallback 调 `db.sh init` —— 但没传 SHULING_DB → db.sh 用自己推导的路径 init 了**源** DB，target DB 依然空
+- 修复：`SHULING_DB="$_GUARD_DB" bash "$SKILL_DIR/scripts/db.sh" init`，让 init 落到 target DB
+
+**附赠 — `install.sh ua_step_preflight` 判定放宽**
+- 问题：preflight 退出码 0=全绿 / 1=auto_fixable / 2=need_user；但旧 `ua_step_preflight` 任何非零都当 upgrade 失败 → 新装 target 没配 MCP/Key/profile 是预期的（exit 2），却让 upgrade-all overall=failed，误导 agent
+- 修复：exit 0/1/2 都视为 upgrade 本身成功（代码/DB 升级完成），只记一个 `note: runtime_config_incomplete`；只有脚本 crash / 其他异常 exit code 才算 upgrade 失败
+- 解耦原则：upgrade-all 只对"代码和 DB schema 升级"负责；运行时配置就绪（登录、key、profile）是首次调用 skill 时的责任
+
+### 🛡 新增 —— `scripts/pre-submit-verify.sh`（21 项本地回归套件）
+
+把社区 cookbook-dev 的 verifier 行为模型内化成本地可跑的自检脚本。**发版前强制必跑**。
+
+覆盖的验证面：
+- 依赖：sqlite3 / rsync / jq / python3
+- 干净 target 初装（独立 HOME 隔离）
+- target runtime.env 的 `MCP_URL` / `IMAGE_GEN_API_KEY` 是否真被用户传入值覆写
+- target `data/xhs.db` 是否被 init + 含 5 张关键表（含 `__migrations`）
+- target preflight 的 "SQLite 数据库" check 是否 `status=ok`
+- upgrade-all 模拟 v2.1.3 → current 的完整升级链
+- upgrade-all 是否成功写入 target `__migrations`（不是源 DB）
+- 源 DB 未被 upgrade-all 污染（md5 对比）
+
+使用：
+```bash
+bash scripts/pre-submit-verify.sh         # 彩色人类可读
+bash scripts/pre-submit-verify.sh --json  # agent / CI 可读
+```
+
+退出码：0=可提交，1=有失败，2=环境问题。
+
+### ⬆️ 如何升级
+
+```bash
+cd /path/to/shuling
+git pull
+bash install.sh upgrade-all --json         # 推荐（agent-driven）
+# 或单 target 更新
+bash install.sh
+# 验证 target 全绿
+bash scripts/pre-submit-verify.sh
+```
+
+**如果你刚装了 v2.4.1 但遇到以下任一症状**：
+- 自定义 MCP URL 没生效 / 发帖时报 "API key NOT configured"
+- target preflight 报 `SQLite 数据库 not_initialized`
+- upgrade-all 之后 target DB 的 `__migrations` 是空表（或没有 `__migrations` 表）
+
+直接 `git pull && bash install.sh upgrade-all --json` 就能全修。
+
+### 🧠 Brain / ✋ Hands
+
+_无。SKILL.md / scripts 业务接口 / DB schema / MCP 工具集 零变化。_
+
+### 📎 相关方案 / 参考
+
+- v2.4.0 / v2.4.1 的 cookbook 社区失败反馈（verify_reason 字段）直接驱动了本版 5 处修复
+- 本版完整模拟社区 verifier Phase 2 的行为：见 `scripts/pre-submit-verify.sh`
+- 社区 verifier 的审核 prompt 源码：`cookbook/backend/scripts/verify.py::build_prompt()` 的 Phase 1/2 段
+
+---
+
 ## [2.4.1] - 2026-04-23 "Install Reliability Patch"
 
 社区验证复盘 bugfix：v2.4.0 提交到 cookbook 社区实测发现 4 处执行链路断点，**全部属于 install / preflight 路径的历史隐患**，与 v2.4.0 新增基础设施无关。SKILL.md / 业务流程 / 算法零变化。
