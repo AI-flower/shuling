@@ -114,11 +114,11 @@ _无。SKILL.md / scripts 业务接口 / DB schema / MCP 工具集 零变化。_
 - **问题**：原脚本只查 `python3` / `sqlite3`；但 `install.sh` 自己在 upgrade-all 和初装都用 rsync 同步源码、大量脚本用 jq 解析 JSON，缺失会在执行到具体命令时直接崩
 - **修复**：预检加 jq + rsync，缺失直接 fail_fast + 给 brew/apt 命令提示；关键依赖缺失不再允许"继续安装"，改为硬停
 
-**2. Gemini Key 写入目标修正：根 `.env` → `config/runtime.env`**
-- **问题**：install.sh 把 `GEMINI_API_KEY=xxx` 追加到源目录根 `.env`；但运行时 `scripts/image.py` / `scripts/preflight.py` 读的是每个 target 的 `config/runtime.env` 的 `IMAGE_GEN_API_KEY` —— 两处完全断开，用户跑完 install 以为配好了，实际发帖时报"API key NOT configured"
+**2. 图片 Key 写入目标修正：根 `.env` → `config/runtime.env`**
+- **问题**：install.sh 把图片 Key 追加到源目录根 `.env`；但运行时 `scripts/image.py` / `scripts/preflight.py` 读的是每个 target 的 `config/runtime.env` —— 两处完全断开，用户跑完 install 以为配好了，实际发帖时报"API key NOT configured"
 - **修复**：
-  - §6 改为只收集 `gemini_key` 变量（接受 `IMAGE_GEN_API_KEY` 或 `GEMINI_API_KEY` env var，向后兼容）
-  - §7.5 新增 `_runtime_env_set()` 幂等函数，循环把 `IMAGE_GEN_API_KEY=<key>` 写入每个 target 的 `config/runtime.env`（已有值则保留，不覆盖）
+  - §6 改为收集 Gemini 原生 Key 与 OpenAI 兼容 Key（接受 `GEMINI_API_KEY`、`IMAGE_GEN_API_KEY` 或 `OPENAI_API_KEY` env var）
+  - §7.5 新增 `_runtime_env_set()` 幂等函数，循环把 `GEMINI_API_KEY` / `IMAGE_GEN_API_KEY` 写入每个 target 的 `config/runtime.env`
   - 同步源目录 `config/runtime.env`，方便在源目录跑脚本验证
 - **MCP URL** 同样修正：从 `XHS_MCP_URL` 写入 `config/runtime.env` 的 `MCP_URL`
 
@@ -140,15 +140,15 @@ git pull
 bash install.sh upgrade-all --json   # v2.4.0 的 upgrade-all 本身正常，不受本版 bugfix 影响
 ```
 
-**如果你是刚装完 v2.4.0 但没跑通发帖**，大概率是 Gemini Key 只写到了根 `.env`。修复方式：
+**如果你是刚装完 v2.4.0 但没跑通发帖**，大概率是图片 Key 只写到了根 `.env`。修复方式：
 
 ```bash
 # 方式 A（推荐）：升级到 v2.4.1 + 重跑 install
 git pull && bash install.sh
-# 会自动把 gemini_key 同步到各 target 的 config/runtime.env
+# 会自动把图片 Key 同步到各 target 的 config/runtime.env
 
 # 方式 B（不升级，手动同步）：
-python3 scripts/image.py --set-key <your-gemini-key>
+python3 scripts/image.py --set-key <your-image-api-key>
 ```
 
 ### 🧠 Brain

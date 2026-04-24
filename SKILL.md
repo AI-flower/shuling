@@ -247,11 +247,12 @@ python3 scripts/preflight.py
      - **用户主动提议方案优先**：用户说"我给你 cookie"/"我直接粘贴"/"帮我用 cookie 登录"等任何变体 → **立即接受**，让用户从浏览器复制完整 `Cookie` 头字符串，调用 `bash scripts/xhs.sh import-cookie '<cookie字符串>'`。**不要绕回扫码、不要继续解释扫码流程**
      - 默认扫码：执行 `bash scripts/xhs.sh login` 获取二维码链接，返回给上层让用户扫码
 
-2. **图片生成 API**（**必需** —— 强制 Gemini，无降级路径）
-   - 薯灵已移除 HTML 截图降级。没有 Gemini API Key 就无法生图，也就无法发帖
-   - 问用户："薯灵需要 Gemini 图片 API（免费额度 / 有 Nano Banana Pro 模型）。请提供你的 API Key。"
-   - 获取地址：https://aistudio.google.com/app/apikey
-   - 拿到 Key 写入：`python3 scripts/image.py --set-key <KEY>`
+2. **图片生成 API**（**必需** —— 首次固定选择一种供应商，无自动切换）
+   - 薯灵已移除 HTML 截图降级。没有图片 API Key 就无法生图，也就无法发帖
+   - 首次使用必须先问用户："你能提供哪一种图片 API？1) Gemini 原生 API；2) OpenAI 兼容图片 API。确认后我会固定使用这一种，后续真实生图不自动切换。"
+   - 用户选 Gemini：写 `IMAGE_GEN_PROTOCOL=gemini-native`，配置 `GEMINI_API_KEY`、`GEMINI_IMAGE_MODEL=gemini-2.5-flash-image`
+   - 用户选 OpenAI 兼容：写 `IMAGE_GEN_PROTOCOL=openai-images`，配置 `IMAGE_GEN_API_KEY`、`IMAGE_GEN_OPENAI_MODEL`、`IMAGE_GEN_BASE_URL`
+   - 拿到协议选择后再写 Key：`python3 scripts/image.py --set-key <KEY>`
    - **用户拒绝提供 Key 时**：明确告知这是强依赖，安装流程停在这一步，不进入 §1 建画像
 
 > **不要在 0 节问 Telegram / IM 通讯凭证**——通讯渠道由 hermes-agent 自己配置，不属于 skill 业务范围。
@@ -285,7 +286,7 @@ python3 scripts/preflight.py
 
 ```bash
 MCP_URL=http://localhost:18060/mcp
-# IMAGE_GEN_PROVIDER=gemini
+# IMAGE_GEN_PROVIDER=openai-compatible
 # IMAGE_GEN_API_KEY=...
 ```
 
@@ -671,7 +672,7 @@ scripts/db.sh log-choice '{"choice_type":"draft","offered_count":2,"chosen_index
    python3 scripts/image.py --check
    ```
    - 返回 0 → 走 AI 生图（下面的第 4 步）
-   - 返回 2 → **硬停**。告诉用户："Gemini API Key 未配置，薯灵强制使用 Gemini 生图，请先配置 Key 才能继续"，不要尝试降级任何 HTML 截图路径
+   - 返回 2 → **硬停**。告诉用户："图片 API 类型或 Key 未配置，请先确认固定使用 Gemini 原生还是 OpenAI 兼容，并提供对应 Key"，不要尝试自动切换或降级任何 HTML 截图路径
 
 4. **AI 生图路径**（中文模板驱动，两阶段生成）
 
@@ -714,9 +715,10 @@ scripts/db.sh log-choice '{"choice_type":"draft","offered_count":2,"chosen_index
 
    **提示词理念**（跟 RedInk 对齐，**不要违反**）：
    - **禁止自己写英文 prompt**——模板已经是中文的 77 行完整约束
-   - **禁止说"不要包含文字"**——Gemini 3 Pro 的中文字形渲染已过关，强制"文字必须完整呈现"反而更像小红书
+   - **禁止说"不要包含文字"**——当前 Gemini / OpenAI 图片模型的中文排版能力已够用，强制"文字必须完整呈现"更符合小红书图文
    - **禁止用 `IMAGE_BRAND_STYLE` 拼前缀**——模板里"小红书爆款图文风格"这个锚词就是品牌风格的最高表达
-   - **推荐模型**：`gemini-3-pro-image-preview`（Nano Banana Pro，中文文字 + multimodal 参考图都最准）
+   - **协议规则**：`IMAGE_GEN_PROTOCOL` 必须固定为 `gemini-native` 或 `openai-images`，不要使用 `auto`
+   - **模型选择**：Gemini 原生 `gemini-2.5-flash-image`；OpenAI 兼容常用 `gpt-image-2`
 
    **极短 prompt 兜底**（仅当 API 上下文受限）：加 `--short` 切到 `prompts/image_prompt_short.txt`（6 行极简版）。
 
@@ -1101,11 +1103,11 @@ scripts/xhs.sh user <user_id>               # 用户主页信息
 
 ```bash
 python3 scripts/image.py --check                        # 检查 API Key，exit 0=可用，2=未配置
-python3 scripts/image.py --set-key "API_KEY"             # 配置 Gemini Key
+python3 scripts/image.py --set-key "API_KEY"             # 配置图片 API Key
 python3 scripts/image.py "图片描述prompt" /output.png    # 生成图片
 ```
 
-环境变量：`IMAGE_GEN_API_KEY`、`IMAGE_GEN_MODEL`（默认 gemini-2.0-flash-preview-image-generation）
+环境变量：先固定 `IMAGE_GEN_PROTOCOL=gemini-native` 或 `IMAGE_GEN_PROTOCOL=openai-images`；Gemini 使用 `GEMINI_API_KEY`、`GEMINI_IMAGE_MODEL`；OpenAI 兼容使用 `IMAGE_GEN_API_KEY`、`IMAGE_GEN_OPENAI_MODEL`、`IMAGE_GEN_BASE_URL`
 
 
 ### scripts/db.sh — 数据库操作
@@ -1195,7 +1197,7 @@ scripts/noterx-diagnose.sh --test
 |------|---------|
 | MCP 未运行 | `xhs.sh` 自动尝试启动，失败则提示用户 |
 | 登录过期 | `xhs.sh login` 获取二维码 → 返回给上层让用户扫码；若用户主动给 cookie，用 `xhs.sh import-cookie` |
-| Gemini 不可用 | 硬停并提示用户配置 Key（已不再提供 HTML 截图降级） |
+| 图片 API 不可用 | 硬停并提示用户配置 Key（已不再提供 HTML 截图降级） |
 | 用户长时间不回复 | 超时后自动选择评分最高的（超时时间由平台层配置） |
 | 知识库文件损坏/不存在 | 用默认值继续，不阻塞创作 |
 | 发布失败 | 返回失败原因，保留 meta.json 供重试 |

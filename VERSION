@@ -121,7 +121,7 @@ calib:
   migration_idempotency: "v2.4.0"                  # v2.4.0 新增：__migrations 表 + _guard.sh
   dependencies_locked: "v2.4.0"                    # v2.4.0 新增：requirements.txt
   install_dep_check: "v2.4.1"                      # v2.4.1 新增：install.sh 补 jq + rsync 依赖检查
-  install_env_write_target: "config/runtime.env"   # v2.4.1 修正：从根 .env 的 GEMINI_API_KEY → config/runtime.env 的 IMAGE_GEN_API_KEY
+  install_env_write_target: "config/runtime.env"   # v2.4.1 修正：从根 .env → config/runtime.env；v2.4.x 支持 GEMINI_API_KEY + IMAGE_GEN_API_KEY
   preflight_mcp_strict: "v2.4.1"                   # v2.4.1 修正：check_mcp 否定信号优先，去掉 state.mcp_configured 掩盖失败的 fallback
   runtime_env_force_override: "v2.4.2"             # v2.4.2 修正：_runtime_env_set 强制覆盖模板默认值（MCP_URL 才能被真写入）
   install_target_db_init: "v2.4.2"                 # v2.4.2 新增：每 target 循环跑 db.sh init，target 的 data/xhs.db 不再 not_initialized

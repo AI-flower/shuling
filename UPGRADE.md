@@ -108,11 +108,11 @@ cd <target> && python3 scripts/preflight.py --json
 > ⚠️ 本条目为 v2.4.0 发版时**补录**（v2.3.0 发版时 UPGRADE.md 漏更新）。
 
 **类型**：HANDS + CALIB
-**Breaking**：**有** —— 之前靠 HTML 截图兜底的部署必须配 Gemini API Key
+**Breaking**：**有** —— 之前靠 HTML 截图兜底的部署必须配置图片 API Key
 
 **变化**：
 - HTML 截图降级路径完全删除（`scripts/screenshot.cjs` / `templates/post.html` 移除）
-- Gemini API Key 从可选变必需
+- 图片 API Key 从可选变必需，且必须先固定选择 Gemini 原生或 OpenAI 兼容其中一种
 - `scripts/image.py` 重写：`render_prompt()` 模板系统 + `--reference` 封面回流 + `--short` 极简 fallback
 - 新增 `prompts/image_prompt.txt` / `prompts/image_prompt_short.txt` 中文模板
 - `generated_images.prompt` 字段改为存 `page_content` 短语义（节省空间 + 便于 pattern 学习）
@@ -121,14 +121,14 @@ cd <target> && python3 scripts/preflight.py --json
 
 ```bash
 cd /path/to/shuling && git pull
-bash install.sh     # 会强制问 Gemini API Key（老安装已配则不问）
+bash install.sh     # 会强制问图片 API Key（老安装已配则不问）
 
 # 预检
 python3 scripts/image.py --check    # 返回 0 才能继续
 ```
 
 **兼容性说明**：
-- 老部署若未配 Gemini Key：发帖流程 §2.3 会硬停，按提示补配
+- 老部署若未配图片 API Key：发帖流程 §2.3 会硬停，按提示补配
 - 老数据（posts / generated_images）完全保留
 - v2.4.0 起 upgrade-hooks/v2.3.0/ 提供自动化路径（`runtime-env-sync.sh` 跨 target 借用 Key）
 
@@ -249,7 +249,9 @@ ls schemas/                              # 应看到 3 个 .schema.json
 | 变量 | 默认 | 作用 |
 |---|---|---|
 | `SHULING_ASSUME_YES` | `0` | 设 `1` 等同 `--yes`，所有交互用默认值 |
-| `GEMINI_API_KEY` | 空 | 非交互模式下预填 Gemini Key，避免被 prompt 卡住 |
+| `IMAGE_GEN_PROTOCOL` | 空 | 非交互模式下固定图片 API 类型：`gemini-native` 或 `openai-images` |
+| `GEMINI_API_KEY` | 空 | 非交互模式下预填 Gemini 原生图片 Key，避免被 prompt 卡住 |
+| `IMAGE_GEN_API_KEY` / `OPENAI_API_KEY` | 空 | 非交互模式下预填 OpenAI 兼容图片 Key |
 | `XHS_MCP_URL` | 空 | 非交互模式下预填 MCP URL |
 
 > `preflight.py` 退出码从 v2.1.3 起分级：`0` 就绪 / `1` 可自动修复 / `2` 需用户配合。如果你的 CI 脚本之前假设 exit=0 就是"没问题"，请复核——以前总是返回 0。
