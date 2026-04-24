@@ -27,7 +27,9 @@ SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 #   bash install.sh upgrade-all --json             # 强制机器可读 JSON
 #
 # 环境变量（非交互模式下替代 prompt）:
-#   GEMINI_API_KEY=xxx             预填 Gemini API Key，写入 .env
+#   IMAGE_GEN_PROTOCOL=gemini-native|openai-images  非交互模式下固定图片 API 类型
+#   GEMINI_API_KEY=xxx             预填 Gemini 原生图片 API Key
+#   OPENAI_API_KEY=xxx             预填 OpenAI 兼容图片 API Key，写入 IMAGE_GEN_API_KEY
 #   XHS_MCP_URL=http://...         预填 MCP URL，写入 .env
 #   SHULING_ASSUME_YES=1           等同 --yes
 #   SHULING_CREATOR_MODE=existing  等同 --mode=existing
@@ -37,7 +39,7 @@ SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 #   bash install.sh --dry-run                          # 预演一次
 #   bash install.sh --mode=existing-creator            # 老博主接入模式
 #   bash install.sh upgrade-all --dry-run --json       # 计划 JSON
-#   SHULING_ASSUME_YES=1 GEMINI_API_KEY=xxx bash install.sh   # CI/远程
+#   SHULING_ASSUME_YES=1 IMAGE_GEN_PROTOCOL=gemini-native GEMINI_API_KEY=xxx bash install.sh
 #   bash install.sh --target ~/.myagents/skills/shuling       # 自定义目标
 
 ASSUME_YES="${SHULING_ASSUME_YES:-0}"
@@ -835,23 +837,55 @@ fi
 run "建 knowledge-base/" mkdir -p "$SKILL_DIR/knowledge-base"
 info "knowledge-base/ 目录就绪"
 
-# ─── 6. 可选：收集 Gemini API Key（实际写入在 §7.5 的 config/runtime.env）──
+# ─── 6. 可选：收集图片生成 API Key（实际写入在 §7.5 的 config/runtime.env）──
 printf "\n${BOLD}=== 可选配置 ===${RESET}\n\n"
 
-# 优先读 env var（非交互模式下唯一通道）。变量名兼容历史：GEMINI_API_KEY (v2.3-)
-# 和运行时实际读取的 IMAGE_GEN_API_KEY (v2.3+)，任一提供即可。
-gemini_key="${IMAGE_GEN_API_KEY:-${GEMINI_API_KEY:-}}"
-if [ -z "$gemini_key" ] && [ "$ASSUME_YES" = "0" ]; then
-    printf "配置 Gemini API Key？（用于 AI 图片生成，留空跳过）\n"
-    printf "  获取地址: https://aistudio.google.com/api-keys\n"
-    prompt "  API Key: " gemini_key ""
+image_provider="${IMAGE_GEN_PROTOCOL:-}"
+gemini_api_key="${GEMINI_API_KEY:-}"
+openai_image_api_key="${IMAGE_GEN_API_KEY:-${OPENAI_API_KEY:-}}"
+
+case "$image_provider" in
+    gemini|gemini-native|google|google-gemini) image_provider="gemini-native" ;;
+    openai|openai-image|openai-images|openai-chat) image_provider="openai-images" ;;
+    auto) image_provider="" ;;
+    "") ;;
+    *) fail "未知 IMAGE_GEN_PROTOCOL=$image_provider；请选择 gemini-native 或 openai-images" ;;
+esac
+
+if [ -z "$image_provider" ]; then
+    if [ -n "$gemini_api_key" ] && [ -z "$openai_image_api_key" ]; then
+        image_provider="gemini-native"
+    elif [ -n "$openai_image_api_key" ] && [ -z "$gemini_api_key" ]; then
+        image_provider="openai-images"
+    elif [ "$ASSUME_YES" = "0" ]; then
+        printf "请选择本 skill 后续固定使用的图片 API 类型：\n"
+        printf "  1) Gemini 原生 API（推荐，使用 GEMINI_API_KEY）\n"
+        printf "  2) OpenAI 兼容图片 API（使用 IMAGE_GEN_API_KEY/OPENAI_API_KEY）\n"
+        prompt "  选择 [1/2]: " image_choice ""
+        case "$image_choice" in
+            1|gemini|Gemini|gemini-native) image_provider="gemini-native" ;;
+            2|openai|OpenAI|openai-images) image_provider="openai-images" ;;
+            *) fail "必须先选择图片 API 类型：1=Gemini 原生，2=OpenAI 兼容" ;;
+        esac
+    else
+        fail "非交互安装必须显式提供 IMAGE_GEN_PROTOCOL=gemini-native 或 openai-images"
+    fi
 fi
-if [ -n "$gemini_key" ]; then
-    info "已收集 Gemini Key，稍后写入各 target 的 config/runtime.env"
+
+if [ "$image_provider" = "gemini-native" ] && [ -z "$gemini_api_key" ] && [ "$ASSUME_YES" = "0" ]; then
+    printf "Gemini Key 获取地址: https://aistudio.google.com/app/apikey\n"
+    prompt "  Gemini API Key: " gemini_api_key ""
+elif [ "$image_provider" = "openai-images" ] && [ -z "$openai_image_api_key" ] && [ "$ASSUME_YES" = "0" ]; then
+    printf "OpenAI 兼容默认 base_url: https://api.gjs.ink\n"
+    prompt "  OpenAI 兼容图片 API Key: " openai_image_api_key ""
+fi
+
+if [ "$image_provider" = "gemini-native" ] && [ -z "$gemini_api_key" ]; then
+    fail "已选择 Gemini 原生生图，但未配置 GEMINI_API_KEY"
+elif [ "$image_provider" = "openai-images" ] && [ -z "$openai_image_api_key" ]; then
+    fail "已选择 OpenAI 兼容生图，但未配置 IMAGE_GEN_API_KEY/OPENAI_API_KEY"
 else
-    fail "未配置 Gemini Key —— 薯灵强制使用 Gemini 生图，没有 Key 将无法发帖"
-    info "获取 Key: https://aistudio.google.com/app/apikey"
-    info "之后可重跑 install 或运行: python3 scripts/image.py --set-key <KEY>"
+    info "图片 API 类型已确认：$image_provider；后续真实生图将固定使用该类型"
 fi
 
 # ─── 7. 可选：收集 MCP URL（实际写入在 §7.5）─────────────────────────
@@ -867,7 +901,7 @@ else
 fi
 
 
-# ─── 7.5 为每个 target 落 config/runtime.env（含 IMAGE_GEN_API_KEY / MCP_URL）──
+# ─── 7.5 为每个 target 落 config/runtime.env（含 GEMINI_API_KEY / IMAGE_GEN_API_KEY / MCP_URL）──
 # 这是运行时实际读取的配置位置（详见 scripts/image.py 和 scripts/preflight.py）。
 # install 只写"空字段"：如果 target 的 runtime.env 已经有值，不覆盖用户已配。
 # Telegram / IM 通讯凭证不在 skill 配置范围内 —— 由 hermes-agent 自己管理。
@@ -913,8 +947,12 @@ if [ -f "$RUNTIME_ENV_TEMPLATE" ]; then
         else
             info "$target: config/runtime.env 已存在，保留"
         fi
-        if [ -n "$gemini_key" ]; then
-            _runtime_env_set "$runtime_env" "IMAGE_GEN_API_KEY" "$gemini_key"
+        _runtime_env_set "$runtime_env" "IMAGE_GEN_PROTOCOL" "$image_provider"
+        if [ "$image_provider" = "gemini-native" ]; then
+            _runtime_env_set "$runtime_env" "GEMINI_API_KEY" "$gemini_api_key"
+            info "$target: GEMINI_API_KEY 已写入"
+        elif [ "$image_provider" = "openai-images" ]; then
+            _runtime_env_set "$runtime_env" "IMAGE_GEN_API_KEY" "$openai_image_api_key"
             info "$target: IMAGE_GEN_API_KEY 已写入"
         fi
         if [ -n "$mcp_url" ]; then
@@ -936,7 +974,9 @@ if [ -f "$RUNTIME_ENV_TEMPLATE" ]; then
     if [ ! -f "$src_runtime_env" ]; then
         cp "$RUNTIME_ENV_TEMPLATE" "$src_runtime_env" 2>/dev/null || true
     fi
-    [ -n "$gemini_key" ] && _runtime_env_set "$src_runtime_env" "IMAGE_GEN_API_KEY" "$gemini_key"
+    _runtime_env_set "$src_runtime_env" "IMAGE_GEN_PROTOCOL" "$image_provider"
+    [ "$image_provider" = "gemini-native" ] && _runtime_env_set "$src_runtime_env" "GEMINI_API_KEY"    "$gemini_api_key"
+    [ "$image_provider" = "openai-images" ] && _runtime_env_set "$src_runtime_env" "IMAGE_GEN_API_KEY" "$openai_image_api_key"
     [ -n "$mcp_url" ]    && _runtime_env_set "$src_runtime_env" "MCP_URL"            "$mcp_url"
 fi
 

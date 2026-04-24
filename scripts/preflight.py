@@ -118,48 +118,42 @@ def check_mcp():
             "detail": detail,
             "action": "ask_user",
             "ask": (
-                "xiaohongshu-mcp 未就绪。常见原因：\n"
-                "  1. MCP 服务未启动（`~/.local/bin/xiaohongshu-mcp &` 或检查 systemd/launchd）\n"
-                "  2. 小红书登录态失效（重新 `bash scripts/xhs.sh login` 或 import-cookie）\n"
-                "  3. MCP_URL 配置错误（查 config/runtime.env 的 MCP_URL）\n"
+                f"xiaohongshu-mcp 未就绪{hint_suffix}。请先启动/登录小红书 MCP。\n"
+                "可尝试：bash scripts/xhs.sh status 或 bash scripts/xhs.sh login"
                 f"{ask_extra}"
-            ).rstrip(),
+            ),
         }
 
     try:
         result = subprocess.run(
             ["bash", str(xhs_sh), "status"],
-            capture_output=True, text=True, timeout=30,
+            cwd=str(SKILL_DIR),
+            capture_output=True,
+            text=True,
+            timeout=20,
         )
     except subprocess.TimeoutExpired:
-        return _not_running(f"status 检查超时（30s）{hint_suffix}")
-    except FileNotFoundError:
-        return _not_running("bash 不可用，无法运行 scripts/xhs.sh")
+        return _not_running("status timeout")
     except Exception as e:
-        return _not_running(f"检查异常：{e}{hint_suffix}")
+        return _not_running(f"status exception: {e}")
 
-    output = (result.stdout or "") + (result.stderr or "")
+    output = (result.stdout or "") + "\n" + (result.stderr or "")
     out_lower = output.lower()
 
-    # 否定信号优先：出现这些词，哪怕 returncode==0 也不能当 ok。
-    negative_en = (
-        "error", "refused", "timeout", "unauthorized",
-        "not logged", "not_logged", "login required", "login failed",
-        "connection refused", "503", "502", "500", "401", "403", "404",
+    negative_tokens = (
+        "login_required", "not logged", "not_logged", "未登录", "需要登录",
+        "connection refused", "econnrefused", "timeout", "timed out",
+        "error", "failed", "401", "403", "503",
     )
-    negative_zh = (
-        "未登录", "登录失败", "连接失败", "服务未启动",
-        "需要登录", "token 失效", "cookie 失效", "Cookie 失效",
-    )
-    if any(kw in out_lower for kw in negative_en) or any(kw in output for kw in negative_zh):
+    if any(tok in out_lower for tok in negative_tokens) or any(tok in output for tok in ("未登录", "需要登录")):
         return _not_running(
-            f"status 输出含错误信号（returncode={result.returncode}）{hint_suffix}"
+            f"status 输出包含否定信号{hint_suffix}",
+            ask_extra=(f"\n  原始输出前 200 字符：{output[:200].strip()!r}" if output.strip() else ""),
         )
 
     if result.returncode != 0:
         return _not_running(f"status returncode={result.returncode}{hint_suffix}")
 
-    # 肯定信号必须明确 —— 不接受宽泛的 login / ok / logged 关键词
     positive_zh = ("已登录", "登录成功", "在线", "登录有效")
     positive_en = (
         '"logged_in": true', '"logged_in":true',
@@ -167,10 +161,7 @@ def check_mcp():
         '"status": "ok"', '"status":"ok"',
         'login_status: ok', 'logged in as',
     )
-    has_positive = (
-        any(kw in output for kw in positive_zh)
-        or any(tok in out_lower for tok in positive_en)
-    )
+    has_positive = any(kw in output for kw in positive_zh) or any(tok in out_lower for tok in positive_en)
     if has_positive:
         update_state(mcp_configured=True)
         return {"name": "xiaohongshu-mcp", "status": "ok", "detail": "MCP 服务运行中且已登录", "action": None}
@@ -182,32 +173,31 @@ def check_mcp():
 
 
 def check_image_gen():
-    """检查图片生成能力 —— Gemini 图片 API 是强依赖。"""
-    api_key = os.environ.get("IMAGE_GEN_API_KEY", "")
-
-    if not api_key and RUNTIME_ENV.exists():
-        for line in RUNTIME_ENV.read_text().splitlines():
-            line = line.strip()
-            if line.startswith("#") or "=" not in line:
-                continue
-            k, v = line.split("=", 1)
-            if k.strip() == "IMAGE_GEN_API_KEY" and v.strip().strip("'\""):
-                api_key = v.strip().strip("'\"")
-
-    if api_key:
-        return {"name": "图片生成 API", "status": "ok", "action": None}
+    """检查图片生成能力 —— 必须先固定选择 Gemini 原生或 OpenAI 兼容。"""
+    image_script = SCRIPTS_DIR / "image.py"
+    if image_script.exists():
+        result = subprocess.run(
+            [sys.executable, str(image_script), "--check"],
+            cwd=str(SKILL_DIR),
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        output = (result.stderr or result.stdout or "").strip()
+        if result.returncode == 0:
+            return {"name": "图片生成 API", "status": "ok", "detail": output, "action": None}
 
     return {
         "name": "图片生成 API",
         "status": "missing",
-        "detail": "未配置 Gemini 图片生成 API Key（必需，无降级）",
+        "detail": "未选择或未配置图片 API（必须固定为 Gemini 原生或 OpenAI 兼容其中一种）",
         "action": "ask_user",
         "ask": (
-            "图片生成 API 未配置 —— 薯灵强制使用 Gemini 模型生图，没有 Key 无法继续。\n"
-            "请提供 Google AI Studio 的 API Key：\n"
-            "  获取地址: https://aistudio.google.com/app/apikey\n"
-            "  推荐模型: gemini-3-pro-image-preview（Nano Banana Pro，中文准 + 支持参考图）\n"
-            "\n拿到 Key 后告诉我，我会写到 config/runtime.env。"
+            "首次使用图片生成前，需要先确认你能提供哪一种 API；确认后后续真实生图只使用这一种，不自动切换。\n"
+            "请选择并提供对应 Key：\n"
+            "  1) Gemini 原生：IMAGE_GEN_PROTOCOL=gemini-native，GEMINI_API_KEY=<your-key>，GEMINI_IMAGE_MODEL=gemini-2.5-flash-image\n"
+            "  2) OpenAI 兼容：IMAGE_GEN_PROTOCOL=openai-images，IMAGE_GEN_API_KEY=<your-key>，IMAGE_GEN_OPENAI_MODEL=gpt-image-2，IMAGE_GEN_BASE_URL=https://api.gjs.ink\n"
+            "\n拿到你的选择和 Key 后，我会写到 config/runtime.env。"
         ),
     }
 
