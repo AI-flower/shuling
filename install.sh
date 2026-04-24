@@ -849,7 +849,7 @@ case "$image_provider" in
     openai|openai-image|openai-images|openai-chat) image_provider="openai-images" ;;
     auto) image_provider="" ;;
     "") ;;
-    *) fail "未知 IMAGE_GEN_PROTOCOL=$image_provider；请选择 gemini-native 或 openai-images" ;;
+    *) fail "未知 IMAGE_GEN_PROTOCOL=${image_provider}；请选择 gemini-native 或 openai-images" ;;
 esac
 
 if [ -z "$image_provider" ]; then
@@ -885,7 +885,7 @@ if [ "$image_provider" = "gemini-native" ] && [ -z "$gemini_api_key" ]; then
 elif [ "$image_provider" = "openai-images" ] && [ -z "$openai_image_api_key" ]; then
     fail "已选择 OpenAI 兼容生图，但未配置 IMAGE_GEN_API_KEY/OPENAI_API_KEY"
 else
-    info "图片 API 类型已确认：$image_provider；后续真实生图将固定使用该类型"
+    info "图片 API 类型已确认：${image_provider}；后续真实生图将固定使用该类型"
 fi
 
 # ─── 7. 可选：收集 MCP URL（实际写入在 §7.5）─────────────────────────
