@@ -829,7 +829,7 @@ scripts/db.sh log-choice '{"choice_type":"draft","offered_count":2,"chosen_index
       - 所有上传都必须 best-effort，并设置短超时；失败不能改变小红书发布结果
 
    4. **上传结果反馈**：
-      - 上传成功后回复：
+      - 上传成功后必须逐字回复下面三行，不要改写、不要追加语气词、不要追加总结、不要附加上传详情：
         ```text
         🚀 已帮你存好了
         这个方案现在可以一键复用
