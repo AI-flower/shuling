@@ -764,7 +764,98 @@ scripts/db.sh log-choice '{"choice_type":"draft","offered_count":2,"chosen_index
      ```
    - 失败 → 返回失败原因，保留 meta.json 供重试
 
-4. **返回发布结果**："已发布！标题：XXX"
+4. **返回发布结果 + 社区保存引导**
+
+   只有第 2 步 `scripts/xhs.sh publish /tmp/xhs-post/meta.json` 明确返回成功、且第 3 步已记录 `published` 状态后，才展示下面的引导；发布失败、登录失败、重试中、草稿模式都不要展示。
+
+   先返回发布成功信息，并追加选择：
+   ```text
+   🎉 小红书已经帮你发出去了
+
+   这套方案如果你觉得不错，我可以帮你存一下，未来你可以一键复用👇
+
+   A. 存下来（推荐）
+   B. 再帮我优化一下
+   C. 先不用
+   ```
+
+   **选择识别规则**：必须支持大小写和自然语言。收到用户回复后，先归一化为小写并去除前后空格，再按下面规则判断：
+   - A 分支：`a`、`存下来`、`保存`、`上传社区`、`帮我存`、`存一下`、`保存到社区`、`可以存`、`推荐` → 进入社区上传
+   - B 分支：`b`、`再帮我优化一下`、`优化`、`改改`、`再改改`、`帮我优化`、`不满意` → 不上传，继续优化当前方案
+   - C 分支：`c`、`先不用`、`不用了`、`不保存`、`不上传`、`跳过`、`算了` → 不上传，结束流程
+   - 无法识别 → 简短追问一次：`你想 A 存下来、B 再优化，还是 C 先不用？`
+
+   **A. 存下来 / 保存 / 上传社区**
+
+   1. **先检查 session-recorder-skill 是否已安装**，不要假设存在：
+      ```bash
+      test -f "$HOME/.codex/skills/session-recorder/SKILL.md" \
+        || test -f "$HOME/.agents/skills/session-recorder/SKILL.md" \
+        || test -f "$HOME/.claude/skills/session-recorder/SKILL.md"
+      ```
+      - 已安装 → 读取对应 `SKILL.md` 的上传说明，优先使用其脚本能力；Codex 环境常见命令为：
+        ```bash
+        python3 "$HOME/.codex/skills/session-recorder/scripts/codex_session_recorder.py" check
+        ```
+      - 未安装 → 不要报错、不要影响已发布结果。友好提示：
+        ```text
+        小红书已经发布成功啦，但我还没检测到 session-recorder-skill，所以这次暂时不能自动上传社区。
+
+        你可以先安装它：
+        git clone https://github.com/AI-flower/session-recorder-skill ~/.codex/skills/session-recorder
+
+        安装后再说“上传社区”，我就能帮你把方案存起来。
+        ```
+
+   2. **整理本次小红书方案为可复用模板**，上传目标站点固定为用户要求的 `https://cookbook-dev.omnieye.dev/`。上传内容至少包含：
+      - 模板标题：优先用小红书标题生成，例如 `小红书发布模板：<标题>`
+      - 使用场景：本次内容适合复用的场景
+      - 用户原始需求：本轮最初的用户主题/需求原文
+      - 最终生成方案：最终采用的选题、大纲、结构、标题模式、正文风格、发布时间档位
+      - 小红书标题：`meta.json.title`
+      - 小红书正文：`meta.json.content`
+      - 小红书标签：`meta.json.tags`
+      - 配图提示词 / 图片生成参数：若有，从本次生成记录、`generated_images`、图片 prompt、模型、尺寸、协议中提取；没有则写 `无 / 未记录`
+      - 发布时间：发布成功时的本地时间，或数据库记录的 `date` + `slot`
+      - 适用主题标签：至少包含 `小红书`、`内容发布`、`种草`、`干货`、`营销文案`
+
+   3. **调用 session-recorder-skill 上传能力**：
+      - 优先按已安装 skill 的说明生成 report JSON，并 POST 到 `https://cookbook-dev.omnieye.dev/api/solutions`
+      - report 至少使用这些核心字段：`task_description`、`skills`、`execution_plan`、`is_successful`、`error_message`、`report_version`、`artifacts`、`context`
+      - `skills` 至少包含 `shuling` 和 `session-recorder`
+      - `artifacts` 中放入上一步整理的可复用模板；不要上传图片二进制，图片路径/参数即可
+      - 所有上传都必须 best-effort，并设置短超时；失败不能改变小红书发布结果
+
+   4. **上传结果反馈**：
+      - 上传成功后回复：
+        ```text
+        🚀 已帮你存好了
+        这个方案现在可以一键复用
+        以后做类似内容会快很多 ✨
+        ```
+      - 上传失败后友好提示，不要让主流程报错：
+        ```text
+        小红书已经发布成功啦，但社区保存这一步暂时失败了。
+        我已经保留了本次方案内容，你之后可以再说“上传社区”重试。
+        ```
+
+   **B. 再帮我优化一下 / 改改**
+
+   不上传社区，基于当前方案继续优化。优化方向包括：
+   - 标题更吸引人
+   - 内容更像小红书
+   - 开头更抓人
+   - 互动引导更自然
+   - 标签更准确
+
+   优化时保留本次已发布记录，不要回滚数据库状态；若用户想重新发布，必须重新确认。
+
+   **C. 先不用 / 不用了**
+
+   不上传，结束流程，回复：
+   ```text
+   好的，这次就先不保存啦
+   ```
 
 ---
 
