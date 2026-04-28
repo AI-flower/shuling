@@ -1,0 +1,18 @@
+{
+  "mode": "conservative",
+  "prefer_user_supplied_sources": true,
+  "never_collect_full_comment_history": true,
+  "never_store_raw_post_body": true,
+  "daily_budget": {
+    "search_feeds": 8,
+    "list_feeds": 5,
+    "get_feed_detail": 15,
+    "fetch_comments": 5
+  },
+  "per_session_budget": {
+    "search_feeds": 3,
+    "get_feed_detail": 5,
+    "fetch_comments": 2
+  },
+  "cooldown_minutes_after_risk": 1440
+}

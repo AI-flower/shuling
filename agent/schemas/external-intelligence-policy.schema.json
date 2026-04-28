@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/external-intelligence-policy.schema.json",
+  "title": "agent/config/external-intelligence.json",
+  "description": "外部情报采样策略（v3.1+）。控制 external-intel.sh 的预算、缓存、失败降级。由 ensure-runtime-layout 从 agent/policies/external-intelligence.default.json 拷贝初始化。详见 docs/plans/v3-account-execution-safety-hardening.md §12.4。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "prefer_user_supplied_sources",
+    "never_collect_full_comment_history",
+    "never_store_raw_post_body",
+    "daily_budget",
+    "per_session_budget",
+    "cooldown_minutes_after_risk"
+  ],
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["conservative", "balanced", "aggressive"],
+      "description": "采样积极度。conservative=严格预算（默认）；balanced=允许更多深读；aggressive=仅 dev mode 实验，生产禁用。"
+    },
+    "prefer_user_supplied_sources": {
+      "type": "boolean",
+      "description": "是否优先使用用户手动提供的链接/截图（L0 数据）而非主动抓 MCP。默认 true。"
+    },
+    "never_collect_full_comment_history": {
+      "type": "boolean",
+      "description": "硬约束：禁止抓取一条笔记的全量评论。仅允许 ≤30 条采样。默认 true。"
+    },
+    "never_store_raw_post_body": {
+      "type": "boolean",
+      "description": "硬约束：禁止把笔记原文长期保存到 external-signals。只存摘要信号。默认 true。"
+    },
+    "daily_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["search_feeds", "list_feeds", "get_feed_detail", "fetch_comments"],
+      "properties": {
+        "search_feeds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "每天最多调 search_feeds 的次数。"
+        },
+        "list_feeds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "每天最多调 list_feeds（推荐流）的次数。"
+        },
+        "get_feed_detail": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "每天最多深读 feed 详情的次数。"
+        },
+        "fetch_comments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "每天最多抓取评论的次数（每次仍限 ≤30 条）。"
+        }
+      },
+      "description": "每日预算。各字段为单日次数硬上限，超过即降级到内部记忆。"
+    },
+    "per_session_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["search_feeds", "get_feed_detail", "fetch_comments"],
+      "properties": {
+        "search_feeds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "单 session 内 search_feeds 上限。"
+        },
+        "get_feed_detail": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "单 session 内 get_feed_detail 上限。"
+        },
+        "fetch_comments": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "单 session 内 fetch_comments 上限。"
+        }
+      },
+      "description": "单 session 预算。比 daily 更严格，避免一次会话耗尽日预算。"
+    },
+    "cooldown_minutes_after_risk": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "命中风险信号后 external-intel 自我冷却分钟数。默认 1440（24 小时）。"
+    }
+  }
+}

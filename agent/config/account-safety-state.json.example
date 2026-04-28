@@ -1,0 +1,13 @@
+{
+  "_comment": "v3.1+ 模板。真正生效的文件是 agent/config/account-safety-state.json，由 db.sh ensure-runtime-layout 写入初始值。运行时由 account-safety.sh / xhs.sh 维护，手动修改前请先停止 cron。",
+  "risk_level": "normal",
+  "mode": "draft-only",
+  "daily_publish_count": 0,
+  "daily_comment_count": 0,
+  "last_publish_at": null,
+  "last_comment_at": null,
+  "cooldown_until": null,
+  "cooldown_reason": null,
+  "last_risk_event": null,
+  "updated_at": "2026-04-28"
+}

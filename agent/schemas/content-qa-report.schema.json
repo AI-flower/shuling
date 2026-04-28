@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/content-qa-report.schema.json",
+  "title": "content-qa.py 输出",
+  "description": "内容质量与 AI 托管感检查报告（v3.1+）。content-qa.py 在 03-daily-flow 生成 meta.json 前调用，score<70 时要求重写或用户确认。详见 docs/plans/v3-account-execution-safety-hardening.md §11。",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["ok", "score", "warnings", "checked_at"],
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "description": "总体是否通过。score>=70 且无 critical warning 时为 true。false 时调用方应触发重写流程。"
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "内容质量综合分 [0,100]。涵盖标题相似度/模板重复/正文开头/标签组合/emoji 密度/AI 味词汇/图片结构/清单体连发等 8 项检查。"
+    },
+    "warnings": {
+      "type": "array",
+      "description": "本次检查命中的警告条目。可为简短字符串（agent 可读），也可为结构化对象（含 check/severity/samples 便于回溯）。",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "object",
+            "required": ["check", "severity", "message"],
+            "additionalProperties": true,
+            "properties": {
+              "check": {
+                "type": "string",
+                "description": "8 项检查名之一，如 title_similarity / list_style_run。"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["info", "warn", "error"]
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "samples": {
+                "type": "array",
+                "items": { "type": "object" }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "checked_at": {
+      "type": "string",
+      "description": "检查执行时间。允许 ISO8601 date-time（带 Z）或纯日期（YYYY-MM-DD），后者用于 03-daily-flow 简化输出。",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}Z)?$"
+    },
+    "target_post_id": {
+      "type": ["integer", "null"],
+      "description": "本次检查针对的 posts.id（如已入库）。null=仅在 meta.json 阶段做 pre-check。"
+    },
+    "sample_size": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "本次检查覆盖的数据规模，便于 agent 判断置信度。",
+      "properties": {
+        "recent_posts": { "type": "integer", "minimum": 0 },
+        "image_strategies": { "type": "integer", "minimum": 0 },
+        "draft_present": { "type": "boolean" }
+      }
+    },
+    "note": {
+      "type": "string",
+      "description": "可选解释，如 \"no history yet\"。"
+    }
+  }
+}

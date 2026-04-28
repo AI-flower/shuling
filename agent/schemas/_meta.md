@@ -45,3 +45,31 @@
 ## 版本治理
 
 schema 不向后兼容时强制升 BRAIN 位（见 RELEASING.md 决策树）。
+
+## v3.1+ Account Safety Layer
+
+为支持账号执行权收口与外部情报智能进化，新增 6 个数据契约。详见 `docs/plans/v3-account-execution-safety-hardening.md`。
+
+| Schema | 适用文件 | 写入方 | 读取方 |
+|---|---|---|---|
+| `approval.schema.json` | `agent/config/approvals/<id>.json` | `approval.sh request` / `grant` | `xhs.sh publish/comment/import-cookie` 在执行前 verify |
+| `account-safety-policy.schema.json` | `agent/config/account-safety.json` | `db.sh ensure-runtime-layout`（首次拷贝自 default policy）+ 用户手改 | `xhs.sh` / `account-safety.sh` / `import-existing.sh` 决定动作是否启用 |
+| `account-safety-state.schema.json` | `agent/config/account-safety-state.json` | `account-safety.sh` / `xhs.sh`（每次 MCP 调用前后维护） | 所有 privileged 动作的硬门禁；`doctor.sh` 状态展示 |
+| `external-intelligence-policy.schema.json` | `agent/config/external-intelligence.json` | `db.sh ensure-runtime-layout`（首次拷贝自 default policy）+ 用户手改 | `external-intel.sh` 决定预算与缓存策略 |
+| `external-signal.schema.json` | `agent/knowledge-base/external-signals/<slug>-<YYYY-MM-DD>.json` | `external-intel.sh research-topic / competition-gap / comment-demand` | `03-daily-flow.md` 双因子选题评分（external_momentum / competition_gap / comment_demands） |
+| `content-qa-report.schema.json` | content-qa.py stdout（不落盘） | `content-qa.py` | `03-daily-flow.md` 在生成 meta.json 前调用，score<70 触发重写 |
+
+### 默认策略
+
+- `agent/policies/account-safety.default.json`：默认 `draft-only` 模式，发布/评论默认禁用，cookie 导入允许，max_daily_publishes=1。
+- `agent/policies/external-intelligence.default.json`：默认 `conservative` 模式，每日 search_feeds=8/list_feeds=5/get_feed_detail=15/fetch_comments=5，触发风险后冷却 1440 分钟。
+
+### 硬约束
+
+- `external-signal.schema.json` 通过 `patternProperties` 反向断言禁止 `full_body` / `raw_comments` / `full_comments` / `raw_post_body` / `note_body` / `raw_html` 字段，从 schema 层确保 §12.8 "不保存原始内容"。
+- `approval.schema.json` 的 `id` 强制 `appr_YYYYMMDD_HHMMSS_<8hex>`，便于 `verify` 时 fail fast。
+- `account-safety-state.schema.json` 的 `risk_level` enum 只允许 `normal/watch/cooldown/locked`，对应 §7.2 风险等级表。
+
+### 用户态 vs 仓库态
+
+`agent/config/account-safety.json`、`agent/config/account-safety-state.json`、`agent/config/approvals/*`、`agent/knowledge-base/external-signals/*` 均为用户态，`.gitignore` 已覆盖。仓库内只跟随 `.example` 模板与 `policies/*.default.json`。

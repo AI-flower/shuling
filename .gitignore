@@ -29,6 +29,8 @@ agent/data/*.db-shm
 agent/data/*.db-wal
 agent/data/*.db-journal
 agent/data/.schema-degraded.lock
+agent/data/external-intel-counters.json
+agent/knowledge-base/external-signals/*.json
 agent/knowledge-base/profile.json
 agent/knowledge-base/preferences.json
 agent/knowledge-base/patterns.md
@@ -76,3 +78,11 @@ node_modules/
 
 # v2.4.0 wip artifact
 .playwright-mcp/
+
+# v3.1 Account Safety Layer（用户态）
+agent/config/account-safety.json
+agent/config/account-safety-state.json
+agent/config/approvals/*
+!agent/config/approvals/.gitkeep
+agent/knowledge-base/external-signals/*
+!agent/knowledge-base/external-signals/.gitkeep

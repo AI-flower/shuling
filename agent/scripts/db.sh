@@ -397,6 +397,49 @@ cmd_query_historical_stats() {
     sql_json "SELECT * FROM historical_stats ORDER BY snapshotted_at DESC LIMIT $limit;"
 }
 
+# v3.1.0+ external_signals 辅助索引（详见 docs/runbooks/external-intelligence.md）
+# 注：external-intel.sh 主要写 JSON 文件 cache，本表是可选辅助索引。
+# 失败不阻断（v3.1 主路径不依赖此表）。
+cmd_query_external_signals() {
+    local topic=""
+    local days=""
+    local limit=100
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --topic) shift; topic="${1:-}"; shift ;;
+            --days)  shift; days="${1:-}"; shift ;;
+            --limit) shift; limit="${1:-100}"; shift ;;
+            *) shift ;;
+        esac
+    done
+    # 表不存在或查询失败 → 输出空数组，不阻断
+    if ! sqlite3 "$DB_PATH" "SELECT 1 FROM external_signals LIMIT 1;" >/dev/null 2>&1; then
+        echo "[]"
+        return 0
+    fi
+    local where=""
+    local conds=()
+    if [ -n "$topic" ]; then
+        local esc
+        esc="$(sql_escape "$topic")"
+        conds+=("topic LIKE '%${esc}%'")
+    fi
+    if [ -n "$days" ]; then
+        conds+=("date(observed_at) >= date('now','-${days} days')")
+    fi
+    if [ "${#conds[@]}" -gt 0 ]; then
+        local IFS=" AND "
+        where="WHERE ${conds[*]}"
+    fi
+    local out
+    out="$(sql_json "SELECT * FROM external_signals $where ORDER BY observed_at DESC LIMIT $limit;" 2>/dev/null)"
+    if [ -z "$out" ]; then
+        echo "[]"
+    else
+        printf '%s\n' "$out"
+    fi
+}
+
 cmd_query_metrics() {
     local post_id=""
     while [ $# -gt 0 ]; do
@@ -631,6 +674,49 @@ LIMIT $limit;
 # ensure-schema: 检查 __migrations 表 + 自动应用未应用的 migration
 # 详见 docs/plans/v3-playbook-split-feasibility.md + ADR-0001 §第 12 条 降级路径强制
 
+# v3.1+ Account Safety Layer 初始化（幂等）
+# - agent/config/account-safety.json：从 agent/policies/account-safety.default.json 拷贝
+# - agent/config/account-safety-state.json：写入默认初始状态
+# - agent/config/approvals/、agent/knowledge-base/external-signals/：mkdir -p
+# 详见 docs/plans/v3-account-execution-safety-hardening.md §5.2 / §6.1 / §7.1 / §12.7
+ensure_safety_layout() {
+    local agent_root="${SHULING_AGENT_ROOT:-$SKILL_DIR}"
+    local cfg_dir="$agent_root/config"
+    local kb_dir="$agent_root/knowledge-base"
+    local policies_dir="$agent_root/policies"
+
+    # 目录骨架
+    mkdir -p "$cfg_dir/approvals" "$kb_dir/external-signals" 2>/dev/null || return 0
+
+    # account-safety.json：copy from default policy（不覆盖已有）
+    local policy_target="$cfg_dir/account-safety.json"
+    local policy_default="$policies_dir/account-safety.default.json"
+    if [ ! -e "$policy_target" ] && [ -f "$policy_default" ]; then
+        cp -p "$policy_default" "$policy_target" 2>/dev/null || true
+    fi
+
+    # account-safety-state.json：写入默认初始状态（不覆盖已有）
+    local state_target="$cfg_dir/account-safety-state.json"
+    if [ ! -e "$state_target" ]; then
+        local today
+        today="$(date -u +%Y-%m-%d)"
+        cat > "$state_target" <<EOF
+{
+  "risk_level": "normal",
+  "mode": "draft-only",
+  "daily_publish_count": 0,
+  "daily_comment_count": 0,
+  "last_publish_at": null,
+  "last_comment_at": null,
+  "cooldown_until": null,
+  "cooldown_reason": null,
+  "last_risk_event": null,
+  "updated_at": "$today"
+}
+EOF
+    fi
+}
+
 cmd_ensure_runtime_layout() {
     local mode="run"
     local fmt="text"
@@ -648,8 +734,9 @@ cmd_ensure_runtime_layout() {
     local agent_root="${SHULING_AGENT_ROOT:-$SKILL_DIR}"
     local skill_root="${SHULING_SKILL_ROOT:-$(cd "$agent_root/.." && pwd)}"
 
-    # 已完成则幂等返回
+    # 已完成则幂等返回（仍补跑 safety layout，方便老 v3 升级到 v3.1+）
     if [ -f "$marker" ]; then
+        [ "$mode" != "dry" ] && ensure_safety_layout
         if [ "$fmt" = "json" ]; then
             emit_json status=ok action=skip reason=marker_exists marker="$marker"
         else
@@ -751,6 +838,9 @@ cmd_ensure_runtime_layout() {
 }
 EOF
     fi
+
+    # v3.1+ Account Safety Layer 初始化（幂等；不影响 layout marker）
+    [ "$mode" != "dry" ] && ensure_safety_layout
 
     if [ "$fmt" = "json" ]; then
         emit_json status=ok mode="$mode" copied="$copied" would_copy="$would_copy" skipped="$skipped" not_found_v2="$not_found" marker="$marker"
@@ -889,6 +979,7 @@ case "$cmd" in
     query-request-log)  cmd_query_request_log "$@" ;;
     add-historical-stat)   cmd_add_historical_stat "$@" ;;
     query-historical-stats) cmd_query_historical_stats "$@" ;;
+    query-external-signals) cmd_query_external_signals "$@" ;;
     update-post-meta)   cmd_update_post_meta "$@" ;;
     *)
         echo "Usage: db.sh <command> [args]"
@@ -914,6 +1005,8 @@ case "$cmd" in
         echo "  query-request-log [--days N --tool T --status S --limit N --summary]"
         echo "  add-historical-stat '<json>'   Snapshot account stats (for audit trend)"
         echo "  query-historical-stats [--limit N]"
+        echo "  query-external-signals [--topic X] [--days N] [--limit N]"
+        echo "                                 v3.1+: external_signals 辅助索引（可选）"
         exit 1
         ;;
 esac

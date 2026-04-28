@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/account-safety-state.schema.json",
+  "title": "agent/config/account-safety-state.json",
+  "description": "账号安全实时状态机（v3.1+）。account-safety.sh 在每次 MCP 调用前后读写。verify 必须检查 risk_level 不在 cooldown/locked 才能放行 publish/comment/import-cookie。详见 docs/plans/v3-account-execution-safety-hardening.md §7。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "risk_level",
+    "mode",
+    "daily_publish_count",
+    "daily_comment_count",
+    "last_publish_at",
+    "last_comment_at",
+    "cooldown_until",
+    "cooldown_reason",
+    "last_risk_event",
+    "updated_at"
+  ],
+  "properties": {
+    "risk_level": {
+      "type": "string",
+      "enum": ["normal", "watch", "cooldown", "locked"],
+      "description": "当前风险等级。normal=按 policy 执行；watch=允许但发前强提醒；cooldown=禁 publish/comment/import-cookie；locked=只允许 doctor/preflight/read-only。"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["draft-only", "supervised", "read-only-research", "ops-maintenance"],
+      "description": "当前生效的运行模式。从 account-safety.json 同步而来。"
+    },
+    "daily_publish_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "今日已发布次数（UTC 0 点重置）。用于和 max_daily_publishes 比对。"
+    },
+    "daily_comment_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "今日已评论次数（UTC 0 点重置）。"
+    },
+    "last_publish_at": {
+      "type": ["string", "null"],
+      "description": "最近一次发布成功时间。ISO8601 UTC。null=从未发布。"
+    },
+    "last_comment_at": {
+      "type": ["string", "null"],
+      "description": "最近一次评论成功时间。ISO8601 UTC。null=从未评论。"
+    },
+    "cooldown_until": {
+      "type": ["string", "null"],
+      "description": "cooldown 解除时间。ISO8601 UTC。null=未在 cooldown。"
+    },
+    "cooldown_reason": {
+      "type": ["string", "null"],
+      "description": "进入 cooldown 的原因摘要。例：\"captcha required\" / \"daily publish limit reached\"。"
+    },
+    "last_risk_event": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event", "tool", "hint", "created_at"],
+          "properties": {
+            "event": {
+              "type": "string",
+              "minLength": 1,
+              "description": "事件类型。例：risk_signal / quota_exceeded / login_failed。"
+            },
+            "tool": {
+              "type": "string",
+              "minLength": 1,
+              "description": "触发该事件的 MCP 工具名。例：publish_content / search_feeds。"
+            },
+            "hint": {
+              "type": "string",
+              "description": "命中的风险关键词或简短描述。例：\"captcha required\"。"
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+              "description": "事件发生时间。ISO8601 UTC。"
+            }
+          }
+        }
+      ],
+      "description": "最近一次风险事件。null=最近无事件。"
+    },
+    "updated_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}Z)?$",
+      "description": "状态最近一次写盘时间。YYYY-MM-DD 或 ISO8601 UTC。"
+    }
+  }
+}

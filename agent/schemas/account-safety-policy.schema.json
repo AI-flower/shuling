@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/account-safety-policy.schema.json",
+  "title": "agent/config/account-safety.json",
+  "description": "账号安全策略（v3.1+）。声明用户选择的运行模式与各类高风险动作是否启用。由 ensure-runtime-layout 从 agent/policies/account-safety.default.json 拷贝初始化；用户可手改。详见 docs/plans/v3-account-execution-safety-hardening.md §5.2。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mode",
+    "publishing_enabled",
+    "commenting_enabled",
+    "cookie_import_enabled",
+    "bulk_import_enabled",
+    "cron_publish_enabled",
+    "max_daily_publishes",
+    "max_daily_comments",
+    "require_approval_for_publish",
+    "require_approval_for_comment",
+    "cooldown_on_risk_signal"
+  ],
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["draft-only", "supervised", "read-only-research", "ops-maintenance"],
+      "description": "运行模式。draft-only=只起稿不发布（默认）；supervised=用户每次确认；read-only-research=只读分析；ops-maintenance=只跑运维脚本。"
+    },
+    "publishing_enabled": {
+      "type": "boolean",
+      "description": "是否允许 xhs.sh publish 路径执行。false 时即使有 approval 也直接拒绝。默认 false。"
+    },
+    "commenting_enabled": {
+      "type": "boolean",
+      "description": "是否允许 xhs.sh comment 路径执行。默认 false（评论比发布更敏感）。"
+    },
+    "cookie_import_enabled": {
+      "type": "boolean",
+      "description": "是否允许 xhs.sh import-cookie。首次安装需要登录，故默认 true。"
+    },
+    "bulk_import_enabled": {
+      "type": "boolean",
+      "description": "是否允许 import-existing.sh 批量导入历史。默认 false，需用户显式开启。"
+    },
+    "cron_publish_enabled": {
+      "type": "boolean",
+      "description": "cron 是否能触发发布。默认 false，cron 只生成草稿与复盘。"
+    },
+    "max_daily_publishes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "每日最大发布数硬上限。超过即进入 cooldown。默认 1。"
+    },
+    "max_daily_comments": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "每日最大评论数硬上限。默认 0（默认禁评）。"
+    },
+    "require_approval_for_publish": {
+      "type": "boolean",
+      "description": "publish 是否强制要求 --approval-id。默认 true。"
+    },
+    "require_approval_for_comment": {
+      "type": "boolean",
+      "description": "comment 是否强制要求 --approval-id。默认 true。"
+    },
+    "cooldown_on_risk_signal": {
+      "type": "boolean",
+      "description": "MCP 返回风险关键词（429/captcha/risk/forbidden 等）时是否自动进入 cooldown。默认 true。"
+    }
+  }
+}

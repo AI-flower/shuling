@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/approval.schema.json",
+  "title": "agent/config/approvals/<id>.json",
+  "description": "一次性账号写操作授权令牌（v3.1+）。由 approval.sh request → grant 写出，xhs.sh publish/comment 等高风险动作消费一次后失效。文件路径：agent/config/approvals/<id>.json。详见 docs/plans/v3-account-execution-safety-hardening.md §6。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "action",
+    "resource",
+    "resource_hash",
+    "created_at",
+    "expires_at",
+    "granted_by",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^appr_\\d{8}_\\d{6}_[a-f0-9]{8}$",
+      "description": "授权 ID。格式 appr_YYYYMMDD_HHMMSS_<8 位 hex>。例：appr_20260428_153000_abcd1234。"
+    },
+    "action": {
+      "type": "string",
+      "enum": ["publish", "comment", "import-cookie", "override-quota"],
+      "description": "授权动作。publish=发布笔记；comment=发表评论；import-cookie=导入 Cookie；override-quota=临时关闭限额（仅 dev mode）。"
+    },
+    "resource": {
+      "type": "string",
+      "minLength": 1,
+      "description": "授权指向的具体资源。publish/import-cookie 是文件路径（如 /tmp/xhs-post/meta.json）；comment 是 note_id+内容标识符。"
+    },
+    "resource_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "resource 内容的 sha256 摘要，verify 时用于检测资源篡改。格式 sha256:<64 位 hex>。"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+      "description": "授权创建时间。ISO8601 UTC（Z 结尾）。"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+      "description": "授权过期时间。ISO8601 UTC（Z 结尾）。默认 created_at + 30min。"
+    },
+    "granted_by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "谁批的。一般为 user，未来可扩展（如 ci/cron-confirmed）。"
+    },
+    "consumed_at": {
+      "type": ["string", "null"],
+      "description": "消费时间。null=未消费；ISO8601 UTC=已被某个动作消费一次（一次性原则）。"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "granted", "consumed", "revoked", "expired"],
+      "description": "授权状态。pending=已 request 未 grant；granted=可用；consumed=已使用；revoked=用户撤销；expired=已过期。"
+    }
+  }
+}

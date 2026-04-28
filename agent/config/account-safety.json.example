@@ -1,0 +1,14 @@
+{
+  "_comment": "v3.1+ 模板。真正生效的文件是 agent/config/account-safety.json，由 db.sh ensure-runtime-layout 从 agent/policies/account-safety.default.json 拷贝生成。手改时确保通过 agent/schemas/account-safety-policy.schema.json 校验。",
+  "mode": "draft-only",
+  "publishing_enabled": false,
+  "commenting_enabled": false,
+  "cookie_import_enabled": true,
+  "bulk_import_enabled": false,
+  "cron_publish_enabled": false,
+  "max_daily_publishes": 1,
+  "max_daily_comments": 0,
+  "require_approval_for_publish": true,
+  "require_approval_for_comment": true,
+  "cooldown_on_risk_signal": true
+}

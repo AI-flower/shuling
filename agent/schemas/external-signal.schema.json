@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/external-signal.schema.json",
+  "title": "agent/knowledge-base/external-signals/<topic>-<date>.json",
+  "description": "外部情报摘要信号（v3.1+）。external-intel.sh 采样后的结构化归纳，仅保存信号、不保存原文。文件路径：agent/knowledge-base/external-signals/<slug>-<YYYY-MM-DD>.json。详见 docs/plans/v3-account-execution-safety-hardening.md §12.6 / §12.8。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "topic",
+    "observed_at",
+    "sample_size",
+    "competition_density",
+    "common_angles",
+    "overused_patterns",
+    "comment_demands",
+    "white_space",
+    "confidence",
+    "expires_at"
+  ],
+  "patternProperties": {
+    "^(full_body|raw_comments|full_comments|raw_post_body|note_body|raw_html)$": {
+      "not": {},
+      "description": "硬禁字段。external-signal 不允许保存原文/全量评论 dump，违反 §12.8。"
+    }
+  },
+  "properties": {
+    "topic": {
+      "type": "string",
+      "minLength": 1,
+      "description": "采样主题。例：\"租房收纳\"。"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "采样日期 YYYY-MM-DD（UTC）。"
+    },
+    "sample_size": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["search_results", "details", "comments"],
+      "properties": {
+        "search_results": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "本次采样读到的搜索结果条数。"
+        },
+        "details": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "本次采样深读的笔记详情数（≤5）。"
+        },
+        "comments": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30,
+          "description": "本次采样抽取的评论数（≤30，硬上限）。"
+        }
+      },
+      "description": "采样规模。任何字段超过 §12.6 默认上限的样本视为不合规。"
+    },
+    "competition_density": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "赛道竞争密度判断。low=蓝海；medium=中等；high=已饱和。"
+    },
+    "common_angles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "本主题常见切入角度。例：[\"小户型收纳\",\"租房党低成本\"]。"
+    },
+    "overused_patterns": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "已过饱和、不建议再用的标题/结构模板。例：[\"10个收纳神器\",\"租房党必买\"]。"
+    },
+    "comment_demands": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "评论区反复出现的真实需求。例：[\"不打孔怎么装\",\"预算100以内\"]。"
+    },
+    "white_space": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "尚未被覆盖、可作为差异化切入的角度。"
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "归纳置信度 [0,1]。受 sample_size 与一致性影响；选题评分用作权重。"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "缓存过期日 YYYY-MM-DD。命中缓存且未过期则不重复请求 MCP。详见 §12.7 TTL 表。"
+    }
+  }
+}
