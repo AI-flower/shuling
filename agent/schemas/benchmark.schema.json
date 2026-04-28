@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/benchmark.schema.json",
+  "title": "agent/knowledge-base/benchmarks/<slug>.json",
+  "description": "对标账号 dossier（v3.2+）。01-onboarding-new.md 冷启动 seeding 与 02-onboarding-existing.md 差距分析阶段产出。区分 business_benchmark（学变现路径）与 content_sample（仅学内容形式），前者必须通过利润证据硬门。详见 docs/plans/v3.2-creator-business-intelligence-plan.md §5.2。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "benchmark_type",
+    "account_name",
+    "platform",
+    "monetization_guess",
+    "coverage",
+    "evidence_level",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^benchmark_\\d{8}_[a-z0-9_-]+$",
+      "description": "对标 ID。格式：benchmark_YYYYMMDD_slug。"
+    },
+    "benchmark_type": {
+      "type": "string",
+      "enum": ["business_benchmark", "content_sample"],
+      "description": "对标类型。business_benchmark=可作为商业对标，必须 monetization_guess.profit_evidence_gate=pass；content_sample=仅作为内容样本（学标题/封面/结构），不影响商业判断。"
+    },
+    "account_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "对标账号名。"
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["xiaohongshu", "douyin", "video_account", "bilibili", "x", "other"],
+      "description": "所在平台。"
+    },
+    "profile_url_or_id": {
+      "type": "string",
+      "description": "账号主页 URL 或 ID。可空。"
+    },
+    "positioning": {
+      "type": "string",
+      "description": "对标账号的定位描述。例：「面向 25-35 岁职场女性的护肤入门指南」。"
+    },
+    "audience": {
+      "type": "string",
+      "description": "对标吸引的目标人群描述。"
+    },
+    "content_formats": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "常用内容形式。例：[「图文清单」, 「单图长文」, 「短视频教程」]。"
+    },
+    "top_topics": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "高频选题。"
+    },
+    "title_patterns": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "标题套路抽象。例：[「数字清单 + 结果承诺」, 「反差悬念 + 身份代入」]。"
+    },
+    "cover_patterns": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "封面套路抽象。"
+    },
+    "hook_patterns": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "开头钩子套路抽象。"
+    },
+    "monetization_guess": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "evidence", "profit_evidence_gate", "profit_evidence_level", "confidence"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["consulting", "course", "community", "goods", "ads", "lead_gen", "unknown"],
+          "description": "推测的变现方式。consulting=咨询陪跑；course=课程；community=社群；goods=带货；ads=广告；lead_gen=私域引流；unknown=不确定。"
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "推测依据。例：[「主页有付费课程入口」, 「评论区有人问报名链接」]。"
+        },
+        "profit_evidence_gate": {
+          "type": "string",
+          "enum": ["pass", "fail", "unknown"],
+          "description": "利润证据硬门是否通过。仅 pass 时本对标可作为 business_benchmark；fail/unknown 只能作为 content_sample。"
+        },
+        "profit_evidence_level": {
+          "type": "string",
+          "enum": ["hard", "medium", "weak", "none", "unknown"],
+          "description": "利润证据等级。hard=明确产品/价格/购买；medium=多条询价/咨询入口；weak=泛互动；none=无；unknown=数据不足。weak/none/unknown 时 profit_evidence_gate 必须 fail/unknown。"
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "推测置信度。"
+        }
+      },
+      "description": "变现路径推测与证据。"
+    },
+    "why_worth_learning": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "这个账号值得学的具体理由。建议至少 1 条。"
+    },
+    "imitable_actions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "用户可以模仿的动作清单。例：[「首屏挂明确判断」, 「每周一条系列」]。"
+    },
+    "not_imitable_actions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "看得见但学不了的动作。例：[「依赖人设争议」, 「靠投流跑量」]。"
+    },
+    "risk_notes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "风险提醒。例：[「擦边话题」, 「依赖灰色变现」]。"
+    },
+    "source_notes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "信息来源。例：[「用户手动提供」, 「2026-04-28 search_feeds 抓取」]。"
+    },
+    "coverage": {
+      "type": "string",
+      "enum": ["account_dossier", "single_post_sample", "internal_pattern", "unknown"],
+      "description": "证据覆盖范围。account_dossier=完整对标 dossier（≥10 条样本+主页观察）；single_post_sample=单篇爆款样本；internal_pattern=本账号历史 pattern；unknown=证据不足。决定 benchmark_score 的封顶值（详见 plan §5.2.5）。"
+    },
+    "evidence_level": {
+      "type": "string",
+      "enum": ["hard", "medium", "weak", "unknown"],
+      "description": "整体证据等级。"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "dossier 创建日期。"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "最近一次更新日期。"
+    }
+  }
+}

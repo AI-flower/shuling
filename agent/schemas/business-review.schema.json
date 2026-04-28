@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/business-review.schema.json",
+  "title": "business_reviews 表的 review_json 字段",
+  "description": "业务归因型复盘（v3.2+）。05-review.md 为每条已发布帖子生成。区分流量/收藏/信任/线索/成交/争议六类信号，把数据归因到业务问题而不只是更新内容 pattern。仅 hard/medium 证据才允许 sales/lead 信号为 high。详见 docs/plans/v3.2-creator-business-intelligence-plan.md §5.6。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "performance_tier",
+    "traffic_signal",
+    "save_signal",
+    "trust_signal",
+    "lead_signal",
+    "sales_signal",
+    "controversy_signal",
+    "main_attribution",
+    "evidence_level",
+    "evidence",
+    "confidence",
+    "business_interpretation",
+    "next_action"
+  ],
+  "definitions": {
+    "signalLevel": {
+      "type": "string",
+      "enum": ["high", "normal", "low", "unknown"],
+      "description": "信号强弱。"
+    }
+  },
+  "properties": {
+    "performance_tier": {
+      "type": "string",
+      "enum": ["excellent", "normal", "weak", "mixed"],
+      "description": "整体表现层级。mixed=高流量低价值或高互动低信任等矛盾型。"
+    },
+    "traffic_signal": {
+      "$ref": "#/definitions/signalLevel",
+      "description": "流量信号（曝光/点赞/阅读量）。"
+    },
+    "save_signal": {
+      "$ref": "#/definitions/signalLevel",
+      "description": "收藏信号。"
+    },
+    "trust_signal": {
+      "$ref": "#/definitions/signalLevel",
+      "description": "信任信号（关注增长、复访、深度评论）。"
+    },
+    "lead_signal": {
+      "$ref": "#/definitions/signalLevel",
+      "description": "线索信号（私信、求模板、求联系方式、关键词触发）。仅在 evidence_level in {hard, medium} 时允许 high。"
+    },
+    "sales_signal": {
+      "$ref": "#/definitions/signalLevel",
+      "description": "成交信号。仅在 evidence_level in {hard, medium} 时允许 high。"
+    },
+    "controversy_signal": {
+      "$ref": "#/definitions/signalLevel",
+      "description": "争议信号（负面、反驳、站队评论）。high 时不晋升为正向 pattern。"
+    },
+    "main_attribution": {
+      "type": "string",
+      "enum": [
+        "topic",
+        "title",
+        "cover",
+        "opening",
+        "content_depth",
+        "format",
+        "benchmark",
+        "offer",
+        "audience",
+        "conversion_path",
+        "timing",
+        "unknown"
+      ],
+      "description": "主要归因。回答「这次表现的最大变量是什么」。"
+    },
+    "evidence_level": {
+      "type": "string",
+      "enum": ["hard", "medium", "weak", "unknown"],
+      "description": "归因证据等级。hard=明确私信/成交/询价/手动确认；medium=评论求链接/模板/价格、关注异常增长；weak=LLM 语义推断；unknown=证据不足。"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "text", "weight"],
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": ["metrics", "comment", "dm", "manual", "llm_inference"],
+            "description": "证据来源。"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "证据原文或简短摘要。"
+          },
+          "metric": {
+            "type": "string",
+            "description": "如来自 metrics，附上具体指标名（可选）。例：「saves_rate=0.18」。"
+          },
+          "weight": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "本条证据的权重。"
+          }
+        }
+      },
+      "description": "支撑归因的证据列表。无 hard/medium 证据时 sales_signal/lead_signal 不得为 high。"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "归因总置信度。"
+    },
+    "business_interpretation": {
+      "type": "string",
+      "minLength": 1,
+      "description": "业务解读（人类可读）。例：「知识收藏型内容，适合涨粉和信任，不宜直接视为转化 pattern」。"
+    },
+    "next_action": {
+      "type": "string",
+      "enum": [
+        "repeat",
+        "iterate",
+        "series",
+        "change_title",
+        "change_offer",
+        "change_benchmark",
+        "pause",
+        "unknown"
+      ],
+      "description": "下一步动作建议。repeat=保留；iterate=小改再发；series=做系列；change_title/offer/benchmark=换变量再测；pause=暂停此方向。"
+    }
+  }
+}

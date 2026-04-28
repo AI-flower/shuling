@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/content-asset.schema.json",
+  "title": "content_assets 表的 asset_json 字段 / agent/knowledge-base/asset-ledger.md 节段",
+  "description": "内容资产复利单元（v3.2+）。03-daily-flow.md（选题）/05-review.md（复盘）/07-comment-insights.md（评论）写入。每次内容生产后回答「沉淀了什么可复用资产」。详见 docs/plans/v3.2-creator-business-intelligence-plan.md §5.8。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "asset_type",
+    "source",
+    "content",
+    "confidence",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^asset_\\d{8}_[a-z0-9_-]+$",
+      "description": "资产 ID。格式：asset_YYYYMMDD_slug。"
+    },
+    "asset_type": {
+      "type": "string",
+      "enum": [
+        "topic_seed",
+        "series_arc",
+        "title_evidence",
+        "audience_language",
+        "faq",
+        "case",
+        "objection",
+        "offer_signal",
+        "benchmark_insight",
+        "workflow_rule"
+      ],
+      "description": "资产类型。topic_seed=可进选题候选池；series_arc=可扩展系列；title_evidence=被验证的标题公式/触发器证据；audience_language=用户原话痛点描述；faq=高频问题；case=具体案例；objection=用户反对意见；offer_signal=用户索要服务/产品；benchmark_insight=对标可模仿动作；workflow_rule=验证过的创作/复盘规则。"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manual_note"],
+      "properties": {
+        "post_id": {
+          "type": ["integer", "null"],
+          "description": "来源帖子 ID（如来自复盘）。"
+        },
+        "comment_id": {
+          "type": ["string", "null"],
+          "description": "来源评论 ID（如来自评论洞察）。"
+        },
+        "benchmark_id": {
+          "type": "string",
+          "description": "来源对标 ID（如来自 benchmark_insight）。可空字符串。"
+        },
+        "manual_note": {
+          "type": "string",
+          "description": "人工补充来源描述。例：「用户私信原话」「自己生活案例」。可空字符串。"
+        }
+      },
+      "description": "资产来源。post_id/comment_id/benchmark_id/manual_note 至少一项有内容。"
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1,
+      "description": "资产内容主体。例：audience_language 类型放原话；faq 类型放问题；workflow_rule 类型放规则。"
+    },
+    "why_it_matters": {
+      "type": "string",
+      "description": "这个资产的价值说明。例：「这是目标读者描述痛点的原话，比『账号运营困难』更适合放进开头或封面」。"
+    },
+    "reuse_plan": {
+      "type": "string",
+      "description": "下次怎么用。例：「下次 build_trust 选题可用作开头场景；可扩成系列」。"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "资产置信度。high=多次出现/经过发布验证；medium=单次明确信号；low=单一来源或语义推测。"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "资产生成日期。"
+    },
+    "last_used_at": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "最近一次复用日期。可空。"
+    }
+  }
+}

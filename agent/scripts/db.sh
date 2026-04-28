@@ -212,6 +212,7 @@ cmd_add_post() {
     [ -z "$json" ] && { echo '{"error": "missing JSON argument"}' >&2; exit 1; }
 
     local date slot title content tags note_id topic_type title_pattern content_style status source published_at
+    local title_formula_id title_trigger title_intent
     date="$(sql_escape "$(json_val "$json" "date")")"
     slot="$(sql_escape "$(json_val "$json" "slot")")"
     title="$(sql_escape "$(json_val "$json" "title")")"
@@ -228,6 +229,10 @@ cmd_add_post() {
     source="${source:-shuling}"
     source="$(sql_escape "$source")"
     published_at="$(sql_escape "$(json_val "$json" "published_at")")"
+    # v3.2.0+ 标题公式可追溯字段（可选；缺省时落 NULL）
+    title_formula_id="$(sql_escape "$(json_val "$json" "title_formula_id")")"
+    title_trigger="$(sql_escape "$(json_val "$json" "title_trigger")")"
+    title_intent="$(sql_escape "$(json_val "$json" "title_intent")")"
 
     # 对 imported source 且带 note_id 的行做幂等 upsert（note_id 唯一）
     if [ "$source" = "imported" ] && [ -n "$note_id" ]; then
@@ -238,7 +243,10 @@ cmd_add_post() {
 UPDATE posts SET
     title='$title', content='$content', tags='$tags',
     topic_type='$topic_type', title_pattern='$title_pattern', content_style='$content_style',
-    status='$status', published_at='$published_at'
+    status='$status', published_at='$published_at',
+    title_formula_id = COALESCE(NULLIF('$title_formula_id',''), title_formula_id),
+    title_trigger    = COALESCE(NULLIF('$title_trigger',''),    title_trigger),
+    title_intent     = COALESCE(NULLIF('$title_intent',''),     title_intent)
 WHERE id=$existing_id;
 "
             echo "{\"id\": $existing_id, \"mode\": \"updated\"}"
@@ -248,8 +256,8 @@ WHERE id=$existing_id;
 
     local new_id
     new_id="$(sql "
-INSERT INTO posts (date, slot, title, content, tags, note_id, topic_type, title_pattern, content_style, status, published_at, source)
-VALUES ('$date','$slot','$title','$content','$tags','$note_id','$topic_type','$title_pattern','$content_style','$status','$published_at','$source');
+INSERT INTO posts (date, slot, title, content, tags, note_id, topic_type, title_pattern, content_style, status, published_at, source, title_formula_id, title_trigger, title_intent)
+VALUES ('$date','$slot','$title','$content','$tags','$note_id','$topic_type','$title_pattern','$content_style','$status','$published_at','$source',NULLIF('$title_formula_id',''),NULLIF('$title_trigger',''),NULLIF('$title_intent',''));
 SELECT last_insert_rowid();
 ")"
     echo "{\"id\": $new_id, \"mode\": \"inserted\"}"
@@ -336,22 +344,29 @@ cmd_query_posts() {
 }
 
 # v2.2.0: 给已有帖补分类字段（AI 分类 imported 帖子后回写）
+# v3.2.0+: 同时支持回写标题公式字段（title_formula_id / title_trigger / title_intent）
 cmd_update_post_meta() {
     local json="$1"
     [ -z "$json" ] && { echo '{"error": "missing JSON argument"}' >&2; exit 1; }
 
-    local id topic_type title_pattern content_style
+    local id topic_type title_pattern content_style title_formula_id title_trigger title_intent
     id="$(json_val "$json" "id")"
     topic_type="$(sql_escape "$(json_val "$json" "topic_type")")"
     title_pattern="$(sql_escape "$(json_val "$json" "title_pattern")")"
     content_style="$(sql_escape "$(json_val "$json" "content_style")")"
+    title_formula_id="$(sql_escape "$(json_val "$json" "title_formula_id")")"
+    title_trigger="$(sql_escape "$(json_val "$json" "title_trigger")")"
+    title_intent="$(sql_escape "$(json_val "$json" "title_intent")")"
 
     [ -z "$id" ] && { echo '{"error": "id required"}' >&2; exit 1; }
 
     sql "UPDATE posts SET
         topic_type = COALESCE(NULLIF('$topic_type',''), topic_type),
         title_pattern = COALESCE(NULLIF('$title_pattern',''), title_pattern),
-        content_style = COALESCE(NULLIF('$content_style',''), content_style)
+        content_style = COALESCE(NULLIF('$content_style',''), content_style),
+        title_formula_id = COALESCE(NULLIF('$title_formula_id',''), title_formula_id),
+        title_trigger    = COALESCE(NULLIF('$title_trigger',''),    title_trigger),
+        title_intent     = COALESCE(NULLIF('$title_intent',''),     title_intent)
         WHERE id = $id;"
     echo "{\"ok\": true, \"id\": $id}"
 }
@@ -669,6 +684,203 @@ LIMIT $limit;
     fi
 }
 
+# ─── v3.2.0+ Creator Business Intelligence storage ──────────────────
+# 7 个 subcommand 写入/读取 v3.2 新表（business_reviews / content_assets /
+# creator_behavior_signals）。AI 写入前应按 schemas/ 自校验，本脚本只负责物理操作。
+# 详见 docs/plans/v3.2-creator-business-intelligence-plan.md §6.2 / §8.1。
+
+# 写入业务归因复盘（05-review）
+cmd_add_business_review() {
+    local json="$1"
+    [ -z "$json" ] && { echo '{"error": "missing JSON argument"}' >&2; exit 1; }
+
+    local post_id reviewed_at performance_tier
+    local traffic_signal save_signal trust_signal lead_signal sales_signal controversy_signal
+    local main_attribution evidence_level confidence business_interpretation next_action
+    post_id="$(json_val "$json" "post_id")"
+    reviewed_at="$(json_val "$json" "reviewed_at")"
+    [ -z "$reviewed_at" ] && reviewed_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    reviewed_at="$(sql_escape "$reviewed_at")"
+    performance_tier="$(sql_escape "$(json_val "$json" "performance_tier")")"
+    traffic_signal="$(sql_escape "$(json_val "$json" "traffic_signal")")"
+    save_signal="$(sql_escape "$(json_val "$json" "save_signal")")"
+    trust_signal="$(sql_escape "$(json_val "$json" "trust_signal")")"
+    lead_signal="$(sql_escape "$(json_val "$json" "lead_signal")")"
+    sales_signal="$(sql_escape "$(json_val "$json" "sales_signal")")"
+    controversy_signal="$(sql_escape "$(json_val "$json" "controversy_signal")")"
+    main_attribution="$(sql_escape "$(json_val "$json" "main_attribution")")"
+    evidence_level="$(sql_escape "$(json_val "$json" "evidence_level")")"
+    confidence="$(sql_escape "$(json_val "$json" "confidence")")"
+    business_interpretation="$(sql_escape "$(json_val "$json" "business_interpretation")")"
+    next_action="$(sql_escape "$(json_val "$json" "next_action")")"
+    # review_json: 整段 JSON 原文落库，便于后续读取完整结构
+    local review_json
+    review_json="$(sql_escape "$json")"
+
+    local new_id
+    new_id="$(sql "
+INSERT INTO business_reviews (
+    post_id, reviewed_at, performance_tier,
+    traffic_signal, save_signal, trust_signal, lead_signal, sales_signal, controversy_signal,
+    main_attribution, evidence_level, confidence,
+    business_interpretation, next_action, review_json
+) VALUES (
+    ${post_id:-NULL}, '$reviewed_at', NULLIF('$performance_tier',''),
+    NULLIF('$traffic_signal',''), NULLIF('$save_signal',''), NULLIF('$trust_signal',''),
+    NULLIF('$lead_signal',''), NULLIF('$sales_signal',''), NULLIF('$controversy_signal',''),
+    NULLIF('$main_attribution',''), NULLIF('$evidence_level',''), NULLIF('$confidence',''),
+    NULLIF('$business_interpretation',''), NULLIF('$next_action',''), '$review_json'
+);
+SELECT last_insert_rowid();
+")"
+    echo "{\"id\": $new_id}"
+}
+
+cmd_query_business_review() {
+    local post_id=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --post-id) shift; post_id="$1"; shift ;;
+            *) shift ;;
+        esac
+    done
+    [ -z "$post_id" ] && { echo '{"error": "missing --post-id"}' >&2; exit 1; }
+    sql_json "SELECT * FROM business_reviews WHERE post_id = $post_id ORDER BY reviewed_at DESC LIMIT 1;"
+}
+
+cmd_query_business_reviews() {
+    local days=7 limit=100
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --days)  shift; days="${1:-7}"; shift ;;
+            --limit) shift; limit="${1:-100}"; shift ;;
+            *) shift ;;
+        esac
+    done
+    sql_json "
+SELECT * FROM business_reviews
+WHERE reviewed_at >= datetime('now', '-${days} days')
+ORDER BY reviewed_at DESC
+LIMIT $limit;
+"
+}
+
+# 写入内容资产单元（asset-ledger 结构化版）
+cmd_add_content_asset() {
+    local json="$1"
+    [ -z "$json" ] && { echo '{"error": "missing JSON argument"}' >&2; exit 1; }
+
+    local asset_key asset_type source_type source_id confidence created_at last_used_at
+    asset_key="$(sql_escape "$(json_val "$json" "id")")"
+    asset_type="$(sql_escape "$(json_val "$json" "asset_type")")"
+    confidence="$(sql_escape "$(json_val "$json" "confidence")")"
+    created_at="$(json_val "$json" "created_at")"
+    [ -z "$created_at" ] && created_at="$(date -u +"%Y-%m-%d")"
+    created_at="$(sql_escape "$created_at")"
+    last_used_at="$(sql_escape "$(json_val "$json" "last_used_at")")"
+
+    # source_type / source_id 从 source 子对象提取摘要（agent 习惯传 source.post_id 或 source.comment_id）
+    # jq 不可用时降级为 python；source 字段允许整体不传
+    source_type=""
+    source_id=""
+    if command -v jq >/dev/null 2>&1; then
+        local _post _comment _benchmark _manual
+        _post="$(echo "$json" | jq -r '.source.post_id // empty')"
+        _comment="$(echo "$json" | jq -r '.source.comment_id // empty')"
+        _benchmark="$(echo "$json" | jq -r '.source.benchmark_id // empty')"
+        _manual="$(echo "$json" | jq -r '.source.manual_note // empty')"
+        if   [ -n "$_post" ]      && [ "$_post" != "null" ];      then source_type="post";      source_id="$_post"
+        elif [ -n "$_comment" ]   && [ "$_comment" != "null" ];   then source_type="comment";   source_id="$_comment"
+        elif [ -n "$_benchmark" ] && [ "$_benchmark" != "null" ]; then source_type="benchmark"; source_id="$_benchmark"
+        elif [ -n "$_manual" ]    && [ "$_manual" != "null" ];    then source_type="manual";    source_id="manual"
+        fi
+    fi
+    source_type="$(sql_escape "$source_type")"
+    source_id="$(sql_escape "$source_id")"
+
+    local asset_json
+    asset_json="$(sql_escape "$json")"
+
+    local new_id
+    new_id="$(sql "
+INSERT INTO content_assets (
+    asset_key, asset_type, source_type, source_id, confidence,
+    created_at, last_used_at, asset_json
+) VALUES (
+    NULLIF('$asset_key',''), '$asset_type', NULLIF('$source_type',''), NULLIF('$source_id',''),
+    NULLIF('$confidence',''), '$created_at', NULLIF('$last_used_at',''), '$asset_json'
+);
+SELECT last_insert_rowid();
+")"
+    echo "{\"id\": $new_id}"
+}
+
+cmd_query_content_assets() {
+    local asset_type="" days="" limit=100
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --type)  shift; asset_type="${1:-}"; shift ;;
+            --days)  shift; days="${1:-}"; shift ;;
+            --limit) shift; limit="${1:-100}"; shift ;;
+            *) shift ;;
+        esac
+    done
+    local -a conds=()
+    [ -n "$asset_type" ] && conds+=("asset_type = '$(sql_escape "$asset_type")'")
+    [ -n "$days" ] && conds+=("date(created_at) >= date('now', '-${days} days')")
+    local where=""
+    if [ "${#conds[@]}" -gt 0 ]; then
+        local IFS=" AND "
+        where="WHERE ${conds[*]}"
+    fi
+    sql_json "SELECT * FROM content_assets $where ORDER BY created_at DESC LIMIT $limit;"
+}
+
+# 写入创作者行为信号（执行摩擦诊断）
+cmd_add_creator_behavior_signal() {
+    local json="$1"
+    [ -z "$json" ] && { echo '{"error": "missing JSON argument"}' >&2; exit 1; }
+
+    local signal_type severity observed_at resolved_at signal_json
+    signal_type="$(sql_escape "$(json_val "$json" "signal_type")")"
+    severity="$(sql_escape "$(json_val "$json" "severity")")"
+    observed_at="$(json_val "$json" "created_at")"
+    [ -z "$observed_at" ] && observed_at="$(date -u +"%Y-%m-%d")"
+    observed_at="$(sql_escape "$observed_at")"
+    resolved_at="$(sql_escape "$(json_val "$json" "resolved_at")")"
+    signal_json="$(sql_escape "$json")"
+
+    [ -z "$signal_type" ] && { echo '{"error": "signal_type required"}' >&2; exit 1; }
+
+    local new_id
+    new_id="$(sql "
+INSERT INTO creator_behavior_signals (
+    signal_type, severity, observed_at, resolved_at, signal_json
+) VALUES (
+    '$signal_type', NULLIF('$severity',''), '$observed_at', NULLIF('$resolved_at',''), '$signal_json'
+);
+SELECT last_insert_rowid();
+")"
+    echo "{\"id\": $new_id}"
+}
+
+cmd_query_creator_behavior_signals() {
+    local days=14 signal_type="" limit=100
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --days)        shift; days="${1:-14}"; shift ;;
+            --signal-type) shift; signal_type="${1:-}"; shift ;;
+            --limit)       shift; limit="${1:-100}"; shift ;;
+            *) shift ;;
+        esac
+    done
+    local -a conds=("date(observed_at) >= date('now', '-${days} days')")
+    [ -n "$signal_type" ] && conds+=("signal_type = '$(sql_escape "$signal_type")'")
+    local IFS=" AND "
+    local where="WHERE ${conds[*]}"
+    sql_json "SELECT * FROM creator_behavior_signals $where ORDER BY observed_at DESC LIMIT $limit;"
+}
+
 # ─── v3.0+ Runtime self-healing ───────────────────────────────────────
 # ensure-runtime-layout: copy-first 把 v2 旧路径数据迁到 v3 agent/ 路径
 # ensure-schema: 检查 __migrations 表 + 自动应用未应用的 migration
@@ -981,6 +1193,13 @@ case "$cmd" in
     query-historical-stats) cmd_query_historical_stats "$@" ;;
     query-external-signals) cmd_query_external_signals "$@" ;;
     update-post-meta)   cmd_update_post_meta "$@" ;;
+    add-business-review)              cmd_add_business_review "$@" ;;
+    query-business-review)            cmd_query_business_review "$@" ;;
+    query-business-reviews)           cmd_query_business_reviews "$@" ;;
+    add-content-asset)                cmd_add_content_asset "$@" ;;
+    query-content-assets)             cmd_query_content_assets "$@" ;;
+    add-creator-behavior-signal)      cmd_add_creator_behavior_signal "$@" ;;
+    query-creator-behavior-signals)   cmd_query_creator_behavior_signals "$@" ;;
     *)
         echo "Usage: db.sh <command> [args]"
         echo ""
@@ -991,13 +1210,14 @@ case "$cmd" in
         echo "  ensure-schema [--dry-run] [--json]"
         echo "                                 v3.0+: auto-apply pending migrations to current DB"
         echo "  add-post '<json>'              Insert/upsert a post (upsert iff source=imported & note_id given)"
+        echo "                                 v3.2+: optional title_formula_id/title_trigger/title_intent"
         echo "  add-metrics '<json>'           Insert metrics"
         echo "  log-choice '<json>'            Log a user choice"
         echo "  query-posts [--today|--days N|--status S|--source S]"
         echo "  query-metrics --post-id N"
         echo "  query-preferences              Aggregate preference weights"
         echo "  update-post-status <id> <status> [note_id]"
-        echo "  update-post-meta '<json>'      Update topic_type/title_pattern/content_style by id"
+        echo "  update-post-meta '<json>'      Update topic_type/title_pattern/content_style/title_formula_id/..."
         echo "  add-diagnosis '<json>'         Insert NoteRx diagnosis result"
         echo "  query-diagnosis --post-id N    Get latest diagnosis for a post"
         echo "  query-undiagnosed [--days N]   List published posts without diagnosis"
@@ -1007,6 +1227,15 @@ case "$cmd" in
         echo "  query-historical-stats [--limit N]"
         echo "  query-external-signals [--topic X] [--days N] [--limit N]"
         echo "                                 v3.1+: external_signals 辅助索引（可选）"
+        echo ""
+        echo "v3.2+ Creator Business Intelligence:"
+        echo "  add-business-review '<json>'              Insert business attribution review (05-review)"
+        echo "  query-business-review --post-id N         Latest review for a post"
+        echo "  query-business-reviews [--days N --limit N]"
+        echo "  add-content-asset '<json>'                Insert content asset ledger entry"
+        echo "  query-content-assets [--type TYPE --days N --limit N]"
+        echo "  add-creator-behavior-signal '<json>'      Insert execution-friction behavior signal"
+        echo "  query-creator-behavior-signals [--days N --signal-type T --limit N]"
         exit 1
         ;;
 esac

@@ -70,6 +70,15 @@ bash agent/scripts/db.sh query-diagnosis --post-id N                # 查最新�
 bash agent/scripts/db.sh query-undiagnosed [--days N]               # 列已发布未诊断的帖子
 bash agent/scripts/db.sh query-external-signals [--topic X] [--days N] [--limit N]
                                                                     # v3.1+ external_signals 辅助索引
+
+# v3.2+ Creator Business Intelligence
+bash agent/scripts/db.sh add-business-review '<json>'              # 业务归因复盘（05-review）
+bash agent/scripts/db.sh query-business-review --post-id N         # 查某帖最新业务复盘
+bash agent/scripts/db.sh query-business-reviews [--days N --limit N]
+bash agent/scripts/db.sh add-content-asset '<json>'                # 内容资产单元（asset-ledger）
+bash agent/scripts/db.sh query-content-assets [--type T --days N --limit N]
+bash agent/scripts/db.sh add-creator-behavior-signal '<json>'      # 执行摩擦行为信号
+bash agent/scripts/db.sh query-creator-behavior-signals [--days N --signal-type T --limit N]
 ```
 
 环境变量：`SHULING_DB`（指定 DB 路径，v2.4.2+，install / migration 调用 target DB 时必传）
@@ -86,7 +95,68 @@ bash agent/scripts/db.sh query-external-signals [--topic X] [--days N] [--limit 
   "topic_type": "家居收纳",
   "title_pattern": "数字清单",
   "content_style": "清单体",
-  "status": "published"
+  "status": "published",
+  "title_formula_id": "loss_stop_doing",
+  "title_trigger": "loss_aversion",
+  "title_intent": "click"
+}
+```
+
+`title_formula_id` / `title_trigger` / `title_intent`（v3.2+）可选；缺省落 NULL，不影响旧调用方。`update-post-meta` 同样支持回写这 3 个字段。
+
+`add-business-review` 输入 JSON 范例（v3.2+，结构对齐 `agent/schemas/business-review.schema.json`）：
+
+```json
+{
+  "post_id": 123,
+  "reviewed_at": "2026-04-28T12:00:00Z",
+  "performance_tier": "mixed",
+  "traffic_signal": "high",
+  "save_signal": "high",
+  "trust_signal": "normal",
+  "lead_signal": "low",
+  "sales_signal": "unknown",
+  "controversy_signal": "low",
+  "main_attribution": "content_depth",
+  "evidence_level": "medium",
+  "confidence": "medium",
+  "evidence": [
+    {"source": "comment", "text": "「收藏了」高频", "weight": "medium"}
+  ],
+  "business_interpretation": "知识收藏型内容，适合涨粉/信任，不直接做转化 pattern",
+  "next_action": "series"
+}
+```
+
+`add-content-asset` 输入 JSON 范例（结构对齐 `agent/schemas/content-asset.schema.json`）：
+
+```json
+{
+  "id": "asset_20260428_audience_language_no_result",
+  "asset_type": "audience_language",
+  "source": {"post_id": 123, "manual_note": ""},
+  "content": "发了 30 条还是没起色，不知道是标题问题还是方向问题",
+  "why_it_matters": "目标读者描述痛点的原话",
+  "reuse_plan": "build_trust 选题做开头场景",
+  "confidence": "medium",
+  "created_at": "2026-04-28"
+}
+```
+
+`add-creator-behavior-signal` 输入 JSON 范例（结构对齐 `agent/schemas/creator-behavior-signal.schema.json`）：
+
+```json
+{
+  "id": "behavior_20260428_draft_no_publish",
+  "signal_type": "draft_no_publish",
+  "severity": "warn",
+  "observed_events": [
+    {"event": "draft_generated", "count": 4, "window_days": 7},
+    {"event": "publish_skipped", "count": 4, "window_days": 7}
+  ],
+  "interpretation": "过去 7 天 4 条草稿，0 条进入发布确认",
+  "next_small_action": "从现有 4 条里选风险最低的 1 条小修后发布",
+  "created_at": "2026-04-28"
 }
 ```
 

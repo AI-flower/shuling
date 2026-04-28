@@ -86,3 +86,7 @@ agent/config/approvals/*
 !agent/config/approvals/.gitkeep
 agent/knowledge-base/external-signals/*
 !agent/knowledge-base/external-signals/.gitkeep
+
+# v3.2 Creator Business Intelligence（用户态；模板/默认文件 *.example / *.md / title-formulas.json 不在此排除）
+agent/knowledge-base/business-profile.json
+agent/knowledge-base/benchmarks/*.json

@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/creator-behavior-signal.schema.json",
+  "title": "creator_behavior_signals 表的 signal_json 字段 / agent/knowledge-base/creator-behavior-signals.md 节段",
+  "description": "创作者执行摩擦信号（v3.2+）。04-publish-flow.md / 05-review.md / 02-onboarding-existing.md 触发；只描述可观察行为和下一步最小动作，绝不输出心理诊断或人格评价。详见 docs/plans/v3.2-creator-business-intelligence-plan.md §5.7。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "signal_type",
+    "severity",
+    "observed_events",
+    "interpretation",
+    "next_small_action",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^behavior_\\d{8}_[a-z0-9_-]+$",
+      "description": "信号 ID。格式：behavior_YYYYMMDD_slug。"
+    },
+    "signal_type": {
+      "type": "string",
+      "enum": [
+        "planning_loop",
+        "direction_hopping",
+        "draft_no_publish",
+        "benchmark_overstudy",
+        "perfectionism",
+        "external_blame",
+        "unknown"
+      ],
+      "description": "行为信号类型。planning_loop=持续要求方案但不发布；direction_hopping=14 天内多次换方向；draft_no_publish=连续生成草稿但不发；benchmark_overstudy=持续要求更多对标；perfectionism=低风险反复修改；external_blame=把失败全部归因外部因素；unknown=数据不足。"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warn", "blocker"],
+      "description": "信号严重度。warn 时 03-daily-flow 进入兜底剧本；blocker 仅在重复 7 天以上+合规风险时使用。"
+    },
+    "observed_events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event", "count", "window_days"],
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": [
+              "draft_generated",
+              "draft_rejected",
+              "direction_changed",
+              "benchmark_requested",
+              "publish_skipped",
+              "review_ignored"
+            ],
+            "description": "可观察事件类型。"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "事件出现次数。"
+          },
+          "window_days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "统计窗口（天）。"
+          },
+          "evidence": {
+            "type": "string",
+            "description": "事件证据（可选简短描述）。"
+          }
+        }
+      },
+      "description": "支撑信号的可观察事件列表。仅记录事实，不写入用户动机推测。"
+    },
+    "interpretation": {
+      "type": "string",
+      "minLength": 1,
+      "description": "对当前行为的描述（不评价人格）。例：「过去 7 天生成 4 条草稿，0 条进入发布确认」。"
+    },
+    "next_small_action": {
+      "type": "string",
+      "minLength": 1,
+      "description": "建议的下一步最小动作。例：「从现有 4 条里选风险最低的一条，小修标题和开头后发布」。必须是可在当天完成的具体动作。"
+    },
+    "cooldown_until": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "信号冷却日期，期间同类信号不重复触发。可空。"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "信号生成日期。"
+    },
+    "resolved_at": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "信号解除日期（用户完成 next_small_action 或情况自然消解）。"
+    }
+  }
+}

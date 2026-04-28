@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/business-profile.schema.json",
+  "title": "agent/knowledge-base/business-profile.json",
+  "description": "创作者业务画像（v3.2+）。回答「这个账号在做什么生意」。01-onboarding-new.md 在内容画像之后采集；02-onboarding-existing.md 从历史内容反推。所有字段允许 unknown，不强制阻塞新用户冷启动。详见 docs/plans/v3.2-creator-business-intelligence-plan.md §5.1。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "creator_track",
+    "creator_stage",
+    "primary_goal",
+    "offer_status",
+    "monetization_stage",
+    "current_bottleneck",
+    "created_at"
+  ],
+  "properties": {
+    "creator_track": {
+      "type": "string",
+      "enum": ["creator_first", "offer_first", "exploration"],
+      "description": "账号当前赛道。creator_first=没有明确产品，先做人群信任内容资产；offer_first=已有产品/服务/明确转化路径；exploration=方向、受众或供给都未验证。默认 creator_first。"
+    },
+    "creator_stage": {
+      "type": "string",
+      "enum": ["new", "has_posts", "has_followers", "has_leads", "has_sales", "has_repeat_sales"],
+      "description": "成长阶段。new=刚开始；has_posts=有内容；has_followers=有粉丝积累；has_leads=有线索；has_sales=有成交；has_repeat_sales=有复购。"
+    },
+    "primary_goal": {
+      "type": "string",
+      "enum": ["grow_followers", "build_trust", "get_leads", "drive_sales", "prepare_live", "product_research", "unknown"],
+      "description": "当前账号最想先达成的目标。每个内容应回答它服务哪个目标。unknown 仅在用户明确未决定时允许。"
+    },
+    "offer_status": {
+      "type": "string",
+      "enum": ["none", "idea", "draft", "selling", "validated"],
+      "description": "产品/服务状态。none=没有；idea=有想法但未做；draft=雏形；selling=正在售卖；validated=已被市场验证。"
+    },
+    "monetization_stage": {
+      "type": "string",
+      "enum": ["no_offer", "offer_no_purchase", "purchase_no_repeat", "repeat_no_scale", "scaled", "unknown"],
+      "description": "变现阶段。no_offer=还没有产品；offer_no_purchase=有产品无人买；purchase_no_repeat=有人买但不复购；repeat_no_scale=有复购但没规模化；scaled=已规模化。"
+    },
+    "offer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "price_range", "delivery"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "产品/服务名称。无产品时留空字符串。"
+        },
+        "description": {
+          "type": "string",
+          "description": "产品/服务描述。说明给谁、解决什么问题、交付什么结果。"
+        },
+        "price_range": {
+          "type": "string",
+          "enum": ["free", "low", "mid", "high", "unknown"],
+          "description": "价格区间。low/mid/high 由用户自定标准；free=免费引流；unknown=未定价。"
+        },
+        "delivery": {
+          "type": "string",
+          "enum": ["content", "consulting", "course", "service", "physical_goods", "digital_goods", "community", "unknown"],
+          "description": "交付形态。content=内容本身；consulting=咨询陪跑；course=课程；service=服务；physical_goods=实物；digital_goods=数字商品；community=社群。"
+        }
+      },
+      "description": "产品/服务结构。offer_status=none 时各字段可填 unknown 或空，但对象必须存在。"
+    },
+    "buyer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "pain_points", "buying_trigger", "objections"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "目标买家画像。例：「3 年内做小红书但卡在没有方向的副业新人」。比内容受众更窄。"
+        },
+        "pain_points": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "买家最痛的具体问题列表。建议来自评论、私信、用户原话。"
+        },
+        "buying_trigger": {
+          "type": "string",
+          "description": "买家从「关注」变成「下单」的关键事件或情绪。"
+        },
+        "objections": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "买家不买、不信、不行动的常见理由。后续可写入转化型内容。"
+        }
+      },
+      "description": "买家画像。offer_first 必填具体内容；creator_first 可填假设；exploration 可全为空数组或 unknown 描述。"
+    },
+    "conversion_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform_role", "next_step", "notes"],
+      "properties": {
+        "platform_role": {
+          "type": "string",
+          "enum": ["awareness", "trust", "lead_capture", "sales", "after_sales", "unknown"],
+          "description": "小红书在整条转化链路里扮演的角色。awareness=认知；trust=信任建设；lead_capture=拿线索；sales=直接成交；after_sales=售后维护。"
+        },
+        "next_step": {
+          "type": "string",
+          "enum": ["follow", "comment", "dm", "wechat", "shop", "live", "link", "unknown"],
+          "description": "用户被内容吸引后期望的下一步动作。dm=私信；wechat=加微信；shop=进店铺；live=进直播；link=点链接。"
+        },
+        "notes": {
+          "type": "string",
+          "description": "转化链路补充说明。例：「私信发资料后再引导报名」。"
+        }
+      },
+      "description": "笔记到下一步动作的承接路径。CTA 设计、结尾互动引导都对齐 next_step。"
+    },
+    "business_model_probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profit_evidence_level",
+        "profit_evidence",
+        "platform_monetization_fit",
+        "pricing_risk",
+        "replacement_risk",
+        "model_notes"
+      ],
+      "properties": {
+        "profit_evidence_level": {
+          "type": "string",
+          "enum": ["hard", "medium", "weak", "none", "unknown"],
+          "description": "利润证据等级。hard=明确产品/价格/购买路径或强商业承接；medium=多条询价/咨询入口；weak=泛互动；none=无；unknown=数据不足。仅 hard/medium 才能视为有真实承接。"
+        },
+        "profit_evidence": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "可观察的商业承接证据列表。例：「评论区出现 12 次问价」「主页有咨询入口」。"
+        },
+        "platform_monetization_fit": {
+          "type": "string",
+          "enum": ["strong", "medium", "weak", "unknown"],
+          "description": "小红书流量与当前变现路径的匹配度。客单价、决策周期、低毛利商品风险综合判断。"
+        },
+        "pricing_risk": {
+          "type": "string",
+          "enum": ["too_low", "too_high", "unclear", "ok", "unknown"],
+          "description": "定价风险。too_low=毛利不足；too_high=信任门槛过高；unclear=没有清晰定价；ok=匹配。"
+        },
+        "replacement_risk": {
+          "type": "string",
+          "enum": ["high", "medium", "low", "unknown"],
+          "description": "替代风险（dbskill「印钞机测试」在薯灵的落地字段）。high=可被复制/价格打穿/同行替代；low=有独特资产或观点。"
+        },
+        "model_notes": {
+          "type": "string",
+          "description": "商业模式补充说明。例：「靠流量转卖位变现，无独家产品」。"
+        }
+      },
+      "description": "轻量商业模式探针。avoid 把高粉丝低利润错配账号误判为健康账号。仅 02-onboarding-existing 的反推阶段必填，新博主可全为 unknown。"
+    },
+    "current_bottleneck": {
+      "type": "string",
+      "enum": [
+        "no_direction",
+        "unclear_concept",
+        "no_benchmark",
+        "no_content",
+        "no_traffic",
+        "no_trust",
+        "no_offer",
+        "no_conversion",
+        "no_repeat",
+        "direction_hopping",
+        "no_publish",
+        "unknown"
+      ],
+      "description": "当前最阻塞的瓶颈。no_publish / direction_hopping 等行为类瓶颈应优先触发 creator-behavior-signals 检查。"
+    },
+    "risk_notes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "由 audit/复盘识别的业务风险条目。例：「依赖单一爆款」「定价高于市场 3x」。"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "画像创建日期 YYYY-MM-DD。"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "最近一次更新日期 YYYY-MM-DD。"
+    }
+  }
+}

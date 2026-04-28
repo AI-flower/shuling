@@ -1,0 +1,48 @@
+{
+  "creator_track": "creator_first",
+  "creator_stage": "has_posts",
+  "primary_goal": "build_trust",
+  "offer_status": "idea",
+  "monetization_stage": "no_offer",
+  "offer": {
+    "name": "",
+    "description": "考虑面向 1-3 年职场新人的求职陪跑服务，但还在验证需求阶段",
+    "price_range": "unknown",
+    "delivery": "consulting"
+  },
+  "buyer": {
+    "description": "毕业 1-3 年、卡在简历或面试反馈不足的职场新人",
+    "pain_points": [
+      "改了 5 版简历仍然不知道哪一版更好",
+      "面试被刷不知道是回答问题还是岗位不匹配",
+      "不知道自己的工作内容能不能写成案例"
+    ],
+    "buying_trigger": "拿到第二轮面试机会但反复挂掉时",
+    "objections": [
+      "怕花钱后没有真的拿到 offer",
+      "怀疑陪跑是不是只是改简历模板"
+    ]
+  },
+  "conversion_path": {
+    "platform_role": "trust",
+    "next_step": "dm",
+    "notes": "主要靠笔记建立信任，评论触发后引导私信沟通真实问题"
+  },
+  "business_model_probe": {
+    "profit_evidence_level": "weak",
+    "profit_evidence": [
+      "评论区出现 3 次「能不能私信你问问」",
+      "主页签名暗示可咨询"
+    ],
+    "platform_monetization_fit": "medium",
+    "pricing_risk": "unclear",
+    "replacement_risk": "medium",
+    "model_notes": "目前只是评论咨询信号，没有真实成交记录；变现路径仍待验证"
+  },
+  "current_bottleneck": "no_offer",
+  "risk_notes": [
+    "尚未沉淀差异化案例资产，存在被同领域博主替代的风险"
+  ],
+  "created_at": "2026-04-28",
+  "updated_at": "2026-04-28"
+}

@@ -1,0 +1,339 @@
+[
+  {
+    "id": "conflict_misread_advice",
+    "category": "cognitive_conflict",
+    "trigger": "打破已有认知",
+    "template": "大家说的 {流行做法}，我做了一年才发现是 {反向结论}",
+    "intent": "trust",
+    "best_for": ["误区纠正", "经验复盘"],
+    "avoid_for": ["纯生活记录"],
+    "constraints": {
+      "max_chars": 22,
+      "needs_tension": true,
+      "cooldown_posts": 3
+    },
+    "notes": "用「我」+「时间」承接判断，比单纯反驳更有信任感"
+  },
+  {
+    "id": "conflict_belief_backfire",
+    "category": "cognitive_conflict",
+    "trigger": "打破已有认知",
+    "template": "为什么 {普遍认为有用的动作} 反而让 {目标人群} 更慢",
+    "intent": "click",
+    "best_for": ["观点输出", "避坑提醒"],
+    "avoid_for": ["纯教程"],
+    "constraints": {
+      "max_chars": 22,
+      "needs_tension": true,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "conflict_late_realization",
+    "category": "cognitive_conflict",
+    "trigger": "打破已有认知",
+    "template": "做 {领域} 的人很久才会承认：{反常识结论}",
+    "intent": "trust",
+    "best_for": ["专业判断", "圈内观察"],
+    "avoid_for": ["新手入门内容"],
+    "constraints": {
+      "max_chars": 20,
+      "needs_tension": true,
+      "cooldown_posts": 4
+    }
+  },
+  {
+    "id": "gap_hidden_step",
+    "category": "curiosity_gap",
+    "trigger": "信息缺口",
+    "template": "{常见结果} 背后还有一步，几乎没人讲过",
+    "intent": "click",
+    "best_for": ["方法解构", "行业内幕"],
+    "avoid_for": ["纯情绪表达"],
+    "constraints": {
+      "max_chars": 20,
+      "needs_tension": true,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "gap_unspoken_reason",
+    "category": "curiosity_gap",
+    "trigger": "信息缺口",
+    "template": "{常见现象} 的真正原因，圈内人不会主动说",
+    "intent": "save",
+    "best_for": ["内幕解释", "决策辅助"],
+    "avoid_for": ["八卦/争议话题"],
+    "constraints": {
+      "max_chars": 22,
+      "needs_tension": true,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "gap_what_changed",
+    "category": "curiosity_gap",
+    "trigger": "信息缺口",
+    "template": "我把 {关键变量} 换成 {非常规选项}，意外的是 {预期外结果}",
+    "intent": "comment",
+    "best_for": ["实验复盘", "尝试型内容"],
+    "avoid_for": ["承诺型转化内容"],
+    "constraints": {
+      "max_chars": 24,
+      "needs_tension": true,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "loss_stop_doing",
+    "category": "loss_aversion",
+    "trigger": "损失规避",
+    "template": "在 {场景} 做 {高频动作} 之前，先停下读这条",
+    "intent": "click",
+    "best_for": ["避坑提醒", "决策前预警"],
+    "avoid_for": ["低风险生活记录"],
+    "constraints": {
+      "max_chars": 22,
+      "needs_tension": true,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "loss_avoidable_cost",
+    "category": "loss_aversion",
+    "trigger": "损失规避",
+    "template": "{动作}，可能让你白花 {时间或金钱}",
+    "intent": "save",
+    "best_for": ["决策辅助", "资源浪费提醒"],
+    "avoid_for": ["纯情绪/争议"],
+    "constraints": {
+      "max_chars": 20,
+      "needs_tension": true,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "loss_quiet_cost",
+    "category": "loss_aversion",
+    "trigger": "损失规避",
+    "template": "看似不重要的 {小动作}，其实正在让 {核心目标} 变远",
+    "intent": "trust",
+    "best_for": ["习惯纠正", "认知校准"],
+    "avoid_for": ["新手入门第一篇"],
+    "constraints": {
+      "max_chars": 24,
+      "needs_tension": true,
+      "cooldown_posts": 4
+    }
+  },
+  {
+    "id": "mirror_specific_self",
+    "category": "identity_mirror",
+    "trigger": "身份代入",
+    "template": "{具体年龄/阶段/职业} 的 {特定处境}，看完会松一口气",
+    "intent": "comment",
+    "best_for": ["精准圈人", "情绪共鸣"],
+    "avoid_for": ["泛人群内容"],
+    "constraints": {
+      "max_chars": 22,
+      "needs_tension": false,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "mirror_silent_majority",
+    "category": "identity_mirror",
+    "trigger": "身份代入",
+    "template": "也在 {处境} 的 {人群}，举个手",
+    "intent": "comment",
+    "best_for": ["互动起势", "群体识别"],
+    "avoid_for": ["纯教程", "信息密度高的内容"],
+    "constraints": {
+      "max_chars": 18,
+      "needs_tension": false,
+      "cooldown_posts": 4
+    }
+  },
+  {
+    "id": "mirror_quiet_doubt",
+    "category": "identity_mirror",
+    "trigger": "身份代入",
+    "template": "如果你也在偷偷怀疑 {大众结论}，先看这条",
+    "intent": "trust",
+    "best_for": ["反主流观点", "圈层共识打破"],
+    "avoid_for": ["新人破冰内容"],
+    "constraints": {
+      "max_chars": 22,
+      "needs_tension": true,
+      "cooldown_posts": 4
+    }
+  },
+  {
+    "id": "number_steps_to_outcome",
+    "category": "number_anchor",
+    "trigger": "数字锚定",
+    "template": "{N} 步，把 {模糊目标} 变成可执行清单",
+    "intent": "save",
+    "best_for": ["方法清单", "工具盘点"],
+    "avoid_for": ["纯观点输出"],
+    "constraints": {
+      "max_chars": 20,
+      "needs_tension": false,
+      "cooldown_posts": 2
+    }
+  },
+  {
+    "id": "number_short_window",
+    "category": "number_anchor",
+    "trigger": "数字锚定",
+    "template": "{X} 分钟做完 {具体产出}，比 {对照方案} 省一半",
+    "intent": "save",
+    "best_for": ["效率方法", "工具型内容"],
+    "avoid_for": ["承诺收入/收益类"],
+    "constraints": {
+      "max_chars": 24,
+      "needs_tension": false,
+      "cooldown_posts": 2
+    }
+  },
+  {
+    "id": "number_filtered_picks",
+    "category": "number_anchor",
+    "trigger": "数字锚定",
+    "template": "看了 {大基数}，留下 {小基数} 真正能用的 {对象}",
+    "intent": "save",
+    "best_for": ["盘点", "筛选型内容"],
+    "avoid_for": ["纯情绪/争议"],
+    "constraints": {
+      "max_chars": 22,
+      "needs_tension": false,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "result_before_after",
+    "category": "result_promise",
+    "trigger": "结果承诺",
+    "template": "用 {方法}，{周期} 内 {目标人群} 也能 {可观测变化}",
+    "intent": "trust",
+    "best_for": ["案例承接", "方法验证"],
+    "avoid_for": ["夸大不可验证收益"],
+    "constraints": {
+      "max_chars": 24,
+      "needs_tension": false,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "result_baseline_breaker",
+    "category": "result_promise",
+    "trigger": "结果承诺",
+    "template": "原本以为 {难做到的事}，靠 {一个动作} 就先解决了 {可见部分}",
+    "intent": "click",
+    "best_for": ["解决方案展示", "门槛拆解"],
+    "avoid_for": ["未发生的承诺"],
+    "constraints": {
+      "max_chars": 24,
+      "needs_tension": false,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "result_smallest_change",
+    "category": "result_promise",
+    "trigger": "结果承诺",
+    "template": "只动 {单一变量}，{核心指标} 当天就能看到差别",
+    "intent": "lead",
+    "best_for": ["最小行动指引", "决策辅助"],
+    "avoid_for": ["不可观测的长期承诺"],
+    "constraints": {
+      "max_chars": 22,
+      "needs_tension": false,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "proof_real_journey",
+    "category": "social_proof",
+    "trigger": "真实佐证",
+    "template": "从 {起点状态} 到 {目标状态}，我中间踩过的坑写在这",
+    "intent": "trust",
+    "best_for": ["亲身复盘", "成长记录"],
+    "avoid_for": ["未亲历的故事"],
+    "constraints": {
+      "max_chars": 24,
+      "needs_tension": false,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "proof_user_story",
+    "category": "social_proof",
+    "trigger": "真实佐证",
+    "template": "粉丝 {特定身份} 用了这套方法，{周期} 后她说 {原话}",
+    "intent": "trust",
+    "best_for": ["案例呈现", "服务效果背书"],
+    "avoid_for": ["无授权或虚构案例"],
+    "constraints": {
+      "max_chars": 24,
+      "needs_tension": false,
+      "cooldown_posts": 4
+    }
+  },
+  {
+    "id": "proof_pair_comparison",
+    "category": "social_proof",
+    "trigger": "真实佐证",
+    "template": "两个 {同类对象}，差距其实只在 {容易忽视的细节}",
+    "intent": "save",
+    "best_for": ["对比拆解", "经验提取"],
+    "avoid_for": ["无对照样本时"],
+    "constraints": {
+      "max_chars": 22,
+      "needs_tension": true,
+      "cooldown_posts": 3
+    }
+  },
+  {
+    "id": "controversy_open_position",
+    "category": "controversy",
+    "trigger": "争议站队",
+    "template": "我可能要被骂，但我坚持 {非主流观点}",
+    "intent": "comment",
+    "best_for": ["立场鲜明的观点", "圈层站队"],
+    "avoid_for": ["平台敏感话题", "新人破冰内容"],
+    "constraints": {
+      "max_chars": 20,
+      "needs_tension": true,
+      "cooldown_posts": 5
+    }
+  },
+  {
+    "id": "controversy_pushback",
+    "category": "controversy",
+    "trigger": "争议站队",
+    "template": "「{热门主张}」这句话，我反对",
+    "intent": "comment",
+    "best_for": ["针对热门论调反驳", "观点输出"],
+    "avoid_for": ["合规边缘话题", "情绪化骂战"],
+    "constraints": {
+      "max_chars": 18,
+      "needs_tension": true,
+      "cooldown_posts": 5
+    }
+  },
+  {
+    "id": "controversy_uncomfortable_truth",
+    "category": "controversy",
+    "trigger": "争议站队",
+    "template": "可能不太好听，但 {目标人群} 真的需要先听这句",
+    "intent": "trust",
+    "best_for": ["善意提醒", "硬核建议"],
+    "avoid_for": ["攻击具体对象", "争议性人身评价"],
+    "constraints": {
+      "max_chars": 22,
+      "needs_tension": true,
+      "cooldown_posts": 4
+    }
+  }
+]

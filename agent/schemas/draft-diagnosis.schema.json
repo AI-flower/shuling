@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/draft-diagnosis.schema.json",
+  "title": "draft-diagnosis（playbook 内部使用，不强制落盘）",
+  "description": "草稿五维诊断 + AI 味检测（v3.2+）。03-daily-flow.md 在 content-qa.py 之后由 LLM 在 playbook 中生成，回答「这条值不值得发」。诊断不硬阻塞发布；只命中合规风险时才阻塞（08-compliance.md 负责）。详见 docs/plans/v3.2-creator-business-intelligence-plan.md §5.5。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "overall_score", "decision", "dimensions", "ai_fingerprint_hits", "checked_at"],
+  "definitions": {
+    "dimensionScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "issue", "evidence", "fix", "fix_priority", "confidence"],
+      "properties": {
+        "score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "本维度得分 [0,100]。"
+        },
+        "issue": {
+          "type": "string",
+          "description": "本维度发现的主要问题。无问题时为空字符串。"
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "支持判断的具体证据片段（可引用原文）。无 evidence 时 confidence 最高只能为 low。"
+        },
+        "fix": {
+          "type": "string",
+          "description": "建议的修改动作。"
+        },
+        "fix_priority": {
+          "type": "string",
+          "enum": ["high", "medium", "low"],
+          "description": "修改优先级。用户看到的诊断只展示 high 的 1-3 项。"
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "本维度判断的置信度。无 evidence 时不允许 medium/high。"
+        }
+      }
+    }
+  },
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "description": "总体是否可发。decision in {pass, user_confirm} 时 true；revise/regenerate 时 false。"
+    },
+    "overall_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "六维加权综合分 [0,100]。"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["pass", "revise", "regenerate", "user_confirm"],
+      "description": "建议动作。pass=可发；revise=小修后再发；regenerate=结构性重写；user_confirm=诊断分偏低但用户可强制发。"
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clarity",
+        "title_cover_fit",
+        "expression_efficiency",
+        "cognitive_gap",
+        "human_signal",
+        "business_alignment"
+      ],
+      "properties": {
+        "clarity": {
+          "$ref": "#/definitions/dimensionScore",
+          "description": "是否一句话说清楚核心观点。"
+        },
+        "title_cover_fit": {
+          "$ref": "#/definitions/dimensionScore",
+          "description": "标题/封面是否给出明确点击理由，且与正文承诺一致。"
+        },
+        "expression_efficiency": {
+          "$ref": "#/definitions/dimensionScore",
+          "description": "是否绕、空、堆术语、信息密度低。"
+        },
+        "cognitive_gap": {
+          "$ref": "#/definitions/dimensionScore",
+          "description": "是否提供读者不知道的新判断、新方法或新案例。"
+        },
+        "human_signal": {
+          "$ref": "#/definitions/dimensionScore",
+          "description": "是否有真人经验、具体细节、判断痕迹（不按通用「真人感」模板判断，参考 profile.json 历史风格）。"
+        },
+        "business_alignment": {
+          "$ref": "#/definitions/dimensionScore",
+          "description": "是否服务 business-profile.primary_goal 或 conversion_path.next_step。business-profile 缺失时 confidence=low + score 中性。"
+        }
+      },
+      "description": "六维诊断详情。"
+    },
+    "ai_fingerprint_hits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "severity", "sample", "reason"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "uniform_rhythm",
+              "gnomic_endings",
+              "synonym_substitution",
+              "translation_tone",
+              "hook_pain_promise",
+              "not_x_but_y",
+              "term_stacking",
+              "smooth_emotion_curve",
+              "fake_reader_voice",
+              "empty_blessing"
+            ],
+            "description": "AI 味信号类型。详见 plan §5.5.4。"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "warn", "error"],
+            "description": "严重度。"
+          },
+          "sample": {
+            "type": "string",
+            "minLength": 1,
+            "description": "原文中命中的片段。必须可回溯。"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "判断理由。"
+          }
+        }
+      },
+      "description": "AI 托管感命中条目。空数组=未命中。仅检测「读起来像托管内容」，不识别「是否 AI 生成」。"
+    },
+    "summary": {
+      "type": "string",
+      "description": "给用户看的简短总结。可选。"
+    },
+    "checked_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}Z)?$",
+      "description": "诊断时间。YYYY-MM-DD 或 ISO8601 UTC。"
+    }
+  }
+}
