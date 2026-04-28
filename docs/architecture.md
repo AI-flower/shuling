@@ -252,6 +252,70 @@ v3.0 新增的 runtime 自愈机制，让"只 `git pull` 不跑 install"的用�
 
 设计原则之一（ADR-0001 §第 12 条）：每个引入的新机制必须给出"如果该机制不可用怎么办"的降级路径。
 
+### Account Safety Layer（v3.1+）
+
+v3.1 在业务内核 `agent/` 之上叠加 **Account Safety Layer**，把账号写操作从「普通脚本能力」降级为「需要 approval 的 privileged mutation」。决策依据见 [ADR-0003](adr/0003-account-execution-boundary.md)。
+
+```
+agent/playbook/
+  ↓ 业务流程编排
+agent/scripts/
+  ├── xhs.sh                 小红书 MCP 统一入口（v3.1 起对 publish/comment/import-cookie 强制 verify approval）
+  ├── approval.sh            一次性用户授权（request / grant / verify / consume / revoke）
+  ├── account-safety.sh      风险策略 / 状态机 / cooldown
+  ├── external-intel.sh      L0-L3 外部情报采样统一入口（预算化 + 缓存）
+  ├── content-qa.py          内容模板化 / AI 味质量检查
+  └── db.sh / image.py / ...
+  ↓
+agent/policies/account-safety.default.json
+agent/policies/external-intelligence.default.json
+agent/config/account-safety.json          ← 用户态 mode 选择
+agent/config/account-safety-state.json    ← 风险等级 / 风险事件 / cooldown
+agent/config/external-intelligence.json   ← 用户态预算 override
+agent/config/approvals/                   ← 一次性授权文件目录
+```
+
+四种运行模式：
+
+| 模式 | 默认 | 允许动作 | 禁止动作 |
+|---|---|---|---|
+| `draft-only` | 是 | 选题 / 起稿 / 复盘 / L0-L2 外部情报 | 发布 / 评论 / cron 自动发布 |
+| `supervised` | 推荐生产 | 草稿 + 用户授权后的 publish | 评论（除非显式启用）、unsafe override |
+| `read-only-research` | 老博主导入前 | 只 search / detail / 分析 | 任何写动作 |
+| `ops-maintenance` | 运维 | doctor / preflight / verify | 任何业务流程 |
+
+四种风险等级：
+
+| 等级 | 允许 | 禁止 |
+|---|---|---|
+| `normal` | 按 policy + approval 执行 | — |
+| `watch` | 草稿 + 强提醒 | — |
+| `cooldown` | search / detail / 草稿 / 复盘 | publish / comment / import-cookie |
+| `locked` | doctor / preflight / 只读 | 任何 mutation |
+
+进入 `cooldown` 的触发：发布连续失败 2 次 / 评论失败 1 次 / MCP 返回 429 / captcha / 风控关键词 / 登录态连续失败 / 当天发布数达上限 / 用户手动暂停。
+
+发布链路：
+
+```
+03-daily-flow → emit draft_ready → 等待用户确认 →
+approval.sh request publish → approval.sh grant → emit publish_approved →
+04-publish-flow → xhs.sh publish --approval-id → account-safety.sh verify → publish_content
+```
+
+**`draft_ready` 是 non-mutating event**，不能触发 publish。`publish_approved` 只能由 `approval.sh grant` 显式产生，cron 与自动 routing 都不能合成。
+
+外部情报降级路径（ADR-0001 第 12 条原则在 v3.1 的具体落地）：
+
+```
+external-intel.sh research-topic
+  ↓ check budget + safety state
+  ├─ budget OK + safety normal → MCP 调用 + 写入 external_signals
+  ├─ budget exhausted          → 读 cache，未命中即降级到内部 profile/preferences/patterns
+  ├─ safety != normal          → 不发起 L3，只用 L0-L2 + cache
+  └─ MCP 返回风险关键词        → 立即停止 + 写 risk event + 进入 cooldown
+```
+
 ---
 
 ## 部署运维层（ops/）

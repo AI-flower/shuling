@@ -1,6 +1,6 @@
 # 薯灵 (ShuLing)
 
-> Stateful Creator Agent for 小红书博主 — 通过 SKILL.md 接入 Claude Code / Codex / Hermes，业务大脑在 `agent/playbook/`。
+> Stateful Creator Agent for 小红书博主：自动完成外部情报采样、选题、起稿、生图、复盘和学习；账号发布与互动默认由用户确认授权。通过 SKILL.md 接入 Claude Code / Codex / Hermes，业务大脑在 `agent/playbook/`。
 
 [![Version](https://img.shields.io/badge/version-3.0.0-blue)](VERSION)
 [![Codename](https://img.shields.io/badge/codename-Stateful%20Creator%20Agent-green)](CHANGELOG.md)
@@ -52,6 +52,20 @@ v3.0 起，薯灵的形态明确分成 **三层**：
 - **部署运维层**（`ops/`）：安装、cron 模板、verify 门禁、布局迁移。只在源仓库里，不会被打包进 target。
 
 详细决策与 12 条总原则见 [`docs/adr/0001-stateful-creator-agent.md`](docs/adr/0001-stateful-creator-agent.md)，完整架构图与三层职责见 [`docs/architecture.md`](docs/architecture.md)。
+
+### 能力边界（v3.1+ Account Safety Hardening）
+
+薯灵的核心定位是「全自动运营大脑 + 受控账号执行层」。能力分为三档：
+
+| 自动（agent 直接执行） | 受控（需用户显式授权） | 默认禁用 |
+|---|---|---|
+| 外部情报低频采样（L0-L2） | 发布笔记 | 评论（除非显式启用 `SHULING_ENABLE_COMMENT=1`） |
+| 选题 / 起稿 / 生图 | Cookie 导入 | 关闭节流（`XHS_DISABLE_THROTTLE=1`，仅 dev mode） |
+| 复盘 / 学习 | 外部情报 L3 深读 | 关闭限额（`XHS_DISABLE_QUOTA=1`，仅 dev mode） |
+| 评论洞察（只读 + 回复建议） | 批量历史导入 | 高频抓取（L4） |
+| 账号体检建议 | 进入 supervised 模式 | 全自动账号托管 |
+
+发布、评论、Cookie 导入等账号写操作被定义为 **privileged mutation**，由 `agent/scripts/approval.sh` 一次性授权 + `xhs.sh` 内部 6 道 verify 把守，**不依赖 playbook 文案约束**。完整边界与决策路径见 [`docs/adr/0003-account-execution-boundary.md`](docs/adr/0003-account-execution-boundary.md) · [`docs/runbooks/account-safety.md`](docs/runbooks/account-safety.md) · [`docs/runbooks/external-intelligence.md`](docs/runbooks/external-intelligence.md)。
 
 ---
 

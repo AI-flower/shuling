@@ -44,6 +44,81 @@ bash install.sh
 
 ## 逐版本迁移步骤
 
+## v3.0.0 → v3.1.0（Account Safety Hardening）准备
+
+> ⏳ **状态**：v3.1.0 尚未发版。本节是过渡期文档铺垫——v3.1 落地前可以提前了解将要发生什么变化、准备好迁移路径。
+>
+> 决策依据：[`docs/adr/0003-account-execution-boundary.md`](docs/adr/0003-account-execution-boundary.md)
+> 实施细则：[`docs/plans/v3.1-account-safety-implementation-plan.md`](docs/plans/v3.1-account-safety-implementation-plan.md)
+> 运行手册：[`docs/runbooks/account-safety.md`](docs/runbooks/account-safety.md) · [`docs/runbooks/external-intelligence.md`](docs/runbooks/external-intelligence.md)
+
+### v3.1 的关键行为变更（提前周知）
+
+1. **`agent/scripts/xhs.sh publish` 将需要 approval**。从 v3.1 起，无 approval-id 调用直接返回 `error: approval_required`。AI 助手会自动在 `draft_ready` 之后请求 approval，用户回复「发」即触发 grant；自定义脚本必须显式调 `approval.sh request` + `grant`。
+2. **评论默认禁用**。`xhs.sh comment` 即使在 supervised 模式下也需要 `SHULING_ENABLE_COMMENT=1` 环境变量 + approval。07-comment-insights 默认只输出回复建议。
+3. **cron 改 draft-only**。`ops/cron/*` 模板的 prompt 移除「执行午间发布流程」「执行晚间发布流程」等字样，统一改为「生成草稿 + 等待用户确认 + 不要发布」。
+4. **外部情报采样新增预算 / 缓存层**。所有对小红书 search / detail / comment 的访问必须通过 `agent/scripts/external-intel.sh` 入口，受 `agent/policies/external-intelligence.default.json` 预算约束。
+5. **`draft_ready` 与 publish 解耦**。`draft_ready` 是 non-mutating 事件，仅用于通知用户；不再是 04-publish-flow 的触发条件。
+
+### 旧自动化脚本迁移示例
+
+如果你的 cron job、CI 任务或第三方集成里有这样的代码（v3.0 行为）：
+
+```bash
+# v3.0 自动化（v3.1 起失败）
+bash agent/scripts/xhs.sh publish /tmp/xhs-post/meta.json
+```
+
+v3.1 起需要改为：
+
+```bash
+# v3.1 标准发布流程
+APPROVAL=$(bash agent/scripts/approval.sh request publish /tmp/xhs-post/meta.json | jq -r '.id')
+
+# 由用户在 TTY 或对话里 grant；非交互场景必须先获得用户确认
+bash agent/scripts/approval.sh grant "$APPROVAL"
+
+# 然后 publish 才能成功
+bash agent/scripts/xhs.sh publish /tmp/xhs-post/meta.json --approval-id "$APPROVAL"
+
+# 成功后 consume，防止误用
+bash agent/scripts/approval.sh consume "$APPROVAL"
+```
+
+### 旧外部数据采样脚本迁移示例
+
+如果你的 playbook / 脚本里有这样的散落调用（v3.0 行为）：
+
+```bash
+# v3.0 散落调用
+bash agent/scripts/xhs.sh search "租房收纳"
+bash agent/scripts/xhs.sh detail "$note_id"
+bash agent/scripts/xhs.sh fetch-comments "$note_id"
+```
+
+v3.1 起统一走 external-intel.sh：
+
+```bash
+# v3.1 预算化外部情报
+bash agent/scripts/external-intel.sh research-topic "租房收纳" --budget conservative
+bash agent/scripts/external-intel.sh competition-gap "租房收纳"
+bash agent/scripts/external-intel.sh comment-demand "$note_id" --limit 30
+```
+
+`xhs.sh search/detail/fetch-comments` 仍然存在并可被直接调用（用于一次性手工查询），但 v3.1 verify 第 41 条会扫描 playbook 文件，禁止 03/05/07 散落调用。
+
+### 升级前可以做什么
+
+v3.1 还未发版，但你现在就可以：
+
+- 阅读 [`docs/adr/0003-account-execution-boundary.md`](docs/adr/0003-account-execution-boundary.md) 理解新边界
+- 检查你的自动化脚本是否直接调用 `xhs.sh publish/comment/import-cookie`，规划迁移
+- 备份 `agent/data/xhs.db` + `agent/config/runtime.env` + `agent/knowledge-base/*`（与 v2 → v3 升级前置 checklist 一致）
+
+升级实际步骤将在 v3.1.0 发版时补全。
+
+---
+
 ## v2.x → v3.0.0 "Stateful Creator Agent"（2026-04-27）
 
 > ⚠ **v3.0 是 BRAIN +1 breaking 升级**——target 布局重组、SKILL.md 完全瘦身、scripts/ 路径变化。
