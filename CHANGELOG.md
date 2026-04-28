@@ -15,6 +15,109 @@
 
 ---
 
+## [3.1.0] - 2026-04-28 "Account Safety Hardening"
+
+> ✅ **状态**：已发版。v3.1 在 v3.0 三层架构之上叠加 **Account Safety Layer**：账号写权限收口为 privileged mutation、cron 默认 draft-only、外部情报采样预算化、内容 AI 托管感检测、verify 门禁从 32 条扩到 40 条。
+>
+> **版本位决策**：HANDS +1 / CALIB +1 → v3.1.0（business-language semantics 反转，但向后兼容；非 BRAIN +1）
+>
+> 决策依据：[`docs/adr/0003-account-execution-boundary.md`](docs/adr/0003-account-execution-boundary.md)
+> 实施细则：[`docs/plans/v3.1-account-safety-implementation-plan.md`](docs/plans/v3.1-account-safety-implementation-plan.md)
+> 完整设计：[`docs/plans/v3-account-execution-safety-hardening.md`](docs/plans/v3-account-execution-safety-hardening.md)
+
+### Stage 1（已合入 v3.0.x dev 分支）— 文档与边界决策
+
+- 新增 ADR-0003：定义 privileged mutation 边界、`draft_ready != publish_allowed`、cron draft-only、评论默认禁用 5 段决策
+- 新增 `docs/runbooks/account-safety.md`：7 个子章节（模式 / 开启 supervised / 授权发布 / 查看 cooldown / 解除 cooldown / 安全导入 cookie / 安全批量导入历史）
+- 新增 `docs/runbooks/external-intelligence.md`：6 个子章节（情报 vs 爬虫 / L0-L4 风险分层 / 预算配置 / external signal 输出解释 / 失败降级 / 不存原文）
+- 新增 `docs/plans/v3.1-account-safety-implementation-plan.md`：8 stage 浓缩执行计划
+- README 加「能力边界」段（自动 / 受控 / 默认禁用三档）+ 定位句更新
+- UPGRADE 加「v3.0 → v3.1 准备」段（含旧自动化脚本迁移示例）
+- docs/architecture.md 加「Account Safety Layer」段
+
+### Stage 3 + Stage 5（已合入 dev 分支）— Approval 硬门禁 + Account Safety Cooldown
+
+#### 🧠 Brain（产品边界 + 业务语义反转）
+
+- **privileged mutation 概念落地**：publish / comment / import-cookie / override-quota 不再是 agent 的普通能力，而是必须经过 approval + safety state 校验才能放行。`xhs.sh` 内部硬校验拒绝未授权请求，AI 长会话漂移、cron prompt 改写、老自动化脚本直调等所有上游路径都覆盖到。
+- **`draft_ready` 语义反转**：草稿生成 ≠ 发布授权。04-publish-flow.md 的 `when` 移除「draft_ready 事件触发」，改为「用户明确回复'发'」+「publish_approved 事件触发」（后者只能由 `approval.sh grant` 显式产生）。
+- **评论 Action Boundary**：07-comment-insights.md 默认只输出回复建议，不调 `xhs.sh comment`。即使 `commenting_enabled=true` 也要走 `SHULING_ENABLE_COMMENT=1` + approval flow。
+
+#### ✋ Hands（脚本 + DB + 配置）
+
+- **新增 `agent/scripts/approval.sh`**（429 行）：7 个子命令（request / grant / verify / consume / revoke / list / cleanup-expired）。verify 6 道闸：文件存在 / status=granted / action 匹配 / resource sha256 匹配 / 未过期 / 未消费 / safety state ∉ {cooldown, locked}。退出码 0/1/2/30 与 _common.sh 对齐。
+- **新增 `agent/scripts/account-safety.sh`**（350 行）：8 个子命令（status / check / record-event / enter-cooldown / exit-cooldown / increment / reset-daily / set-mode）。识别 14 个风险关键词（429 / captcha / risk / forbidden / 风控 / 频繁 等）→ 命中即写 `last_risk_event` + 进 cooldown。
+- **`agent/scripts/xhs.sh` 5 处门禁改造**：
+  1. publish 无 `--approval-id` → exit 1 `approval_required`；成功后自动 consume + increment publish。
+  2. comment 默认 `comment_disabled`，需 `SHULING_ENABLE_COMMENT=1` + approval。
+  3. import-cookie 增加 cooldown 拒绝 + 非 @file 输入警告。
+  4. `XHS_DISABLE_THROTTLE=1` / `XHS_DISABLE_QUOTA=1` 在非 dev mode 下立即 exit 2 `dev_mode_required`。
+  5. mcp_call 响应识别 14 风险关键词 → 异步调用 account-safety.sh record-event。
+- **`agent/scripts/import-existing.sh` 改造**：default `--limit` 从 200 调到 50；新增 `plan` / `run` 子命令（plan 输出预估批次数 + 节流估时）；批次间强制 `BATCH_COOLDOWN_SECONDS=300` sleep；`--override-quota` 改名 `--unsafe-override-quota`（旧名带 deprecation warning 仍生效一次）；非 dev mode + 非 TTY 下禁止 unsafe override。
+- **`agent/scripts/xhs.sh` 一致性收口**：顶部 source `_paths.sh` / `_common.sh`（与 db.sh 对齐，§15.1）。
+- **`agent/scripts/import-existing.sh` 一致性收口**：旧路径 `$SKILL_DIR/scripts/xhs.sh` 改为 `$SCRIPTS_DIR/xhs.sh`（来自 `_paths.sh` 的 `SHULING_SCRIPTS_DIR`，§15.2）。
+
+#### 🎛 Calib（playbook + cron + doctor + 文档）
+
+- **04-publish-flow.md** 重写 Procedure 第 2-3 步为 approval flow（request → grant → verify → publish --approval-id → consume + increment）；frontmatter `version: 3.1.0`；Failure Handling 增加 approval 失败转 09 的引用。
+- **07-comment-insights.md** 顶部增加 `Comment Action Boundary` 段（默认只生成回复建议，不发出；用户坚持要评论 → 走 approval flow）。
+- **09-troubleshooting.md** 在 General Exception Matrix 前新增 `Account Safety Failure Matrix`（13 个错误码 + 3 个诊断命令）。
+- **ops/doctor.sh 新增 3 项检查**：`account_safety_policy`（policy 文件存在 + JSON 有效，输出 mode）、`account_safety_state`（state 文件存在 + 输出 risk_level）、`cooldown_active`（cooldown 时黄色高亮、locked 时红色高亮，TTY 下生效）。
+- **cron 模板**：Wave 1 已落地 draft-only 文案改写（与 §10 对齐）。
+
+完成时 `bash ops/verify/pre-submit-verify.sh --strict` 仍通过（35-42 条 verify check 由 Stage 8 实施）。
+
+### Stage 6（已合入 dev 分支）— External Intelligence MVP
+
+#### 🧠 Brain（双因子选题决策）
+
+- **双因子选题评分公式落地**（§12.9）：`03-daily-flow.md` §2.1 第 5 步从单因子改为
+  ```text
+  final_score = 0.35 * audience_fit         (内部 profile.json)
+              + 0.25 * external_momentum    (external-signals 趋势)
+              + 0.20 * competition_gap      (external-signals.white_space 差异化空间)
+              + 0.15 * creator_preference   (preferences.json + user_choices)
+              + 0.05 * freshness            (xhs.db posts 近期重复)
+  ```
+  外部数据缺失时 `external_momentum` / `competition_gap` 取中性 0.5，并明确标注「本轮未获取外部趋势数据」，**不允许伪装成有外部数据**。
+- **外部情报采样前置**：03-daily-flow §2.1 新增第 2 步「外部情报采样」（cache-get → research-topic 降级链），所有外部研究统一收口到 `external-intel.sh`，禁止 03/05/07 散调 `xhs.sh search/recommend/detail` 或 `fetch-comments.sh`。
+- **评论需求 → external signal 转换**：05-review.md 新增 Comment Demands 段，复盘时把评论高频需求转结构化 signal，**不存评论原文**；07-comment-insights.md 新增 Comment Read Boundary，强制评论读取走 `external-intel.sh comment-demand` + 低频预算。
+
+#### ✋ Hands（脚本 + DB + cache）
+
+- **新增 `agent/scripts/external-intel.sh`**（~660 行）：6 个子命令（research-topic / competition-gap / comment-demand / cache-get / cache-prune / budget-status）。
+  - 走 `xhs.sh` 而非裸调 MCP（继承节流/限额/风险关键词识别）
+  - 写盘前用 `agent/schemas/external-signal.schema.json` 自校验（jsonschema 优先 + stdlib fallback）
+  - safety state 为 `cooldown` / `locked` 时 exit 30 完全停止
+  - MCP 响应命中风险关键词 → `account-safety.sh record-event external_intel "<hint>"` + exit 31
+  - 预算耗尽 / MCP 失败 → `degraded:true` + exit 0（caller 降级到内部记忆）
+  - cache 路径 `$SHULING_KB_DIR/external-signals/<sha256(topic)[:16]>.json`，TTL by signal_type（trend 3d / competition 7d / comment_demand 14d / evergreen 30d）
+  - 计数器 `$SHULING_DATA_DIR/external-intel-counters.json`，daily 按日期分桶 + per-session 按 `SHULING_SESSION_ID` 或 PID 分桶
+- **新增 `agent/migrations/db/v3.1.0.sh`**：建 `external_signals` 表 + 2 个索引（`idx_ext_signals_topic` / `idx_ext_signals_expires`），通过 `_guard.sh` 台账幂等。本表是 JSON cache 之外的辅助索引（v3.1 主路径以 JSON 为权威）。
+- **`db.sh` 新增 `query-external-signals` 子命令**：`[--topic X] [--days N] [--limit N]`，表不存在或为空都输出 `[]` 不阻断。
+
+#### 🎛 Calib（schema + policy + playbook + 配置）
+
+- **`agent/schemas/external-signal.schema.json`**（Wave 1 已落，本 stage 完成消费契约）：硬禁 `full_body / raw_comments / full_comments / raw_post_body / note_body / raw_html` 字段；`sample_size.comments` 上限 30。
+- **`agent/policies/external-intelligence.default.json`**（Wave 1 已落）：conservative 默认 + daily(8/5/15/5) + per-session(3/5/2) + cooldown_minutes_after_risk=1440。
+- **`03-daily-flow.md`**：frontmatter 加 `external-intel.sh` 调用；Inputs 加 external-signals/<topic>.json；§2.1 加第 2 步采样 + 第 5 步双因子；Failure Handling 加「外部情报失败降级」段；Anti-Patterns 加 2 条（不裸调 search/detail；不存原文）；Cross-Refs 加外部情报 runbook + external-intel.sh 引用。
+- **`05-review.md`**：calls.scripts 加 external-intel.sh；新增 Comment Demands → External Signals 段。
+- **`07-comment-insights.md`**：calls.scripts 加 external-intel.sh；新增 Comment Read Boundary 段（低频预算 + 走 external-intel.sh + 不存原文）。
+- **`08-compliance.md`**：Procedure 末尾新增 External Signal Storage Rules 段（允许字段 / 禁止字段 / 写盘前校验）；Cross-Refs 加 external-intelligence runbook 与 external-signal schema。
+- **`agent/scripts/README.md`**：新增 `external-intel.sh` 完整条目（6 子命令 + 契约 + 输出形状 + 退出码）；db.sh 条目补 `query-external-signals`。
+- **`.gitignore`**：新增 `agent/data/external-intel-counters.json` + `agent/knowledge-base/external-signals/*.json`（用户态信号 cache，不进 git）。
+
+verify 41/42 由 Stage 8 实施；本 stage 完成时 verify 套件保持现有通过率不退化。
+
+### v3.1 剩余路线图（待实施）
+
+| Stage | Commit | 内容 |
+|---|---|---|
+| 7 | `feat(v3.1): add content QA and secret safety checks` | content-qa.py + cookie/key 权限检查 |
+| 8 | `test(v3.1): add account execution and intelligence safety gates` | verify 35-42 |
+
+---
+
 ## [3.0.0] - 2026-04-27 "Stateful Creator Agent"
 
 v3.0 是薯灵的**架构重塑版**：从"标准 Skill 包"演化为 **Stateful Creator Agent**，三层架构（SKILL.md 桥梁 + agent/ 内核 + ops/ 部署）。SKILL.md 从 1204 行瘦身到 77 行，全部业务剧本下沉到 agent/playbook/。

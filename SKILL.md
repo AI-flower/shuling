@@ -8,9 +8,9 @@ description: |
   - "今天发什么"
   - "我想做XX方向的博主"
   - "复盘一下最近的帖子"
-version: 3.0.0
-codename: Stateful Creator Agent
-last_updated: 2026-04-27
+version: 3.1.0
+codename: Account Safety Hardening
+last_updated: 2026-04-28
 ---
 
 # 薯灵 — Stateful Creator Agent for 小红书博主
