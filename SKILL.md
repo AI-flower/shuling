@@ -8,8 +8,8 @@ description: |
   - "今天发什么"
   - "我想做XX方向的博主"
   - "复盘一下最近的帖子"
-version: 3.1.0
-codename: Account Safety Hardening
+version: 3.2.0
+codename: Creator Business Intelligence
 last_updated: 2026-04-28
 ---
 

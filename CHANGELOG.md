@@ -15,9 +15,9 @@
 
 ---
 
-## [Unreleased] v3.2.0 — Creator Business Intelligence
+## [3.2.0] - 2026-04-28 "Creator Business Intelligence"
 
-> 🚧 **状态**：开发中。把 dbskill 的业务诊断、对标、内容诊断、标题公式、AI 味识别、业务归因、执行摩擦、慢方法资产复利和概念澄清能力，融合进薯灵现有「画像 → 选题 → 草稿 → 生图 → 发布 → 复盘 → 学习」闭环。
+> ✅ **状态**：已发版。把 dbskill 的业务诊断、对标、内容诊断、标题公式、AI 味识别、业务归因、执行摩擦、慢方法资产复利和概念澄清能力，融合进薯灵现有「画像 → 选题 → 草稿 → 生图 → 发布 → 复盘 → 学习」闭环。
 >
 > **版本位决策**：BRAIN +1 / HANDS +1 / CALIB +1 → v3.2.0（业务画像 / 业务归因复盘 / 选题价值闸门改写主流程，BRAIN 主导）
 >
@@ -25,7 +25,7 @@
 >
 > 不复制 dbskill (CC BY-NC 4.0) 原始知识资产。v3.2 仅吸收业务能力和方法结构，使用薯灵自有抽象规则。
 
-### 🧠 Brain 方向（待落地）
+### 🧠 Brain
 
 - 创作者业务画像（`business-profile.json` / `creator_track`：creator_first / offer_first / exploration）
 - 对标账号 dossier（business_benchmark vs content_sample 双层过滤，利润证据硬门）
@@ -37,14 +37,14 @@
 - 慢方法 + 内容资产复利（10 类 asset，asset-ledger）
 - 概念澄清闸门（IP / 私域 / 精准流量 / 赛道 / 变现 大白话重述）
 
-### ✋ Hands 方向（待落地）
+### ✋ Hands
 
 - 7 个新 schema：`business-profile` / `benchmark` / `title-formula` / `draft-diagnosis` / `business-review` / `creator-behavior-signal` / `content-asset`
 - 6 个新知识库默认文件：`business-profile.json.example` / `title-formulas.json` / `business-patterns.md` / `business-anti-patterns.md` / `asset-ledger.md` / `creator-behavior-signals.md`
 - DB migration v3.2.0：posts +3 列 / topic_candidates +7 列 / 3 张新表（business_reviews / content_assets / creator_behavior_signals）
 - `db.sh` 新增 7 个子命令：add/query × business-review / content-asset / creator-behavior-signal
 
-### 🎛 Calib 方向（待落地）
+### 🎛 Calib
 
 - 03-daily-flow / 04-publish-flow / 05-review / 07-comment-insights / 08-compliance / 09-troubleshooting playbook 引用新数据契约
 - verify 门禁覆盖标题公式 trigram 相似度（防 dbskill 抄袭）、business benchmark 利润证据硬门、行为信号无人格评价
