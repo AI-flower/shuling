@@ -25,8 +25,8 @@ writes:
 preconditions: []
 on_failure:
   - 09-troubleshooting.md
-version: 3.0.0
-last_updated: 2026-04-27
+version: 3.2.0
+last_updated: 2026-04-28
 ---
 
 # 00 Business Routing
@@ -66,6 +66,10 @@ python3 agent/scripts/preflight.py
 | `state.profile_created: true` 但某 check 报 `error`/`missing` | **仅修复缺失项**，不要重新走 01/02 流程，不要重新问画像 |
 | `state.profile_created` 缺失/false，且用户自述"已在运营小红书" | 走 `02-onboarding-existing.md` |
 | `state.profile_created` 缺失/false，且用户为新博主 | 走 `01-onboarding-new.md`（仅缺失项 → 建画像） |
+| 用户使用「IP / 私域 / 精准流量 / 赛道 / 变现 / 副业 / 干货 / 个人品牌 / 人设 / 知识付费」等模糊概念 | 进入 `01-onboarding-new.md`（新博主）或 `02-onboarding-existing.md`（老博主）的「Concept Precheck / Problem Dissolution」段先做大白话重述；澄清结论只用于修正 `profile.json` / `business-profile.json` 字段，**不单独写文件** |
+| 用户说「我想换方向」/「想重新定位」/「换赛道」 | 先做概念澄清（命中同上触发段），再更新 `profile.json` + `business-profile.json`；如已有历史，可同步触发 `02-onboarding-existing.md` 的业务画像反推子段 |
+| **用户连续两次拒绝选题**（本会话 / 跨会话连续 2 次「换」/「不喜欢」/「再来」） | 进入 `03-daily-flow.md` 但**先触发** `## 2.0 Execution Friction Fallback`：复查 `business-profile.json.current_bottleneck` 与 `creator_track`；不强行第三次重推选题；详见 plan §7.2 |
+| **用户连续生成草稿但不发布**（连续 ≥ 3 次走完 03 草稿流程但 24h+ 未进入 04） | 命中 `creator_behavior_signal.draft_no_publish` → 进入 `03-daily-flow.md` 的 `## 2.0 Execution Friction Fallback`；**不**继续无限改稿、不再生成新选题，改用现有 draft；详见 plan §7.2 |
 
 **第 3 步：识别运行平台**
 

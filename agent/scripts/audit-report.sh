@@ -5,7 +5,7 @@
 #   agent/knowledge-base/audit-<YYYY-MM-DD>.json   结构化（AI 读 + agent/schemas/audit-report.schema.json 校验）
 #   agent/knowledge-base/audit-<YYYY-MM-DD>.md     人类可读骨架（AI 后续追加归因分析）
 #
-# 统计维度（MVP 8 项）:
+# 统计维度（MVP 8 项 + v3.2 业务情报 8 项）:
 #   1. 账号快照 (historical_stats 最新行)
 #   2. 流量趋势（最近 N 天每日发布量 × 平均收藏率）
 #   3. Top 5 / Bottom 5 帖（按收藏率）
@@ -14,6 +14,19 @@
 #   6. 评论需求积压（comment_insights.content_requests top-K）
 #   7. 风险信号（连续低表现 / 发布密度异常）
 #   8. (Layer 1 不含) AI 归因分析 — 由 AI 读 JSON 后追加到 md
+#
+#   ─── v3.2: 业务情报段（plan §7.4）──
+#   9.  业务画像推测（AI 待填：creator_track / creator_stage / primary_goal / 等）
+#   10. 商业模式轻量测试（前 3 项必答：利润证据 / 平台匹配 / 商业阶段）
+#   11. 利润证据与平台匹配（证据明细：商业意图评论笔记列表）
+#   12. 高流量低业务价值内容（top_posts 中无商业意图信号的）
+#   13. 低流量高意图内容（bottom_posts 中评论有意图信号的）
+#   14. 方向漂移与执行摩擦信号（topic_type 切换次数 + creator_behavior_signals）
+#   15. 建议保留的业务 pattern（AI 待填，落 business-patterns.md）
+#   16. 建议停止的业务 anti-pattern（AI 待填，落 business-anti-patterns.md）
+#
+#   架构选择：v3.2 段落混合——脚本生成数据骨架（SQL/jq），LLM 后续读 JSON
+#   填入业务画像推测、利润证据等级、平台变现匹配、商业阶段、商业 pattern 等需要判断的字段。
 #
 # 用法:
 #   bash agent/scripts/audit-report.sh                         # 默认最近 90 天
@@ -177,6 +190,83 @@ risks_json=$(jq -cn \
         (if $consecutive_low >= 3 then {code:"consecutive_low_performance", detail: "最近 3 条收藏率均 < 2%"} else empty end)
     ]')
 
+# ─── v3.2: 业务画像反推所需的辅助查询 ──────────────────────────────
+# 这些查询给 AI 做业务归因时提供原料（高流量低互动 / 低流量高意图 / 评论商业意图等）。
+# 字段从最近 $DAYS 天的 imported posts 中筛。
+
+# 商业意图评论 hits（评论里出现「多少钱/价格/链接/购买/报名/咨询/微信/合作」等词的笔记）
+buy_intent_posts_json="$(sqlite3 -json "$DB_PATH" "
+SELECT ci.post_id, pos.title, pos.note_id,
+       ci.content_requests, ci.top_questions
+FROM comment_insights ci
+INNER JOIN posts pos ON ci.post_id = pos.id
+WHERE $SOURCE_FILTER
+  AND (
+    IFNULL(ci.content_requests, '') LIKE '%价%'
+    OR IFNULL(ci.content_requests, '') LIKE '%多少钱%'
+    OR IFNULL(ci.content_requests, '') LIKE '%购买%'
+    OR IFNULL(ci.content_requests, '') LIKE '%链接%'
+    OR IFNULL(ci.content_requests, '') LIKE '%报名%'
+    OR IFNULL(ci.content_requests, '') LIKE '%咨询%'
+    OR IFNULL(ci.content_requests, '') LIKE '%微信%'
+    OR IFNULL(ci.content_requests, '') LIKE '%合作%'
+    OR IFNULL(ci.top_questions,    '') LIKE '%价%'
+    OR IFNULL(ci.top_questions,    '') LIKE '%多少钱%'
+    OR IFNULL(ci.top_questions,    '') LIKE '%购买%'
+    OR IFNULL(ci.top_questions,    '') LIKE '%报名%'
+    OR IFNULL(ci.top_questions,    '') LIKE '%咨询%'
+  )
+ORDER BY ci.analyzed_at DESC LIMIT 30;" 2>/dev/null || echo '[]')"
+[ -z "$buy_intent_posts_json" ] && buy_intent_posts_json='[]'
+
+# 高流量低业务价值候选: 收藏率 ≥ P80 但评论里完全无商业意图信号
+# 简化实现：取 top5_json 与 buy_intent_posts_json 的 note_id 差集
+hi_traffic_lo_intent_json=$(jq -cn \
+    --argjson top "$top5_json" \
+    --argjson buy "$buy_intent_posts_json" \
+    '
+    ($buy | map(.note_id)) as $buy_ids
+    | $top | map(select( ($buy_ids | index(.note_id // "")) | not ))
+    ' 2>/dev/null || echo '[]')
+[ -z "$hi_traffic_lo_intent_json" ] && hi_traffic_lo_intent_json='[]'
+
+# 低流量高意图候选: 收藏率 ≤ 中位数但评论里出现商业意图
+low_traffic_hi_intent_json=$(jq -cn \
+    --argjson bot "$bottom5_json" \
+    --argjson buy "$buy_intent_posts_json" \
+    '
+    ($buy | map(.note_id)) as $buy_ids
+    | $bot | map(select( ($buy_ids | index(.note_id // "")) ))
+    ' 2>/dev/null || echo '[]')
+[ -z "$low_traffic_hi_intent_json" ] && low_traffic_hi_intent_json='[]'
+
+# 方向漂移信号: 14 天滚动窗口内 topic_type 切换次数
+direction_changes_14d="$(sqlite3 "$DB_PATH" "
+WITH recent AS (
+  SELECT topic_type, published_at
+  FROM posts
+  WHERE $SOURCE_FILTER
+    AND published_at >= date('now', '-14 days')
+    AND topic_type IS NOT NULL
+    AND topic_type != ''
+    AND topic_type != '__unclassified__'
+  ORDER BY published_at
+),
+shifts AS (
+  SELECT topic_type,
+         LAG(topic_type) OVER (ORDER BY published_at) AS prev_topic
+  FROM recent
+)
+SELECT COUNT(*) FROM shifts WHERE prev_topic IS NOT NULL AND topic_type != prev_topic;" 2>/dev/null || echo 0)"
+
+# 已写入的行为信号（最近 30 天）
+behavior_signals_json="$(sqlite3 -json "$DB_PATH" "
+SELECT signal_type, severity, observed_at, signal_json
+FROM creator_behavior_signals
+WHERE date(observed_at) >= date('now', '-30 days')
+ORDER BY observed_at DESC LIMIT 20;" 2>/dev/null || echo '[]')"
+[ -z "$behavior_signals_json" ] && behavior_signals_json='[]'
+
 # ─── 组装 JSON ──────────────────────────────────────────────────────
 audit_json=$(jq -cn \
     --arg generated_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -190,8 +280,13 @@ audit_json=$(jq -cn \
     --argjson title_patterns "$patterns_json" \
     --argjson comments "$comments_json" \
     --argjson risks "$risks_json" \
+    --argjson buy_intent "$buy_intent_posts_json" \
+    --argjson hi_lo "$hi_traffic_lo_intent_json" \
+    --argjson lo_hi "$low_traffic_hi_intent_json" \
+    --argjson dir_changes "$direction_changes_14d" \
+    --argjson behavior "$behavior_signals_json" \
     '{
-        meta: {generated_at: $generated_at, window_days: $days, scope: $scope, schema_version: "audit-report-v1"},
+        meta: {generated_at: $generated_at, window_days: $days, scope: $scope, schema_version: "audit-report-v2-business"},
         account_snapshot: $snapshot,
         traffic_trend: $trend,
         top_posts: $top5,
@@ -200,6 +295,14 @@ audit_json=$(jq -cn \
         title_pattern_performance: $title_patterns,
         comment_backlog: $comments,
         risk_signals: $risks,
+        business_intelligence: {
+            buy_intent_posts: $buy_intent,
+            high_traffic_low_business_value: $hi_lo,
+            low_traffic_high_intent: $lo_hi,
+            direction_changes_14d: $dir_changes,
+            behavior_signals_recent: $behavior,
+            note: "AI 需基于本块原始数据反推业务画像 6 维度 + 商业模式 7 测试前 3 项 (利润证据 / 平台变现匹配 / 商业阶段)，并在 .md 对应段落填入。"
+        },
         ai_narrative: null
     }')
 
@@ -272,12 +375,109 @@ $(echo "$risks_json" | jq -r '.[] | "- ⚠️ **\(.code)**: \(.detail)"')
 
 ---
 
+# 业务情报（v3.2 新增）
+
+> 以下段落由 audit-report.sh 提供原始统计 + 占位骨架，AI 必须读取本文配套 JSON 的 \`.business_intelligence\` 字段后回填判断与证据。
+>
+> 输出原则：只描述可观察证据 + 给出可统计指标，不做心理诊断、不评价人格、不断言用户收入（参考 \`agent/playbook/02-onboarding-existing.md\` Replacement Risk Hint 与 Behavior Signal Initial Scan 输出原则）。
+
+## 9. 业务画像推测（AI 待填）
+
+> AI 读 \`.business_intelligence\` + \`.comment_backlog\` + \`.topic_distribution\` 后，在此填入：
+>
+> - \`creator_track\`: creator_first / offer_first / exploration（说明判断依据）
+> - \`creator_stage\`: new / has_posts / has_followers / has_leads / has_sales / has_repeat_sales
+> - \`primary_goal\`: grow_followers / build_trust / get_leads / drive_sales / prepare_live / product_research / unknown
+> - \`offer_status\`: none / idea / draft / selling / validated
+> - \`monetization_stage\`: no_offer / offer_no_purchase / purchase_no_repeat / repeat_no_scale / scaled / unknown
+> - \`current_bottleneck\`: 当前最阻塞瓶颈（schema 限定枚举值）
+>
+> 反推完成后必须展示给用户确认，**不直接写入 business-profile.json**。
+
+## 10. 商业模式轻量测试（前 3 项必答）
+
+> 老博主必须至少回答 3 项：利润证据 / 平台变现匹配 / 商业阶段。后 4 项尽量给出，证据不足允许 \`unknown\`，不强行下结论（plan §5.1.5）。
+
+### 10.1 利润证据等级
+
+> AI 基于 \`.business_intelligence.buy_intent_posts\` + \`.comment_backlog\` 填入：
+>
+> - 等级（hard / medium / weak / none / unknown）：
+> - 证据列表（必须可观察、可计数；例：「评论区出现 12 次问价」「主页有咨询入口」）：
+
+### 10.2 平台变现匹配
+
+> 小红书流量与当前推测变现路径的匹配度（strong / medium / weak / unknown）：
+>
+> 判断依据（客单价 / 决策周期 / 内容信任要求 / 低毛利商品风险）：
+
+### 10.3 商业阶段判断
+
+> 当前所处阶段（从「无产品 / 有产品无人买 / 有人买不复购 / 有复购无规模化 / 已规模化」中选）：
+>
+> 判断依据：
+
+## 11. 利润证据与平台匹配（证据明细）
+
+商业意图评论笔记数：$(echo "$buy_intent_posts_json" | jq 'length') 条
+$(echo "$buy_intent_posts_json" | jq -r '.[] | "- 《\(.title // "")》: \(.content_requests // "" | tostring | .[0:80])"' | head -10)
+
+> AI 在此追加：评论原话样本 → 证据级别归类。
+
+## 12. 高流量低业务价值内容
+
+$(echo "$hi_traffic_lo_intent_json" | jq -r '.[]? | "- \(.title) [\(.note_id)] save_rate=\(.save_rate // 0)"')
+
+> AI 在此判断：这些内容是否「高粉丝、低利润」陷阱？建议如何调整 CTA / 选题方向？
+
+## 13. 低流量高意图内容
+
+$(echo "$low_traffic_hi_intent_json" | jq -r '.[]? | "- \(.title) [\(.note_id)] save_rate=\(.save_rate // 0)"')
+
+> AI 在此判断：这些低流量但有商业意图评论的内容是否值得复用 / 系列化 / 改写标题？
+
+## 14. 方向漂移与执行摩擦信号
+
+- 14 天内方向切换次数（基于 \`topic_type\`）：${direction_changes_14d:-0}
+- 已记录的行为信号（最近 30 天）：$(echo "$behavior_signals_json" | jq 'length') 条
+
+$(echo "$behavior_signals_json" | jq -r '.[]? | "- \(.observed_at) **\(.signal_type)** [\(.severity // "info")]: \(.signal_json | fromjson | .interpretation // "")"' | head -10)
+
+> 注意：行为信号写入必须遵守 \`agent/playbook/08-compliance.md\` Behavior Signal Output Validation 输出原则——
+> 仅描述可观察事件 + 给出当天可完成的下一步动作；
+> **禁词**：逃避 / 自卑 / 不想赚钱 / 拖延症 / 心理咨询 / 人格 / 不够自律 / 害怕失败。
+
+## 15. 建议保留的业务 pattern（AI 待填）
+
+> AI 从历史 imported posts 中识别**反复出现且带正向业务信号**（询价 / 咨询 / 高收藏 / 高保存）的模式，写入：
+>
+> - 标题模式
+> - 选题角度
+> - 互动引导句式
+> - 转化路径设计
+>
+> 同步建议 AI 落入 \`agent/knowledge-base/business-patterns.md\`（confidence=medium，证据来自用户自身历史）。
+
+## 16. 建议停止的业务 anti-pattern（AI 待填）
+
+> AI 从历史 imported posts 中识别**高流量低业务价值**或**重复无效**的模式，写入：
+>
+> - 高流量但完全无商业意图评论的标题/选题套路
+> - 用户语言不匹配的措辞
+> - 与当前 \`primary_goal\` 不对齐的内容方向
+> - 信任损伤信号（争议 / 误解 / 反对意见处理失败）
+>
+> 同步建议 AI 落入 \`agent/knowledge-base/business-anti-patterns.md\`。
+
+---
+
 ## 🧠 AI 归因与建议（待填）
 
 > AI 读完上述 JSON 后，在此追加：
 > 1. Top/Bottom 的成因分析
 > 2. 本周可立即执行的 3 个行动建议
 > 3. 需要进一步观察的信号
+> 4. **\`replacement_risk\` 评估**：如果利润证据 ∈ {hard, medium} 且替代风险 == high，必须追加替代风险提示段（见 02-onboarding-existing.md Replacement Risk Hint）
 
 EOF
 
