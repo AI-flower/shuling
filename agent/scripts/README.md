@@ -68,6 +68,8 @@ bash agent/scripts/db.sh update-post-meta '<json>'                  # 回写分�
 bash agent/scripts/db.sh add-diagnosis '<json>'                     # 写入 NoteRx 诊断
 bash agent/scripts/db.sh query-diagnosis --post-id N                # 查最新诊断
 bash agent/scripts/db.sh query-undiagnosed [--days N]               # 列已发布未诊断的帖子
+bash agent/scripts/db.sh query-external-signals [--topic X] [--days N] [--limit N]
+                                                                    # v3.1+ external_signals 辅助索引
 ```
 
 环境变量：`SHULING_DB`（指定 DB 路径，v2.4.2+，install / migration 调用 target DB 时必传）
@@ -173,6 +175,98 @@ bash agent/scripts/import-existing.sh --resume    # 中断续跑，幂等
 ```
 
 按节流 profile 批量拉取并写入 `posts` 表（`source='imported'`）；耗时约 30+ 分钟，可挂后台。
+
+### agent/scripts/content-qa.py — 内容质量与 AI 托管感检查（v3.0+）
+
+```bash
+python3 agent/scripts/content-qa.py                                      # 默认人类彩色表格
+python3 agent/scripts/content-qa.py --json                               # 单行 JSON（agent 解析）
+python3 agent/scripts/content-qa.py --draft /tmp/xhs-post/meta.json      # 同时检查待发草稿
+python3 agent/scripts/content-qa.py --last-n 30 --threshold 70           # 自定义历史窗口和阈值
+python3 agent/scripts/content-qa.py --db /path/to/xhs.db --json          # 显式指定 DB
+```
+
+供 03-daily-flow.md 在生成 meta.json 前调用，分析最近 N 篇已发布帖 + 当前草稿，检测 8 项 AI 托管感信号：
+
+1. 标题 trigram Jaccard 相似度（≥0.6 算重复）
+2. 同一 `title_pattern` 连续 ≥5 次
+3. 正文前 30 字相似度（≥0.6）
+4. 最近 10 篇标签组合（≥5 个相同 tag）重复
+5. 单页 emoji ≥6 个
+6. 高频 AI 味词汇命中率（"赋能/闭环/抓手/yyds/绝绝子" 等）
+7. `generated_images.gen_strategy` 连续 ≥5 篇
+8. 连续 ≥4 篇清单体（`content_style='清单'` / `title_pattern='数字清单'`）
+
+参数：
+
+- `--db <path>` xhs.db 路径（默认按 `SHULING_DB` env > `SHULING_AGENT_ROOT` > 脚本父目录推导）
+- `--draft <meta.json>` 待发草稿路径（可选，未提供时只查历史）
+- `--last-n <int>` 分析窗口（默认 30）
+- `--threshold <int>` score 阈值（默认 70，低于此值 exit 1）
+- `--json` 单行 JSON 输出
+- `--human` 彩色表格（默认）
+
+退出码：0 = score ≥ threshold / 1 = score < threshold（提示重写）/ 2 = DB 不存在或参数错误。
+
+JSON 输出形状（与 `agent/schemas/content-qa-report.schema.json` 对齐）：
+
+```json
+{
+  "ok": true,
+  "score": 82,
+  "warnings": [
+    {"check": "title_similarity", "severity": "warn", "message": "...", "samples": [...]}
+  ],
+  "checked_at": "2026-04-28",
+  "target_post_id": null,
+  "sample_size": {"recent_posts": 30, "image_strategies": 30, "draft_present": true}
+}
+```
+
+DB 缺失或 posts 表为空 → score=100, warnings=[]，附 `note: "no history yet"`。
+
+纯 stdlib（json/sqlite3/re/argparse），不引入新 pip 依赖；不调 LLM API（规则引擎，非 AI 检测）。
+
+fixture（`agent/scripts/content-qa-fixtures/`）：`repetitive.meta.json` 应触发多项 warn；`clean.meta.json` 在干净 DB 下 score=100。
+
+### agent/scripts/external-intel.sh — 外部情报低风险采样（v3.1+）
+
+> 见 `docs/runbooks/external-intelligence.md` / `docs/plans/v3-account-execution-safety-hardening.md` §12
+
+```bash
+bash agent/scripts/external-intel.sh research-topic "<主题>" [--budget conservative|balanced|aggressive]
+                                  # 主题外部研究：search → 深读（≤3-5）→ 提炼信号 → 落 cache
+bash agent/scripts/external-intel.sh competition-gap "<主题>"
+                                  # 仅 search，输出 competition_density + white_space
+bash agent/scripts/external-intel.sh comment-demand <note_id> [--limit 30]
+                                  # 评论需求提炼（≤30 条评论，**不存原文**）
+bash agent/scripts/external-intel.sh cache-get "<主题>"
+                                  # 查 cache（不发起请求）
+bash agent/scripts/external-intel.sh cache-prune
+                                  # 清理 expires_at < today 的过期 cache
+bash agent/scripts/external-intel.sh budget-status
+                                  # 查看预算余额（daily + per-session + cooldown）
+```
+
+**契约**：
+
+- 必须走 `xhs.sh`（继承节流/限额/风险关键词识别），绝不裸调 MCP
+- 写盘前用 `agent/schemas/external-signal.schema.json` 自校验；硬禁字段 `full_body / raw_comments / full_comments / raw_post_body / note_body / raw_html`（verify 42）
+- safety state 为 `cooldown` / `locked` 时**完全停止**采样（exit 30）
+- 命中风险信号 → 调 `account-safety.sh record-event external_intel "<hint>"` + exit 31，已采样部分仍保留
+- 预算耗尽 / MCP 失败 → 输出 `degraded:true`，exit 0（caller 降级到内部记忆）
+
+**输出形状**（单行 JSON）：
+
+```json
+{"ok":true,"cache_hit":false,"topic":"租房收纳","signal":{...external-signal.schema...},"budget_used":{"search_feeds":1,"get_feed_detail":3},"session_id":"pid-12345"}
+```
+
+**预算策略**：默认 conservative（`agent/policies/external-intelligence.default.json`），用户态 override `agent/config/external-intelligence.json` 只能更保守不能更激进（verify 41）。
+
+**退出码**：0 = ok / cache hit / degraded；1 = usage；2 = policy 解析失败；20 = schema 校验失败；30 = cooldown / locked；31 = 风险信号触发本次采样中止。
+
+**计数器位置**：`agent/data/external-intel-counters.json`（用户态，已 .gitignore）；按 `SHULING_SESSION_ID` 或 PID 分桶。
 
 ### agent/scripts/pre-submit-verify.sh — 发版前强制回归（v2.4.2+，21 项）
 

@@ -114,6 +114,35 @@ python3 -m jsonschema -i agent/knowledge-base/profile.json agent/schemas/profile
 - 每页 3-5 个信息点
 - 不能整页只有标题无内容
 
+### External Signal Storage Rules（v3.1+）
+
+外部情报采样（`external-intel.sh research-topic / competition-gap / comment-demand`）写入 `agent/knowledge-base/external-signals/<hash>.json` 与可选辅助索引 `external_signals` 表时，必须遵守以下边界。**verify 第 42 条扫描，违反即 fail**。
+
+**只允许保存**：
+
+- `note_id`（小红书原内容引用，不是正文）
+- `topic`（采样主题）/ `signal_type`（angle / pattern / comment_demand / white_space）
+- `summary` / `common_angles` / `overused_patterns` / `comment_demands` / `white_space`（≤ 200 字摘要）
+- `confidence`（0-1）/ `sample_size`（采样数量）
+- `observed_at` / `expires_at`
+
+**禁止保存**（schema 硬禁，写盘前必校验）：
+
+- `full_body / body_text / content`（笔记正文）
+- `raw_comments / full_comments / comments_list`（完整评论列表）
+- `raw_post_body / note_body / raw_html`（任何形式原文 dump）
+- `cookies / tokens / auth_*`（任何凭证字段）
+- 任何超过 200 字的非 summary 字段
+
+**写盘前必校验**：
+
+```bash
+# external-intel.sh 内部已自检；外部代码写 external-signals/*.json 也必须校验
+python3 -m jsonschema -i <signal.json> agent/schemas/external-signal.schema.json
+```
+
+详细规则与 TTL 表 → `docs/runbooks/external-intelligence.md` §6 / verify 第 42 条。
+
 ## Writes
 
 本剧本不直接写入；仅返回 `pass / fail` + 错误清单给调用方。
@@ -135,8 +164,10 @@ python3 -m jsonschema -i agent/knowledge-base/profile.json agent/schemas/profile
 
 ## Cross-Refs
 
-被 01-onboarding-new.md / 02-onboarding-existing.md / 03-daily-flow.md / 04-publish-flow.md / 06-learning-loop.md 引用。
+被 01-onboarding-new.md / 02-onboarding-existing.md / 03-daily-flow.md / 04-publish-flow.md / 05-review.md / 06-learning-loop.md / 07-comment-insights.md 引用。
 
 - → `_shared/emoji-dictionary.md`（emoji 总量控制基线）
 - → 06-learning-loop.md（weight/confidence 公式权威）
 - → 09-troubleshooting.md（schema 校验失败兜底）
+- → `docs/runbooks/external-intelligence.md`（外部信号存储边界 + 风险分层 + 失败降级）
+- → `agent/schemas/external-signal.schema.json`（external signal 字段契约 + 硬禁字段）

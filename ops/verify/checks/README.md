@@ -47,6 +47,14 @@
 | 32 | `32-profile-write-precondition.sh` | error | 写 profile.json 的 playbook 必须有非空 preconditions（ADR-0002 D3） |
 | 33 | `33-compliance-inline-limit.sh` | warn | 03/04 内联合规摘要 ≤25/20 行（ADR-0002 D4） |
 | 34 | `34-optional-fallback.sh` | error | needs.optional 字段必须配 fallback（ADR-0002 D5） |
+| 35 | `35-publish-requires-approval.sh` | error | xhs.sh publish 无 --approval-id 必须返回 approval_required |
+| 36 | `36-comment-disabled-by-default.sh` | error | xhs.sh comment 未设 SHULING_ENABLE_COMMENT 时必须返回 comment_disabled |
+| 37 | `37-cron-no-auto-publish.sh` | error | ops/cron/*.example 不含自动发布禁用词（draft-only 纪律） |
+| 38 | `38-disable-throttle-dev-only.sh` | error | XHS_DISABLE_THROTTLE/QUOTA 在非 SHULING_DEV_MODE=1 下必须被拒 |
+| 39 | `39-account-safety-schema.sh` | error | 6 个 account-safety/approval/external-signal schema 可解析 + default policy 自校验 |
+| 40 | `40-no-cookie-in-docs-or-logs.sh` | error | docs/playbook/README 不含真实 cookie 字段或 API key 长串 |
+| 41 | `41-external-intel-budget.sh` | error | external-intelligence policy 预算不超 conservative 上限；playbook 不直散调 xhs.sh（Stage 6 未运行时降为 warn） |
+| 42 | `42-external-signals-no-raw-dumps.sh` | error | external-signals/*.json 不含原始转储字段且单文件 ≤50KB |
 
 ## 调用方式
 

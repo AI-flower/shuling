@@ -23,6 +23,7 @@ calls:
     - agent/scripts/db.sh
     - agent/scripts/fetch-post-data.sh
     - agent/scripts/noterx-diagnose.sh
+    - agent/scripts/external-intel.sh
   playbooks:
     - 06-learning-loop.md
     - 07-comment-insights.md
@@ -83,13 +84,14 @@ last_updated: 2026-04-27
 
    脚本已写入 `post_metrics` 表，并把 `{likes, saves, comments, shares}` 回吐。
 
-3. **逐篇拉评论原文（脚本已过滤垃圾评论）**
+3. **逐篇提炼评论需求**（v3.1+：走 `external-intel.sh`，不直调 `fetch-comments.sh`）
 
    ```bash
-   bash agent/scripts/fetch-comments.sh <note_id> --limit 30
+   # external-intel.sh 内部走 xhs.sh detail 拉评论 + 提需求高频词，不存评论原文
+   bash agent/scripts/external-intel.sh comment-demand <note_id> --limit 30
    ```
 
-   返回 `[{author, text, like_count}]`。**自己读**评论，提炼：正面/负面/提问、用户内容需求（"能不能出一期 X"）、高频词。详见 07-comment-insights.md。
+   返回 `comment_demands` 摘要（高频提问 / 吐槽 / 选题信号）+ note_id 引用 + sample_size + confidence；**禁存评论原文**（schema 硬禁 `raw_comments`，verify 42 强制）。详见 07-comment-insights.md + → `docs/runbooks/external-intelligence.md`。
 
 4. **逐篇 NoteRx 诊断**
 
@@ -173,6 +175,26 @@ last_updated: 2026-04-27
 - **收藏率 < 2%** → 表现较差：weight 下调（详见 06）；同类型连续 3 次 < 2% → 进 `anti-patterns.md`
 
 weight ±0.1 的具体公式与 confidence_level 的重算逻辑：见 06-learning-loop.md（不复述）。
+
+### Comment Demands → External Signals (v3.1+)
+
+复盘第 3 步「拉评论原文」+ 第 5 步「综合分析」之后，把评论里反复出现的需求**转成结构化 external signal**，供下一轮选题（03 §2.1 第 0 步）双因子打分使用。**不存评论原文**。
+
+```bash
+# 不直接调 fetch-comments.sh 做需求归纳；统一走 external-intel.sh comment-demand
+bash agent/scripts/external-intel.sh comment-demand <note_id> --limit 30
+```
+
+`external-intel.sh comment-demand` 输出：
+
+- 写到 `agent/knowledge-base/external-signals/<hash>.json`（仅摘要 + note_id 引用 + sample_size + confidence；禁字段 `full_body / raw_comments / full_comments`）
+- 命中风险信号即停 + 写 `account-safety-state.last_risk_event`（详见 → `docs/runbooks/external-intelligence.md`）
+
+**边界**：
+
+- 复盘**不**把评论原文长期存储到 `comment_insights` 之外的位置
+- 写 `comment_insights` 时只存提炼后的高频提问 / 吐槽 / 选题信号（v3.0 已有契约），不写整段评论
+- 评论需求 → external_signals 的转换是**一次性**的；复盘完成后只保留 signal，不保留中间评论
 
 ### Weekly Recap
 

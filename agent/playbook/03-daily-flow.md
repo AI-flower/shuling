@@ -25,6 +25,7 @@ calls:
     - agent/scripts/db.sh
     - agent/scripts/xhs.sh
     - agent/scripts/image.py
+    - agent/scripts/external-intel.sh
   playbooks:
     - 04-publish-flow.md
     - 06-learning-loop.md
@@ -34,7 +35,7 @@ writes:
   files:
     - agent/data/xhs.db (user_choices)
   emits:
-    - draft_ready
+    - draft_ready  # non-mutating: never authorizes publish (Stage 4 + Stage 3 boundary)
 preconditions:
   - state.setup_completed == true
   - state.cold_start_done == true
@@ -73,6 +74,7 @@ last_updated: 2026-04-27
 - `agent/knowledge-base/preferences.json` — 偏好权重 + 当前 `confidence_level`
 - `agent/knowledge-base/patterns.md` — 文字 pattern 库
 - `agent/knowledge-base/image-patterns.md`（可选） — 图片 pattern 库
+- `agent/knowledge-base/external-signals/<topic>.json`（可选；由 `external-intel.sh` 写）— 外部情报摘要（趋势 / 竞品密度 / 评论需求 / white_space）
 - `agent/policies/content-rules.md` — 合规规则（draft-time 摘要见下文）
 - 用户原始主题（如已选定）
 
@@ -98,32 +100,55 @@ last_updated: 2026-04-27
    - `agent/knowledge-base/preferences.json` → 了解用户偏好权重和当前信心度
    - `agent/knowledge-base/patterns.md` → 了解有效 pattern
 
-2. **获取候选选题**（按博主领域选择通用数据源）
+2. **外部情报采样**（v3.1+，§12 / 双因子选题前置）
 
-   - 用 WebSearch 搜索该领域的最新热点、季节节点、用户需求和趋势变化
-   - 用 `agent/scripts/xhs.sh recommend` 获取推荐流中的相关内容
-   - 用 `agent/scripts/xhs.sh search "领域关键词"` 搜索当前热门话题
+   先查 cache，cache miss 再按预算调用 `external-intel.sh`。**不要**直接散调 `xhs.sh search/detail/recommend` 做外部研究（verify 41 强制；详见 → `docs/runbooks/external-intelligence.md`）。
+
+   ```bash
+   # 候选主题逐个查/采样
+   bash agent/scripts/external-intel.sh cache-get "<候选主题>" || \
+       bash agent/scripts/external-intel.sh research-topic "<候选主题>" --budget conservative
+   ```
+
+   失败降级（见下文 Failure Handling 段）：脚本输出 `degraded:true` / 退出 30/31 时不阻断本流程，**仅用内部记忆**（profile + preferences + patterns）继续，并在用户反馈里明确标注「本轮未获取外部趋势数据」。
+
+3. **获取候选选题**（按博主领域选择通用数据源）
+
+   - 用 WebSearch 搜索该领域的最新热点、季节节点、用户需求和趋势变化（L0-L1，无小红书风险）
    - 回看最近评论与 `comment_insights`，把高频提问、吐槽和需求转成候选选题
+   - 用上一步 `external-intel.sh` 的 `common_angles` / `comment_demands` / `white_space` 作为补充候选源
    - 如果该领域有明确外部信号源，可补充 1-2 个垂直来源（如电商榜单、节假日热点、城市活动、招聘趋势、品牌新品），但不要默认绑定任何单一行业或平台来源
 
-3. **去重过滤**
+4. **去重过滤**
    - 调 `agent/scripts/db.sh query-posts --days 30` 获取最近发布过的帖子
    - 排除已发布过的选题
 
-4. **对每个候选打分**（你自己判断，参考以下维度）
-   - **受众匹配度**（0-30分）：与 profile.json 的受众是否一致
-   - **内容可写性**（0-25分）：能否写成具体的教程/清单/故事，而不是空泛的介绍
-   - **竞品密度**（0-25分）：用 `agent/scripts/xhs.sh search "候选关键词"` 检查，结果少=蓝海=高分
-   - **用户偏好匹配**（0-20分）：与 preferences.json 中高权重的主题类型是否一致
+5. **对每个候选打分**（双因子选题评分，§12.9）
 
-5. **决定输出选题数量**：根据 `confidence_level` 决定输出 1/2/3 个候选；信心度→数量的映射、`last_exploration_at` 探索项追加、`consecutive_rejects` 强制回退三套规则统一在 → `agent/playbook/_shared/confidence-mapping.md`。weight 与 confidence 公式权威定义在 → `agent/playbook/06-learning-loop.md`。
+   **公式（权威）**：
 
-6. **返回选题列表**
-   - 每个选题包含：主题名 + 一句话推荐理由 + 竞品密度（"蓝海"/"中等"/"红海"）
+   ```text
+   final_score =
+     0.35 * audience_fit         (内部 profile.json：与博主受众匹配度)
+   + 0.25 * external_momentum    (external-signal：外部是否升温；competition_density=low/medium 加分)
+   + 0.20 * competition_gap      (external-signal.white_space：是否有差异化空间)
+   + 0.15 * creator_preference   (preferences.json + user_choices：用户是否愿意做)
+   + 0.05 * freshness            (xhs.db posts 近 30 天是否重复)
+   ```
+
+   - `audience_fit` / `freshness`：本 playbook 直接判断
+   - `external_momentum` / `competition_gap`：来自第 2 步 `external-signal.json`；外部数据缺失时这两项各取 0.5（中性占位），并标记本轮缺少外部数据
+   - `creator_preference`：weight 与 confidence 公式权威 → `06-learning-loop.md`
+
+6. **决定输出选题数量**：根据 `confidence_level` 决定输出 1/2/3 个候选；信心度→数量的映射、`last_exploration_at` 探索项追加、`consecutive_rejects` 强制回退三套规则统一在 → `agent/playbook/_shared/confidence-mapping.md`。weight 与 confidence 公式权威定义在 → `agent/playbook/06-learning-loop.md`。
+
+7. **返回选题列表**
+   - 每个选题包含：主题名 + 一句话推荐理由 + 竞品密度（"蓝海"/"中等"/"红海"，来自 `external-signal.competition_density`）
    - 如果只 1 个：附加"回复'换'我再找一个"
+   - 如果本轮**缺少外部数据**：在选题列表末尾追加一行「本轮未获取外部趋势数据，使用账号历史偏好生成候选。」
    - 输出后等待用户回应（hermes 负责把内容送到用户，并把回复喂回来）
 
-7. **记录用户选择**
+8. **记录用户选择**
    ```bash
    agent/scripts/db.sh log-choice '{"choice_type":"topic","offered_count":3,"chosen_index":2,"chosen_label":"办公室收纳","skipped_labels":"[\"通勤穿搭\",\"周末亲子活动\"]"}'
    ```
@@ -322,8 +347,15 @@ agent/scripts/db.sh log-choice '{"choice_type":"draft","offered_count":2,"chosen
 
 - 任何 `agent/scripts/xhs.sh` / `agent/scripts/image.py` 调用非零退出 → 转 → `09-troubleshooting.md`
 - `image.py --check` 返回 2 → **硬停**，提示用户配置图像生成 API Key（Gemini 或 OpenAI gpt-image-2），不降级 HTML
-- WebSearch / `xhs.sh search` 节流命中 → 用现有 `comment_insights` + `patterns.md` 兜底，本轮少出 1 个候选可接受
+- WebSearch / `external-intel.sh` 节流或预算耗尽 → 用现有 `comment_insights` + `patterns.md` 兜底，本轮少出 1 个候选可接受
 - AI 模型 API 报错最多 1 次重试（→ `agent/playbook/09-troubleshooting.md`）
+
+**外部情报失败降级**（v3.1+，§12.10）：
+
+- `external-intel.sh` 返回非零（exit 1/2/20）或输出 `degraded:true` → **不阻断**草稿生成；选题打分时 `external_momentum` / `competition_gap` 取中性 0.5，使用内部 `profile.json` + `preferences.json` + `patterns.md` 兜底
+- `external-intel.sh` 退出 30（cooldown / locked）→ 转 → `09-troubleshooting.md` Account Safety Matrix；本轮强制使用内部记忆
+- `external-intel.sh` 退出 31（采样过程中触发风险信号）→ 已写 `account-safety-state.last_risk_event`，自动进 cooldown；提示用户后停止外部采样
+- 任一上述情况下，选题输出**必须明确标注**：`本轮未获取外部趋势数据，使用账号历史偏好生成候选。` 不允许伪装成有外部数据
 
 ## Anti-Patterns
 
@@ -335,14 +367,19 @@ agent/scripts/db.sh log-choice '{"choice_type":"draft","offered_count":2,"chosen
 - 不在本文件 inline meta.json 字段表（cross-ref → _shared/post-meta-schema.json）
 - 不自己写英文图像 prompt、不禁止 AI 画文字、不拼 `IMAGE_BRAND_STYLE` 前缀
 - 不把信心度→数量映射规则在本文件抄第二遍（cross-ref → _shared/confidence-mapping.md）
+- `draft_ready` 只表示草稿就绪，**不**自动触发 04-publish-flow.md；必须等用户显式回复"发"并走 approval 流程（→ `docs/runbooks/account-safety.md`）
+- **不直接散调 `xhs.sh search/recommend/detail` 或 `fetch-comments.sh` 做外部研究**——必须走 `external-intel.sh`（v3.1+，verify 41 强制）
+- **不存外部内容原文**——external-signals 只保存摘要、标签、note_id 引用、置信度；禁字段 `full_body / raw_comments / full_comments / raw_post_body / note_body / raw_html`（v3.1+，verify 42 强制）
 
 ## Cross-Refs
 
 - → `agent/playbook/04-publish-flow.md`（草稿确认后接管发布）
-- → `agent/playbook/06-learning-loop.md`（weight / confidence 公式权威）
-- → `agent/playbook/08-compliance.md`（完整合规规则）
-- → `agent/playbook/09-troubleshooting.md`（脚本失败 / 节流 / 重试）
+- → `agent/playbook/06-learning-loop.md`（weight / confidence 公式权威 + creator_preference 维度）
+- → `agent/playbook/08-compliance.md`（完整合规规则 + 外部信号存储边界）
+- → `agent/playbook/09-troubleshooting.md`（脚本失败 / 节流 / 重试 / Account Safety Matrix）
 - → `agent/playbook/_shared/emoji-dictionary.md`
 - → `agent/playbook/_shared/outline-template.txt`
 - → `agent/playbook/_shared/confidence-mapping.md`
 - → `agent/playbook/_shared/post-meta-schema.json`
+- → `docs/runbooks/external-intelligence.md`（外部情报采样契约 + 双因子选题字段含义）
+- → `agent/scripts/external-intel.sh`（research-topic / cache-get / budget-status 的契约）

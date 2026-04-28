@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ops/verify/pre-submit-verify.sh — v3.0+ 发版前 34 项回归门
+# ops/verify/pre-submit-verify.sh — v3.1+ 发版前 42 项回归门（Stage 8 新增 35-42）
 #
 # 用法：
 #   bash ops/verify/pre-submit-verify.sh                  # 表格输出
