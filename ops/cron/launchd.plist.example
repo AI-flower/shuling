@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  薯灵 v3.0 launchd 配置示例 (macOS)
+  薯灵 v3.1 launchd 配置示例 (macOS)
+
+  v3.1 起 cron 默认 draft-only：定时任务只生成候选草稿和复盘，不发布、不评论。
+  发布与互动统一走 approval flow（见 docs/runbooks/account-safety.md），
+  必须由用户显式授权后才能进入 04-publish-flow。
 
   使用：
     1. cp ops/cron/launchd.plist.example ~/Library/LaunchAgents/com.shuling.noon.plist
@@ -20,7 +24,7 @@
         <string>--skill</string>
         <string>shuling</string>
         <string>--prompt</string>
-        <string>使用 shuling skill：执行午间发布流程</string>
+        <string>使用 shuling skill：生成午间候选草稿，等待用户确认,不要发布</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict>

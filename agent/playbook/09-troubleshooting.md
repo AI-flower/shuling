@@ -113,6 +113,39 @@ python3 agent/scripts/preflight.py
 - `__migrations` 表里某 migration 标 `failed` → 不重跑；告知用户并建议跑 `install.sh --check`
 - 知识库文件损坏/不存在 → 用默认值继续，不阻塞创作
 
+### Account Safety Failure Matrix（v3.1+，对应 docs/adr/0003-account-execution-boundary.md）
+
+publish / comment / import-cookie 是 privileged mutation，失败时按下表处理：
+
+| 状态 / 错误码 | 现象 | 处理 |
+|---|---|---|
+| `approval_required` | `xhs.sh publish` 没传 `--approval-id` | 引导用户：`bash agent/scripts/approval.sh request publish <meta.json>` → grant |
+| `approval_missing` | `--approval-id` 指向的文件不存在 | approval 文件被删/路径写错；重新 request |
+| `approval_expired` | 当前时间 > expires_at（默认 30 分钟） | 重新 request 一份新 approval |
+| `resource_changed` | meta.json sha256 与 approval 记录的不一致 | 草稿在 grant 后被改过，必须重新生成草稿 + 重新 request |
+| `approval_consumed` | 该 approval 已使用过一次 | 一次性原则；重新 request |
+| `approval_revoked` | 用户已 `approval.sh revoke` | 重新 request |
+| `action_mismatch` | approval action ≠ 当前调用 | 检查是否把 publish approval 用到了 comment（或反之） |
+| `safety_cooldown` | risk_level=cooldown | 展示 cooldown_reason + cooldown_until 给用户；自动到期解除，或显式 `account-safety.sh exit-cooldown`（前置确认风险） |
+| `safety_locked` | risk_level=locked | 只允许 doctor / preflight / 只读；查 `account-safety.sh status` 的 last_risk_event |
+| `comment_disabled` | `SHULING_ENABLE_COMMENT=0`（默认） | 默认提供回复建议、不发出；用户坚持需评论 → 切 supervised + 设 SHULING_ENABLE_COMMENT=1 + approval |
+| `policy_disabled` | account-safety.json 关了对应 *_enabled | 用户改 `agent/config/account-safety.json` 或 `account-safety.sh set-mode supervised` |
+| `daily_cap_reached` | 当日发布/评论已达 max_daily_* | 等待跨日重置（UTC 0 点）或调高 max_daily_publishes（不推荐） |
+| `dev_mode_required` | 非 dev mode 设了 XHS_DISABLE_THROTTLE/QUOTA=1 | 拒绝；告诉用户这是生产保护，必须 `SHULING_DEV_MODE=1` 才允许 |
+
+诊断步骤：
+
+```bash
+# 看当前 safety 状态
+bash agent/scripts/account-safety.sh status
+
+# 看 approval 列表（含状态）
+bash agent/scripts/approval.sh list
+
+# 重新 request 一份
+bash agent/scripts/approval.sh request publish /tmp/xhs-post/meta.json
+```
+
 ### General Exception Matrix（迁入 §8 完整异常场景）
 
 | 场景 | 处理方式 |

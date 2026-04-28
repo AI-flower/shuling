@@ -99,6 +99,61 @@ else
     add_check "skill_version" fail "SKILL.md frontmatter missing version"
 fi
 
+# ─── v3.1+ Account Safety Layer 检查 ───────────────────────────────────
+# 见 docs/plans/v3-account-execution-safety-hardening.md §13.2
+safety_policy_file="$target/agent/config/account-safety.json"
+if [ -f "$safety_policy_file" ]; then
+    if python3 -c "import json; json.load(open('$safety_policy_file'))" >/dev/null 2>&1; then
+        sp_mode="$(python3 -c "import json; print(json.load(open('$safety_policy_file')).get('mode',''))" 2>/dev/null)"
+        add_check "account_safety_policy" ok "mode=$sp_mode"
+    else
+        add_check "account_safety_policy" fail "account-safety.json invalid JSON"
+    fi
+else
+    add_check "account_safety_policy" warn "account-safety.json missing (run db.sh ensure-runtime-layout)"
+fi
+
+safety_state_file="$target/agent/config/account-safety-state.json"
+if [ -f "$safety_state_file" ]; then
+    if python3 -c "import json; json.load(open('$safety_state_file'))" >/dev/null 2>&1; then
+        risk_level="$(python3 -c "import json; print(json.load(open('$safety_state_file')).get('risk_level',''))" 2>/dev/null)"
+        add_check "account_safety_state" ok "risk_level=$risk_level"
+    else
+        add_check "account_safety_state" fail "account-safety-state.json invalid JSON"
+    fi
+else
+    add_check "account_safety_state" warn "account-safety-state.json missing"
+fi
+
+# cooldown_active 检查（额外详细信息）
+if [ -f "$safety_state_file" ]; then
+    cd_info="$(python3 - "$safety_state_file" <<'PYEOF' 2>/dev/null
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    rl = d.get("risk_level","normal")
+    if rl in ("cooldown","locked"):
+        until = d.get("cooldown_until") or "n/a"
+        reason = d.get("cooldown_reason") or "n/a"
+        print(f"{rl}|{reason}|{until}")
+    else:
+        print(f"{rl}||")
+except Exception:
+    print("err||")
+PYEOF
+)"
+    IFS='|' read -r cd_level cd_reason cd_until <<< "$cd_info"
+    if [ "$cd_level" = "cooldown" ]; then
+        add_check "cooldown_active" warn "risk_level=cooldown reason='$cd_reason' until=$cd_until"
+    elif [ "$cd_level" = "locked" ]; then
+        add_check "cooldown_active" fail "risk_level=locked reason='$cd_reason' (only doctor/preflight allowed)"
+    else
+        add_check "cooldown_active" ok "no active cooldown"
+    fi
+else
+    add_check "cooldown_active" warn "state file missing, cannot determine cooldown"
+fi
+
 # 输出
 fail_count=0
 warn_count=0
@@ -120,9 +175,22 @@ if [ "$fmt" = "json" ]; then
 else
     printf '%-22s %-5s %s\n' "CHECK" "STATUS" "MESSAGE"
     printf '%-22s %-5s %s\n' "----------------------" "------" "-------------------------"
+    # ANSI 颜色（仅在 stdout 是 TTY 时启用，避免污染 pipeline）
+    if [ -t 1 ]; then
+        C_YELLOW='\033[33m'; C_RED='\033[31m'; C_RESET='\033[0m'
+    else
+        C_YELLOW=''; C_RED=''; C_RESET=''
+    fi
     for r in "${results[@]}"; do
         IFS='|' read -r k s m <<< "$r"
-        printf '%-22s %-5s %s\n' "$k" "$s" "$m"
+        # account_safety / cooldown_active 高亮
+        if [ "$k" = "cooldown_active" ] && [ "$s" = "warn" ]; then
+            printf '%-22s %b%-5s%b %s\n' "$k" "$C_YELLOW" "$s" "$C_RESET" "$m"
+        elif [ "$k" = "cooldown_active" ] && [ "$s" = "fail" ]; then
+            printf '%-22s %b%-5s%b %s\n' "$k" "$C_RED" "$s" "$C_RESET" "$m"
+        else
+            printf '%-22s %-5s %s\n' "$k" "$s" "$m"
+        fi
     done
     echo ""
     echo "Summary: fail=$fail_count warn=$warn_count total=${#results[@]}"

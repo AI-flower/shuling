@@ -19,6 +19,12 @@
 
 set -e
 
+# ─── v3.1+ 一致性收口：source 路径与公共库 ─────────────────────────────
+# 见 docs/plans/v3-account-execution-safety-hardening.md §8.1 / §15.1
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[ -f "$SCRIPT_DIR/_paths.sh" ] && . "$SCRIPT_DIR/_paths.sh"
+[ -f "$SCRIPT_DIR/_common.sh" ] && . "$SCRIPT_DIR/_common.sh"
+
 MCP_URL="${MCP_URL:-http://localhost:18060/mcp}"
 export no_proxy="${no_proxy:+$no_proxy,}localhost,127.0.0.1"
 
@@ -29,6 +35,16 @@ QUOTA_FILE="$CACHE_DIR/mcp-quota.json"
 SESSION_TTL="${XHS_SESSION_TTL:-120}"
 REUSE_SESSION="${XHS_REUSE_SESSION:-0}"
 LOG_ENABLED="${XHS_DISABLE_LOG:-0}"   # 1 表示禁用（变量名取反便于 env set 1 生效）
+
+# ─── v3.1 节流绕过限制（§8.5 dev_mode_required） ────────────────────────
+if [ "${XHS_DISABLE_THROTTLE:-0}" = "1" ] && [ "${SHULING_DEV_MODE:-0}" != "1" ]; then
+    echo '{"ok":false,"error":"dev_mode_required","message":"禁止在非开发模式关闭节流（XHS_DISABLE_THROTTLE=1 需 SHULING_DEV_MODE=1）"}'
+    exit 2
+fi
+if [ "${XHS_DISABLE_QUOTA:-0}" = "1" ] && [ "${SHULING_DEV_MODE:-0}" != "1" ]; then
+    echo '{"ok":false,"error":"dev_mode_required","message":"禁止在非开发模式关闭限额（XHS_DISABLE_QUOTA=1 需 SHULING_DEV_MODE=1）"}'
+    exit 2
+fi
 
 # ── 帮助信息 ──────────────────────────────────────────────
 usage() {
@@ -362,6 +378,13 @@ except Exception:
   fi
   log_request "$tool_name" "$status" "$latency_ms" "$args_preview" "$error_hint" "$session_tag"
 
+  # ─── v3.1 风险信号识别（§7.3 keywords → record-event）──────────────
+  case "$result" in
+    *captcha*|*risk*|*forbidden*|*blocked*|*"rate limit"*|*"login required"*|*"cookie invalid"*|*风控*|*验证*|*频繁*|*异常*)
+      bash "$SCRIPT_DIR/account-safety.sh" record-event "$tool_name" "${result:0:200}" >/dev/null 2>&1 || true
+      ;;
+  esac
+
   echo "$result" | format_json
 }
 
@@ -412,10 +435,48 @@ case "$CMD" in
     ;;
 
   publish)
-    [ -z "$1" ] && { echo "错误: 缺少 meta.json 路径"; echo "用法: $(basename "$0") publish <meta.json路径>"; exit 1; }
-    META_PATH="$1"
+    # ─── v3.1 Account Safety: publish 必须有 --approval-id ─────────────
+    # 见 docs/adr/0003-account-execution-boundary.md §D1 / §D3 / §D4
+    META_PATH=""
+    APPROVAL_ID=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --approval-id) shift; APPROVAL_ID="${1:-}"; shift ;;
+        --) shift; break ;;
+        *) [ -z "$META_PATH" ] && META_PATH="$1"; shift ;;
+      esac
+    done
+
+    [ -z "$META_PATH" ] && { echo "错误: 缺少 meta.json 路径"; echo "用法: $(basename "$0") publish <meta.json路径> --approval-id <id>"; exit 1; }
     if [ ! -f "$META_PATH" ]; then
       echo "错误: 文件不存在: $META_PATH" >&2
+      exit 1
+    fi
+
+    if [ -z "$APPROVAL_ID" ]; then
+      echo '{"ok":false,"error":"approval_required","message":"发布需要用户确认授权（v3.1）。先运行 approval.sh request publish <meta.json> 后用 grant <id>"}'
+      exit 1
+    fi
+
+    # safety state 拒绝（cooldown / locked / policy disable）
+    set +e
+    _check_out="$(bash "$SCRIPT_DIR/account-safety.sh" check publish 2>&1)"
+    _check_rc=$?
+    set -e
+    if [ "$_check_rc" -ne 0 ]; then
+      echo "$_check_out"
+      [ "$_check_rc" = "30" ] && exit 30
+      exit 1
+    fi
+
+    # approval 6 道闸校验
+    set +e
+    _v_out="$(bash "$SCRIPT_DIR/approval.sh" verify publish "$META_PATH" --approval-id "$APPROVAL_ID" 2>&1)"
+    _v_rc=$?
+    set -e
+    if [ "$_v_rc" -ne 0 ]; then
+      echo "$_v_out"
+      [ "$_v_rc" = "30" ] && exit 30
       exit 1
     fi
 
@@ -451,20 +512,79 @@ for field in ("tags", "schedule_at", "visibility", "is_original"):
 print(json.dumps(data, ensure_ascii=False))
 PYEOF
     )
-    mcp_call "publish_content" "$PAYLOAD"
+    PUBLISH_RESULT="$(mcp_call "publish_content" "$PAYLOAD")"
+    echo "$PUBLISH_RESULT"
+    # 成功后消费 approval + increment count
+    if ! echo "$PUBLISH_RESULT" | grep -qiE '"(error|isError)"[[:space:]]*:[[:space:]]*(true|"[^"]+")'; then
+      bash "$SCRIPT_DIR/approval.sh" consume "$APPROVAL_ID" >/dev/null 2>&1 || true
+      bash "$SCRIPT_DIR/account-safety.sh" increment publish >/dev/null 2>&1 || true
+    fi
     ;;
 
   comment)
-    [ -z "$1" ] && { echo "错误: 缺少 note_id"; echo "用法: $(basename "$0") comment <note_id> <内容>"; exit 1; }
-    [ -z "$2" ] && { echo "错误: 缺少评论内容"; echo "用法: $(basename "$0") comment <note_id> <内容>"; exit 1; }
-    NOTE_ID="$1"
-    CONTENT="$2"
+    # ─── v3.1 Account Safety: comment 默认禁用 + 需 approval ─────────────
+    # 见 docs/adr/0003-account-execution-boundary.md §D5
+    if [ "${SHULING_ENABLE_COMMENT:-0}" != "1" ]; then
+      echo '{"ok":false,"error":"comment_disabled","message":"评论默认禁用。请先 SHULING_ENABLE_COMMENT=1 + approval（07-comment-insights 默认只输出回复建议）"}'
+      exit 1
+    fi
+
+    NOTE_ID=""
+    CONTENT=""
+    XSEC_TOKEN=""
+    APPROVAL_ID=""
+    _positional=()
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --approval-id) shift; APPROVAL_ID="${1:-}"; shift ;;
+        --) shift; break ;;
+        *) _positional+=("$1"); shift ;;
+      esac
+    done
+    NOTE_ID="${_positional[0]:-}"
+    CONTENT="${_positional[1]:-}"
+    XSEC_TOKEN="${_positional[2]:-}"
+
+    [ -z "$NOTE_ID" ] && { echo "错误: 缺少 note_id"; echo "用法: $(basename "$0") comment <note_id> <内容> --approval-id <id>"; exit 1; }
+    [ -z "$CONTENT" ] && { echo "错误: 缺少评论内容"; exit 1; }
+
+    if [ -z "$APPROVAL_ID" ]; then
+      echo '{"ok":false,"error":"approval_required","message":"评论需要用户确认授权（v3.1）。先运行 approval.sh request comment <note_id|content>"}'
+      exit 1
+    fi
+
+    set +e
+    _check_out="$(bash "$SCRIPT_DIR/account-safety.sh" check comment 2>&1)"
+    _check_rc=$?
+    set -e
+    if [ "$_check_rc" -ne 0 ]; then
+      echo "$_check_out"
+      [ "$_check_rc" = "30" ] && exit 30
+      exit 1
+    fi
+
+    # comment resource 用 note_id+content 拼成字面 string（approval.sh 会算 sha256）
+    COMMENT_RESOURCE="${NOTE_ID}:${CONTENT}"
+    set +e
+    _v_out="$(bash "$SCRIPT_DIR/approval.sh" verify comment "$COMMENT_RESOURCE" --approval-id "$APPROVAL_ID" 2>&1)"
+    _v_rc=$?
+    set -e
+    if [ "$_v_rc" -ne 0 ]; then
+      echo "$_v_out"
+      [ "$_v_rc" = "30" ] && exit 30
+      exit 1
+    fi
+
     ESCAPED=$(printf '%s' "$CONTENT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()), end="")' 2>/dev/null || printf '"%s"' "$CONTENT")
-    XSEC_TOKEN="${3:-}"
     if [ -n "$XSEC_TOKEN" ]; then
-      mcp_call "post_comment_to_feed" "{\"feed_id\": \"$NOTE_ID\", \"xsec_token\": \"$XSEC_TOKEN\", \"content\": $ESCAPED}"
+      COMMENT_RESULT="$(mcp_call "post_comment_to_feed" "{\"feed_id\": \"$NOTE_ID\", \"xsec_token\": \"$XSEC_TOKEN\", \"content\": $ESCAPED}")"
     else
-      mcp_call "post_comment_to_feed" "{\"feed_id\": \"$NOTE_ID\", \"content\": $ESCAPED}"
+      COMMENT_RESULT="$(mcp_call "post_comment_to_feed" "{\"feed_id\": \"$NOTE_ID\", \"content\": $ESCAPED}")"
+    fi
+    echo "$COMMENT_RESULT"
+    if ! echo "$COMMENT_RESULT" | grep -qiE '"(error|isError)"[[:space:]]*:[[:space:]]*(true|"[^"]+")'; then
+      bash "$SCRIPT_DIR/approval.sh" consume "$APPROVAL_ID" >/dev/null 2>&1 || true
+      bash "$SCRIPT_DIR/account-safety.sh" increment comment >/dev/null 2>&1 || true
     fi
     ;;
 
@@ -477,12 +597,27 @@ PYEOF
     ;;
 
   import-cookie)
+    # ─── v3.1 Account Safety: cooldown / locked 拒绝 import-cookie ───────
+    # 见 docs/adr/0003-account-execution-boundary.md §D1（import-cookie privileged）
     [ -z "${1:-}" ] && { echo "错误: 缺少 cookie 字符串或文件路径"; echo "用法: $(basename "$0") import-cookie <cookie字符串|@cookie.txt>"; exit 1; }
+
+    set +e
+    _check_out="$(bash "$SCRIPT_DIR/account-safety.sh" check import-cookie 2>&1)"
+    _check_rc=$?
+    set -e
+    if [ "$_check_rc" -ne 0 ]; then
+      echo "$_check_out"
+      [ "$_check_rc" = "30" ] && exit 30
+      exit 1
+    fi
+
     if [[ "$1" == @* ]]; then
       COOKIE_FILE="${1#@}"
       [ ! -f "$COOKIE_FILE" ] && { echo "错误: cookie 文件不存在: $COOKIE_FILE" >&2; exit 1; }
       COOKIE_RAW=$(cat "$COOKIE_FILE")
     else
+      # 警告：直接传字符串会进 shell history / AI 上下文 / ps
+      echo "[warn] 不推荐直接传 cookie 字符串：会进入 shell history / AI 对话 / ps。建议改用 @file 形式（参考 docs/runbooks/account-safety.md §6.1）" >&2
       COOKIE_RAW="$1"
     fi
     ESCAPED=$(printf '%s' "$COOKIE_RAW" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().strip()), end="")')

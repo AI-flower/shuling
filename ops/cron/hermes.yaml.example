@@ -1,4 +1,8 @@
-# Hermes cron 配置示例 — 薯灵 v3.0
+# Hermes cron 配置示例 — 薯灵 v3.1
+#
+# v3.1 起 cron 默认 draft-only：定时任务只生成草稿和复盘，不会自动触发账号写动作。
+# 发布与互动统一走 approval flow（见 docs/runbooks/account-safety.md），
+# 必须由用户显式授权后才能进入 04-publish-flow。
 #
 # 复制到 hermes 配置目录后改名为 .yaml 启用。Hermes 会按 schedule 唤起助手，
 # 助手读 SKILL.md → 启动协议 4 步 → 进入 agent/playbook/00-routing.md。
@@ -6,19 +10,19 @@
 # 使用：cp ops/cron/hermes.yaml.example ~/.hermes/cron/shuling.yaml
 
 jobs:
-  - name: shuling-noon
+  - name: shuling-noon-draft
     schedule: "0 12 * * *"
     skill: shuling
-    prompt: "使用 shuling skill：执行午间发布流程"
-  - name: shuling-evening
+    prompt: "使用 shuling skill：生成午间候选草稿，等待用户确认，不要发布"
+  - name: shuling-evening-draft
     schedule: "0 19 * * *"
     skill: shuling
-    prompt: "使用 shuling skill：执行晚间发布流程"
+    prompt: "使用 shuling skill：生成晚间候选草稿，等待用户确认,不要发布"
   - name: shuling-review
     schedule: "0 23 * * *"
     skill: shuling
-    prompt: "使用 shuling skill：执行夜间复盘"
-  - name: shuling-weekly
+    prompt: "使用 shuling skill：执行夜间复盘,不要发布或评论"
+  - name: shuling-weekly-review
     schedule: "0 22 * * 0"
     skill: shuling
-    prompt: "使用 shuling skill：执行周日深度回顾"
+    prompt: "使用 shuling skill：执行周日深度回顾,不要发布或评论"

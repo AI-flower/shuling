@@ -2,13 +2,13 @@
 id: 04-publish-flow
 title: Publish Flow
 when:
-  - "用户回复'发'"
-  - "草稿确认后"
-  - "draft_ready 事件触发"
+  - "用户明确回复'发'"
+  - "publish_approved 事件触发"
 needs:
   required:
     - agent/knowledge-base/profile.json
     - agent/policies/content-rules.md
+    - agent/policies/account-safety.default.json
     - agent/playbook/_shared/post-meta-schema.json
   db_tables:
     - posts
@@ -18,6 +18,8 @@ needs:
 calls:
   scripts:
     - agent/scripts/xhs.sh
+    - agent/scripts/approval.sh
+    - agent/scripts/account-safety.sh
     - agent/scripts/db.sh
   playbooks:
     - 06-learning-loop.md
@@ -26,25 +28,30 @@ calls:
 writes:
   files:
     - agent/data/xhs.db (posts, post_metrics)
+    - agent/config/approvals/<id>.json (consumed)
   emits:
     - post_published
 preconditions:
-  - "draft_ready 事件已触发"
+  - "用户明确回复'发'"
+  - "approval.sh request publish 已 grant 且未过期未消费"
+  - "account-safety risk_level ∈ {normal, watch}"
   - "agent/config/runtime.env 含 MCP_URL"
 on_failure:
   - 09-troubleshooting.md
-version: 3.0.0
-last_updated: 2026-04-27
+version: 3.1.0
+last_updated: 2026-04-28
 ---
 
 # 04 Publish Flow
 
 把 03 产出的 `meta.json` 推到小红书，记录 note_id，处理失败重试与草稿存档。
 
+> **v3.1 边界**：`draft_ready` 仅表示草稿已就绪，**不**触发本 playbook。本 playbook 必须由「用户明确回复'发'」+ approval grant 触发。详见 `docs/adr/0003-account-execution-boundary.md` §D3。
+
 ## Trigger
 
-- 用户回复"发"（或等价确认词）
-- `draft_ready` 事件触发
+- 用户明确回复"发"（或等价确认词）
+- `publish_approved` 事件触发（由 `approval.sh grant` 显式产生，cron 与自动 routing 都不能合成）
 - 上游：`agent/playbook/03-daily-flow.md`
 
 ## Read This When
@@ -76,12 +83,28 @@ last_updated: 2026-04-27
    - 已登录 → 继续
    - 未登录 → `agent/scripts/xhs.sh login` 获取二维码链接，返回给上层让用户扫码；若用户主动提议给 cookie，改用 `agent/scripts/xhs.sh import-cookie`
 
-2. **发布**
+2. **请求授权 + verify approval（v3.1 硬门禁）**
    ```bash
-   agent/scripts/xhs.sh publish /tmp/xhs-post/meta.json
+   # 2a. 请求授权（AI 触发）
+   APPROVAL_OUT=$(bash agent/scripts/approval.sh request publish /tmp/xhs-post/meta.json)
+   # 输出包含 approval_id（pending），向用户展示并等待用户回复 'grant <id>' 或回复 '发'
+   APPROVAL_ID=$(echo "$APPROVAL_OUT" | python3 -c "import json,sys;print(json.loads(sys.stdin.read())['approval_id'])")
+
+   # 2b. 用户回复 '发'/确认 → grant
+   bash agent/scripts/approval.sh grant "$APPROVAL_ID"
+
+   # 2c. 校验（6 道闸：文件 / status=granted / action / hash / 未过期 / 未消费 / safety state）
+   bash agent/scripts/approval.sh verify publish /tmp/xhs-post/meta.json --approval-id "$APPROVAL_ID"
+   # 任一失败转 → 09-troubleshooting.md Account Safety 故障矩阵
    ```
 
-3. **处理结果**
+3. **发布（带 approval-id；xhs.sh 内部还会再 verify 一次 + check safety state）**
+   ```bash
+   bash agent/scripts/xhs.sh publish /tmp/xhs-post/meta.json --approval-id "$APPROVAL_ID"
+   # 成功后 xhs.sh 会自动 consume approval + increment daily_publish_count
+   ```
+
+4. **处理结果**
    - 成功 → 提取 note_id，记录到数据库：
      ```bash
      agent/scripts/db.sh add-post '{"date":"2026-04-15","slot":"noon","title":"XXX","content":"XXX","tags":"[...]","topic_type":"家居收纳","title_pattern":"数字清单","content_style":"清单体","status":"published"}'
@@ -89,7 +112,7 @@ last_updated: 2026-04-27
      ```
    - 失败 → 见下面"补充：发布失败重试 / 草稿存档"
 
-4. **返回发布结果**："已发布！标题：XXX"，emit `post_published` 供 → `06-learning-loop.md` 后续采集 `post_metrics`
+5. **返回发布结果**："已发布！标题：XXX"，emit `post_published` 供 → `06-learning-loop.md` 后续采集 `post_metrics`
 
 **补充：发布失败重试 / 草稿存档**
 
@@ -114,6 +137,7 @@ last_updated: 2026-04-27
 - MCP 网络/超时 → 1 次重试 → 仍失败转 → `agent/playbook/09-troubleshooting.md`
 - 小红书侧合规拒绝 → 不重试，告诉用户原因，保留 draft 等改稿
 - 任何路径下 `meta.json` 与图片**保留不删**，下次重发可直接用
+- **approval 失败**（approval_required / approval_expired / resource_changed / approval_consumed / safety_cooldown / safety_locked）→ 转 → `agent/playbook/09-troubleshooting.md` Account Safety Failure Matrix
 
 ## Anti-Patterns
 

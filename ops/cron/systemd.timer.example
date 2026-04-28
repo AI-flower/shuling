@@ -1,5 +1,9 @@
 # ─── shuling-noon.timer ──────────────────────────────────────
-# 薯灵 v3.0 systemd timer 配置示例 (Linux)
+# 薯灵 v3.1 systemd timer 配置示例 (Linux)
+#
+# v3.1 起 cron 默认 draft-only：定时任务只生成候选草稿和复盘，不发布、不评论。
+# 发布与互动统一走 approval flow（见 docs/runbooks/account-safety.md），
+# 必须由用户显式授权后才能进入 04-publish-flow。
 #
 # 使用：
 #   1. 把下面 [Timer] 部分保存到 ~/.config/systemd/user/shuling-noon.timer
@@ -7,7 +11,7 @@
 #   3. systemctl --user enable --now shuling-noon.timer
 
 [Unit]
-Description=Shuling noon publish flow
+Description=Shuling noon draft generation (draft-only, no auto-post)
 
 [Timer]
 OnCalendar=*-*-* 12:00:00
@@ -18,10 +22,10 @@ WantedBy=timers.target
 
 # ─── shuling-noon.service（保存到独立文件）─────────────────
 # [Unit]
-# Description=Shuling noon publish flow
+# Description=Shuling noon draft generation (draft-only, no auto-post)
 #
 # [Service]
 # Type=oneshot
-# ExecStart=/usr/local/bin/hermes --skill shuling --prompt "使用 shuling skill：执行午间发布流程"
+# ExecStart=/usr/local/bin/hermes --skill shuling --prompt "使用 shuling skill：生成午间候选草稿，等待用户确认,不要发布"
 # StandardOutput=journal
 # StandardError=journal

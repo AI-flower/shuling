@@ -7,25 +7,33 @@
 #   - patterns.md 种子挖掘 (audit-report --extract-patterns)
 #   - preferences.json bootstrap (本脚本自动完成)
 #
-# 用法:
-#   bash agent/scripts/import-existing.sh                    # 默认拉最近 200 条
-#   bash agent/scripts/import-existing.sh --limit 500        # 拉更多
-#   bash agent/scripts/import-existing.sh --dry-run          # 只打印计划，不写 DB
-#   bash agent/scripts/import-existing.sh --resume           # 从 import-state.json 断点续跑
-#   bash agent/scripts/import-existing.sh --batch-size 20    # 单批笔记数（控制节流总时长）
-#   bash agent/scripts/import-existing.sh --override-quota   # 绕过日限额（只此场景允许）
+# 用法（v3.1+ 默认 limit=50；plan/run 子命令）:
+#   bash agent/scripts/import-existing.sh plan --limit 200       # 估算批次数 + 节流估时
+#   bash agent/scripts/import-existing.sh run --batch 50         # 真跑（每批之间 cooldown）
+#   bash agent/scripts/import-existing.sh                        # 兼容旧调用：直接 run --limit 50
+#   bash agent/scripts/import-existing.sh --limit 500            # 调高 limit（仍走分批）
+#   bash agent/scripts/import-existing.sh --dry-run              # 只打印计划，不写 DB
+#   bash agent/scripts/import-existing.sh --resume               # 从 import-state.json 断点续跑
+#   bash agent/scripts/import-existing.sh --batch-size 20        # 单批笔记数（控制节流总时长）
+#   bash agent/scripts/import-existing.sh --unsafe-override-quota   # v3.1+ 名（仅 dev mode + TTY）
+#   bash agent/scripts/import-existing.sh --override-quota       # v3.0 旧名，deprecated（仍生效一次）
 #   bash agent/scripts/import-existing.sh --mock tests/mock-feeds.json   # 本地测试
 #
 # 环境变量:
 #   SHULING_IMPORT_USER_ID   目标用户 ID（默认自动检测为自己）
+#   SHULING_DEV_MODE=1       --unsafe-override-quota 必须的开关
 #
 # 注意:
 #   - get_feed_detail MIN_GAP=10s + 50/日 (默认 profile)
-#   - 200 条实际耗时 ~35 分钟（按 10s gap）
+#   - 50 条实际耗时 ~10 分钟（按 10s gap）
 #   - cookie 过期会中断，--resume 可续
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# v3.1+ 一致性收口：用 _paths.sh 的 SHULING_SCRIPTS_DIR
+_IMPORT_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+[ -f "$_IMPORT_SCRIPT_DIR/_paths.sh" ] && . "$_IMPORT_SCRIPT_DIR/_paths.sh"
+SCRIPTS_DIR="${SHULING_SCRIPTS_DIR:-$SKILL_DIR/scripts}"
 CACHE_DIR="${XHS_CACHE_DIR:-$HOME/.cache/shuling}"
 STATE_FILE="$CACHE_DIR/import-state.json"
 ERROR_LOG="$CACHE_DIR/import-errors.log"
@@ -39,23 +47,45 @@ fail() { printf "${C_RED}[ERR]${C_RESET} %s\n" "$1" >&2; }
 step() { printf "${C_DIM}[..]${C_RESET} %s\n" "$1"; }
 
 # ─── 参数 ───────────────────────────────────────────────────────────
-LIMIT=200
+# v3.1+ default LIMIT 从 200 调到 50（高读请求保护，见 §14.1-§14.2）
+LIMIT=50
 BATCH_SIZE=50
 DRY_RUN=0
 RESUME=0
 OVERRIDE_QUOTA=0
+UNSAFE_OVERRIDE=0
+DEPRECATED_OLD_FLAG=0
 MOCK_FILE=""
 USER_ID="${SHULING_IMPORT_USER_ID:-}"
+SUBCMD=""   # plan / run；空表示走兼容旧路径
 
 usage() { sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; }
+
+# v3.1+: 第一个非 - 起头的参数若是 plan/run，则识别为子命令
+if [ $# -gt 0 ]; then
+    case "$1" in
+        plan|run) SUBCMD="$1"; shift ;;
+    esac
+fi
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --limit)           shift; LIMIT="$1"; shift ;;
-        --batch-size)      shift; BATCH_SIZE="$1"; shift ;;
+        --batch|--batch-size)
+                           shift; BATCH_SIZE="$1"; shift ;;
         --dry-run)         DRY_RUN=1; shift ;;
         --resume)          RESUME=1; shift ;;
-        --override-quota)  OVERRIDE_QUOTA=1; shift ;;
+        --override-quota)
+                           DEPRECATED_OLD_FLAG=1
+                           OVERRIDE_QUOTA=1
+                           UNSAFE_OVERRIDE=1
+                           shift
+                           ;;
+        --unsafe-override-quota)
+                           OVERRIDE_QUOTA=1
+                           UNSAFE_OVERRIDE=1
+                           shift
+                           ;;
         --mock)            shift; MOCK_FILE="$1"; shift ;;
         --user)            shift; USER_ID="$1"; shift ;;
         -h|--help)         usage; exit 0 ;;
@@ -63,9 +93,37 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+if [ "$DEPRECATED_OLD_FLAG" = "1" ]; then
+    warn "[deprecated] --override-quota 已改名为 --unsafe-override-quota（v3.1）。本次仍按旧名生效；v3.2 移除。"
+fi
+
+# v3.1+ unsafe override 守卫：必须 SHULING_DEV_MODE=1 + TTY
+if [ "$UNSAFE_OVERRIDE" = "1" ]; then
+    if [ "${SHULING_DEV_MODE:-0}" != "1" ]; then
+        echo '{"ok":false,"error":"dev_mode_required","message":"--unsafe-override-quota 必须 SHULING_DEV_MODE=1（生产保护）"}'
+        exit 2
+    fi
+    if [ ! -t 0 ] || [ ! -t 1 ]; then
+        echo '{"ok":false,"error":"unsafe_override_requires_tty","message":"--unsafe-override-quota 在非 TTY 环境（cron/CI）下被禁止"}'
+        exit 2
+    fi
+fi
+
 if [ "$OVERRIDE_QUOTA" = "1" ]; then
     export XHS_DISABLE_QUOTA=1
     warn "已设 XHS_DISABLE_QUOTA=1（限于此场景；仍受节流保护；仍写 request_log）"
+fi
+
+# ─── plan 子命令：估算批次数 + 节流估时 ────────────────────────────────
+if [ "$SUBCMD" = "plan" ]; then
+    batches=$(( (LIMIT + BATCH_SIZE - 1) / BATCH_SIZE ))
+    # min_gap=10s × LIMIT + cooldown 5min × (batches-1)
+    estimated_seconds=$(( LIMIT * 10 + (batches > 1 ? (batches - 1) * 300 : 0) ))
+    estimated_minutes=$(( (estimated_seconds + 59) / 60 ))
+    cat <<EOF
+{"plan":{"total":$LIMIT,"batches":$batches,"batch_size":$BATCH_SIZE,"estimated_minutes":$estimated_minutes,"per_batch_cooldown_seconds":300}}
+EOF
+    exit 0
 fi
 
 # ─── 依赖检查 ───────────────────────────────────────────────────────
@@ -104,7 +162,7 @@ mcp_get_detail() {
         return 0
     fi
     # 真实路径: 走 xhs.sh detail，自动吃节流/限额/日志
-    bash "$SKILL_DIR/scripts/xhs.sh" detail "$note_id" 2>/dev/null || echo "{}"
+    bash "$SCRIPTS_DIR/xhs.sh" detail "$note_id" 2>/dev/null || echo "{}"
 }
 
 mcp_user_profile() {
@@ -113,7 +171,7 @@ mcp_user_profile() {
         jq -c --arg uid "$user_id" '.user // empty' "$MOCK_FILE"
         return 0
     fi
-    bash "$SKILL_DIR/scripts/xhs.sh" user "$user_id" 2>/dev/null || echo "{}"
+    bash "$SCRIPTS_DIR/xhs.sh" user "$user_id" 2>/dev/null || echo "{}"
 }
 
 # ─── 状态管理 ───────────────────────────────────────────────────────
@@ -171,7 +229,7 @@ write_post() {
     fi
 
     local post_resp post_id
-    post_resp="$(bash "$SKILL_DIR/scripts/db.sh" add-post "$post_json")"
+    post_resp="$(bash "$SCRIPTS_DIR/db.sh" add-post "$post_json")"
     post_id="$(echo "$post_resp" | jq -r '.id // empty')"
     [ -z "$post_id" ] && { warn "add-post 失败: $post_resp"; return 1; }
 
@@ -185,7 +243,7 @@ write_post() {
         --argjson comments "$comments" \
         --argjson shares "$shares" \
         '{post_id:$pid,checked_at:(now|strftime("%Y-%m-%dT%H:%M:%SZ")),checkpoint:$checkpoint,likes:$likes,saves:$saves,comments:$comments,shares:$shares}')
-    bash "$SKILL_DIR/scripts/db.sh" add-metrics "$metrics_json" >/dev/null || warn "add-metrics 失败 post_id=$post_id"
+    bash "$SCRIPTS_DIR/db.sh" add-metrics "$metrics_json" >/dev/null || warn "add-metrics 失败 post_id=$post_id"
 
     echo "$post_id"
 }
@@ -249,8 +307,12 @@ while [ "$fetched" -lt "$LIMIT" ]; do
 done
 info "准备处理 ${#NOTE_IDS[@]} 条历史笔记"
 
-# 4) 逐条拉详情 + 写 DB
+# 4) 逐条拉详情 + 写 DB（v3.1+ 每批之间强制 cooldown）
 success=0; failed=0; skipped=0
+BATCH_COOLDOWN_SECONDS="${SHULING_IMPORT_BATCH_COOLDOWN:-300}"
+processed_in_batch=0
+batch_idx=1
+total=${#NOTE_IDS[@]}
 for nid in "${NOTE_IDS[@]}"; do
     if is_completed "$nid" "$STATE"; then
         skipped=$((skipped+1))
@@ -272,6 +334,16 @@ for nid in "${NOTE_IDS[@]}"; do
         failed=$((failed+1))
     fi
     save_state "$STATE"
+
+    processed_in_batch=$((processed_in_batch + 1))
+    # 当一个 batch 满 + 还有剩余 → cooldown
+    remaining_total=$((total - success - failed - skipped))
+    if [ "$processed_in_batch" -ge "$BATCH_SIZE" ] && [ "$remaining_total" -gt 0 ] && [ "$DRY_RUN" = "0" ]; then
+        step "[batch $batch_idx done] cooldown ${BATCH_COOLDOWN_SECONDS}s 后继续下一批 (避免连续高频访问)..."
+        sleep "$BATCH_COOLDOWN_SECONDS"
+        processed_in_batch=0
+        batch_idx=$((batch_idx + 1))
+    fi
 done
 
 # 5) 快照 + bootstrap 偏好（仅非 dry-run）
@@ -292,7 +364,7 @@ if [ "$DRY_RUN" = "0" ]; then
         --argjson imported_posts_count "${imported_count:-0}" \
         --arg meta "{\"user_id\":\"$USER_ID\"}" \
         '{snapshotted_at:(now|strftime("%Y-%m-%dT%H:%M:%SZ")),followers:$followers,total_likes:$total_likes,total_posts:$total_posts,imported_posts_count:$imported_posts_count,earliest_post_at:$earliest,latest_post_at:$latest,meta_json:$meta}')
-    bash "$SKILL_DIR/scripts/db.sh" add-historical-stat "$stat_json" >/dev/null || warn "快照写入失败"
+    bash "$SCRIPTS_DIR/db.sh" add-historical-stat "$stat_json" >/dev/null || warn "快照写入失败"
 fi
 
 # 6) 汇总
