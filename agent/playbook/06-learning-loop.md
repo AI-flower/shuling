@@ -23,8 +23,8 @@ writes:
 preconditions: []
 on_failure:
   - 09-troubleshooting.md
-version: 3.0.0
-last_updated: 2026-04-27
+version: 3.2.0
+last_updated: 2026-04-28
 authority: formulas
 ---
 
@@ -158,6 +158,28 @@ if consecutive_rejects ≥ 2:
 - 已存在 pattern 连续 3 次以上收藏率 ≥ 5% → confidence 升级（experimental → medium → high）
 - 已存在 pattern 连续 3 次 < 2% → 移到 `anti-patterns.md`
 - `patterns.md` 活跃 ≤ 15 条，超出时淘汰 confidence 最低的
+
+## v3.2 Business Pattern Boundary（plan §6.3 方案 A / §7.8 — Stage 11 边界声明）
+
+> 这是 v3.2 在 06 confidence 算法之外**显式划线**的边界声明。Wave 4B Stage 11 在 05-review.md 引入了 `Business Attribution Review` + `business-patterns.md` / `business-anti-patterns.md`；Stage 12 在 03/04/05 引入了 `creator-behavior-signals.md`；本节明确这些**不进入** 06 公式。
+
+**核心规则（plan §6.3 方案 A）**：
+
+- **业务归因不直接改变 `confidence_level`**。`Business Attribution Review` 只输出 `business_interpretation` + `next_action` + 可选 pattern 晋升 / 反模式记录，**不**触发 `weight ±0.1` 或 `confidence_level` 重算。
+- **v3.2 业务 pattern 由 05-review 维护在 `business-patterns.md` / `business-anti-patterns.md`**。它服务的是 03-daily-flow.md 选题打分时的 `goal_alignment_score / monetization_distance_score` 输入，不进入 `preferences.json`。
+- **content asset 先进入 asset-ledger，不直接修改 preferences**。`asset_score` / `asset_score_mode` 只影响 03 的选题打分，不改 `weight`。
+- **creator behavior signal 只影响当次 routing 和建议**，不进入偏好权重。`draft_no_publish / planning_loop / perfectionism / direction_hopping / benchmark_overstudy / external_blame` 命中时，03-daily-flow.md 的 `Execution Friction Fallback` 会改本次会话行为（不再生成新选题），但**不**改 `weight` / `confidence_level`。
+
+**升级路径（plan §7.8 末段）**：
+
+如果未来要把 `business_goal` / `title_trigger` / `creator_track` 等业务维度纳入 `preferences.json` 的权重学习（即 `weight` 与 `confidence_level` 公式联动业务信号），**必须单独 BRAIN 版本升级**（v3.3+ 或 v4.0+），并扩展本文件的 Bayesian-Laplace 公式 + Confidence Level 公式 + 数值校验表，**不允许在 v3.2 范围内悄悄拼接**。
+
+**为什么不直接合并到 06**（plan §6.3 决议依据）：
+
+- 偏好权重 = 用户历史选择倾向（topic / style / title_pattern 三维），样本量到达 10+ 才稳定
+- 业务信号 = 单帖业务结果（lead/sales/trust/save 等），高度情境依赖且小样本（一周 7-14 条）
+- 二者样本规模、置信度计算逻辑、漂移机制都不一样；强行合并会让 Bayesian-Laplace 公式失真，破坏 06 的可证伪性
+- 留出 v3.3+ 升级口子，避免一次性把架构推到不可回退状态
 
 ### 偏好 Bootstrap（imported posts 接入）
 

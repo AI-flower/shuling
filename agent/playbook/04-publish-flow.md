@@ -10,9 +10,16 @@ needs:
     - agent/policies/content-rules.md
     - agent/policies/account-safety.default.json
     - agent/playbook/_shared/post-meta-schema.json
+  optional:
+    - agent/knowledge-base/business-profile.json
+    - agent/knowledge-base/creator-behavior-signals.md
+  fallback:
+    business-profile.json: add-post 不写 title_intent 与 primary_goal 联动校验,仅记录原始 title_formula_id / title_trigger
+    creator-behavior-signals.md: 跳过 draft_no_publish 行为信号写入,但 add-post 主流程不受影响
   db_tables:
     - posts
     - post_metrics
+    - creator_behavior_signals
   env_vars:
     - MCP_URL
 calls:
@@ -38,7 +45,7 @@ preconditions:
   - "agent/config/runtime.env 含 MCP_URL"
 on_failure:
   - 09-troubleshooting.md
-version: 3.1.0
+version: 3.2.0
 last_updated: 2026-04-28
 ---
 
@@ -105,24 +112,83 @@ last_updated: 2026-04-28
    ```
 
 4. **处理结果**
-   - 成功 → 提取 note_id，记录到数据库：
+   - 成功 → 提取 note_id，记录到数据库（**v3.2+ 必须传 `title_formula_id` / `title_trigger` / `title_intent` 三字段**，由 03-daily-flow.md §2.2 第 3 步生成时确定；plan §7.6）：
      ```bash
-     agent/scripts/db.sh add-post '{"date":"2026-04-15","slot":"noon","title":"XXX","content":"XXX","tags":"[...]","topic_type":"家居收纳","title_pattern":"数字清单","content_style":"清单体","status":"published"}'
+     agent/scripts/db.sh add-post '{
+       "date":"2026-04-15",
+       "slot":"noon",
+       "title":"XXX",
+       "content":"XXX",
+       "tags":"[...]",
+       "topic_type":"家居收纳",
+       "title_pattern":"数字清单",
+       "content_style":"清单体",
+       "status":"published",
+       "title_formula_id":"number_anchor_steps",
+       "title_trigger":"number_anchor",
+       "title_intent":"trust"
+     }'
      agent/scripts/db.sh update-post-status <id> published <note_id>
      ```
+
+     字段语义（plan §5.4.5 / §7.6）：
+     - `title_formula_id` — `agent/knowledge-base/title-formulas.json[].id`，没有匹配公式时填 `"manual"`
+     - `title_trigger` — 该公式 `trigger`（如「损失规避」「打破已有认知」）；`manual` 时为空字符串
+     - `title_intent` — `click | save | comment | trust | lead | conversion | series` 七选一；publish 入库前**必须有值**（08-compliance.md `Title Formula Validation` 强制）
+
    - 失败 → 见下面"补充：发布失败重试 / 草稿存档"
 
 5. **返回发布结果**："已发布！标题：XXX"，emit `post_published` 供 → `06-learning-loop.md` 后续采集 `post_metrics`
 
+   **不改 approval / account-safety 逻辑**（plan §7.6 末段）：v3.2 仅在 `add-post` 写入新增标题公式字段；approval grant、6 道闸、消费、cooldown 行为完全沿用 v3.1。
+
 **补充：发布失败重试 / 草稿存档**
 
 - 发布失败时**不要删** `/tmp/xhs-post/meta.json` 与图片文件，原地保留供重试
-- 同时把这条草稿落库为 `status='draft'`，便于后续手动重发或日报追踪：
+- 同时把这条草稿落库为 `status='draft'`，便于后续手动重发或日报追踪（同样**保留 v3.2+ 标题公式字段**）：
   ```bash
-  agent/scripts/db.sh add-post '{"date":"2026-04-15","slot":"noon","title":"XXX","content":"XXX","tags":"[...]","topic_type":"家居收纳","title_pattern":"数字清单","content_style":"清单体","status":"draft"}'
+  agent/scripts/db.sh add-post '{"date":"2026-04-15","slot":"noon","title":"XXX","content":"XXX","tags":"[...]","topic_type":"家居收纳","title_pattern":"数字清单","content_style":"清单体","status":"draft","title_formula_id":"number_anchor_steps","title_trigger":"number_anchor","title_intent":"trust"}'
   ```
 - 重试策略：MCP 临时错误（超时 / 5xx）最多 1 次重试；登录态失效 → 走第 1 步重登；合规拒绝（小红书侧驳回）→ 不重试，转 `09-troubleshooting.md` 让用户改稿
 - 同一草稿重发成功后，把 draft 行的 `status` 改为 `published` 并补 `note_id`，不要新建一行（避免 06 计指标时重复计数）
+- **`draft_no_publish` 行为信号**（v3.2+ Stage 12，plan §5.7.6 / §7.6 末段 — 可执行规则）：
+
+  **触发条件**：用户在 03-daily-flow.md 完成草稿确认（`draft_ready` emit）后 **24 小时内**仍未进入本 playbook（无 `approval.sh request publish` / 无 grant / 无 `xhs.sh publish` 调用）→ 在下次会话开头记录 `draft_no_publish` 信号，但**不替用户自动发布**。
+
+  **下次会话开头的检测逻辑**（LLM 在 playbook 内执行）：
+
+  ```bash
+  # 检查 24h+ 未发布的 draft（status=draft 且 created_at < now - 24h）
+  bash agent/scripts/db.sh query-posts --days 14 --status draft
+  # 同时查询 7-14 天内已写过的 draft_no_publish 信号，避免重复写
+  bash agent/scripts/db.sh query-creator-behavior-signals --days 14 --signal-type draft_no_publish
+  ```
+
+  **写入命令**（与 03-daily-flow.md `Execution Friction Fallback` 同款）：
+
+  ```bash
+  bash agent/scripts/db.sh add-creator-behavior-signal '{
+    "id": "behavior_20260428_draft_no_publish",
+    "signal_type": "draft_no_publish",
+    "severity": "warn",
+    "observed_events": [
+      {"event": "draft_generated", "count": 1, "window_days": 1, "evidence": "draft 在 24h 前生成但未发布"},
+      {"event": "publish_skipped", "count": 1, "window_days": 1}
+    ],
+    "interpretation": "草稿在 24 小时前已确认但仍未发布。当前问题更像发布前摩擦（不是选题不够好）。",
+    "next_small_action": "把这条草稿小修标题或开头后发出去；本会话不再生成新选题。",
+    "cooldown_until": "2026-05-05",
+    "created_at": "2026-04-28"
+  }'
+  ```
+
+  **行为底线（plan §5.7.5 / §7.6 末段）**：
+
+  - **不**自动重发草稿；用户必须显式回复"发"才进入第 2 步 approval flow
+  - **不**做心理评价（禁词："拖延症 / 你在逃避 / 你自卑 / 你不想赚钱"等；08-compliance.md `Behavior Signal Output Validation` 强制）
+  - cron 下次唤醒时，03-daily-flow.md 的 `Execution Friction Fallback` 读到此信号 → **不再扩展新选题**，改走兜底剧本（详见 → 03-daily-flow.md `## 2.0 Execution Friction Fallback`）
+  - 写入失败 → 转 → 09-troubleshooting.md `behavior_signal_db_failed` 行；只追加 `creator-behavior-signals.md`，不阻塞本 playbook
+  - 用户主动表示判断不准 → 转 → 09-troubleshooting.md `behavior_signal_misfire` 行；本会话不再提示
 
 ## Writes
 

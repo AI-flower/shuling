@@ -1,15 +1,29 @@
 #!/usr/bin/env python3
-"""内容质量与 AI 托管感检查 — v3.0+
+"""内容质量与 AI 托管感检查 — v3.0 / v3.2+
 
 供 03-daily-flow.md 在生成 meta.json 前调用：分析最近 N 篇已发布帖
-+ 当前待发草稿，检测 8 项"AI 托管感"信号（标题/正文/标签/emoji 模板化、
-高频 AI 味词、图片页结构与清单体过度集中）。
++ 当前待发草稿，检测「AI 托管感」与「v3.2 标题公式过度重复」两类信号。
+
+检测项（v3.2+ 共 12 项）：
+  1.  title_similarity        最近 30 篇标题 trigram Jaccard ≥ 0.6
+  2.  title_pattern_run       同一 title_pattern 连续 ≥ 5 次
+  3.  opening_repeat          正文开头 30 字相互 Jaccard ≥ 0.6
+  4.  tag_combo_repeat        最近 10 篇里同一 5+ 标签组合 ≥ 2 次
+  5.  emoji_density           单页 emoji 数 ≥ 6
+  6.  ai_flavored_words       最近 10 篇 ≥ 30% 命中 / 草稿 ≥ 2 个 AI 味词
+  7.  image_strategy_run      同一 gen_strategy 连续 ≥ 5 篇
+  8.  list_style_run          连续 ≥ 4 篇清单体
+  9.  draft_title_similar_to_history    草稿标题与历史帖高相似
+  10. draft_opening_similar_to_history  草稿正文开头与历史帖高相似
+  11. title_formula_repeat   (v3.2+) 同一 title_formula_id 在最近 5 篇 ≥ 3 次（cooldown）
+  12. title_trigger_repeat   (v3.2+) 同一 title_trigger 在最近 5 篇 ≥ 4 次（模板化）
 
 设计原则：
   - 纯 stdlib（不引入新 pip 依赖）
-  - 不调 LLM API（这是规则引擎，不是 AI 检测）
-  - 8 项检测各自独立函数，易于单测
+  - 不调 LLM API（这是规则引擎，不是 AI 检测；语义诊断由 03-daily-flow §2.2.5 LLM 执行）
+  - 12 项检测各自独立函数，易于单测
   - DB 缺失/为空 → score=100, warnings=[]，不报错
+  - v3.1 schema 的 DB（无 title_formula_id 列）→ 11/12 项静默跳过，不报错
   - JSON 输出与 agent/schemas/content-qa-report.schema.json 对齐
 
 用法：
@@ -130,7 +144,11 @@ def _jaccard(a: set, b: set) -> float:
 
 # ─── 数据加载 ─────────────────────────────────────────────────────
 def _load_recent_posts(db_path: Path, last_n: int) -> list[dict]:
-    """读最近 N 篇 published 帖（按 created_at desc）。表/库不存在返回 []。"""
+    """读最近 N 篇 published 帖（按 created_at desc）。表/库不存在返回 []。
+
+    v3.2+：尝试读取 title_formula_id / title_trigger / title_intent 三列；
+    若 DB 还在 v3.1 schema（migration 未跑），降级到不读这三列。
+    """
     if not db_path.exists():
         return []
     try:
@@ -144,17 +162,36 @@ def _load_recent_posts(db_path: Path, last_n: int) -> list[dict]:
         if not cur.fetchone():
             conn.close()
             return []
-        cur.execute(
-            """
-            SELECT id, date, title, content, tags, topic_type,
-                   title_pattern, content_style, status, created_at
-            FROM posts
-            WHERE status IN ('published','draft')
-            ORDER BY datetime(created_at) DESC
-            LIMIT ?
-            """,
-            (last_n,),
-        )
+        # 探测 v3.2 列是否存在（PRAGMA 兼容性最好）
+        cur.execute("PRAGMA table_info(posts)")
+        cols = {row[1] for row in cur.fetchall()}
+        v32_cols = {"title_formula_id", "title_trigger", "title_intent"}
+        has_v32 = v32_cols.issubset(cols)
+        if has_v32:
+            cur.execute(
+                """
+                SELECT id, date, title, content, tags, topic_type,
+                       title_pattern, content_style, status, created_at,
+                       title_formula_id, title_trigger, title_intent
+                FROM posts
+                WHERE status IN ('published','draft')
+                ORDER BY datetime(created_at) DESC
+                LIMIT ?
+                """,
+                (last_n,),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, date, title, content, tags, topic_type,
+                       title_pattern, content_style, status, created_at
+                FROM posts
+                WHERE status IN ('published','draft')
+                ORDER BY datetime(created_at) DESC
+                LIMIT ?
+                """,
+                (last_n,),
+            )
         rows = [dict(r) for r in cur.fetchall()]
         conn.close()
         return rows
@@ -501,6 +538,80 @@ def check_list_style_run(posts: list[dict]) -> list[dict]:
     return out
 
 
+# v3.2+ 标题公式重复检测（plan §5.4 / §8.2）─────────────────────────────
+TITLE_FORMULA_RECENT_WINDOW = 5
+TITLE_FORMULA_REPEAT_LIMIT = 3   # 最近 5 篇里同一 formula_id 出现 ≥ 3 次 → warn
+TITLE_TRIGGER_RECENT_WINDOW = 5
+TITLE_TRIGGER_REPEAT_LIMIT = 4   # 最近 5 篇里同一 trigger 出现 ≥ 4 次 → warn
+
+
+def check_title_formula_repeat(posts: list[dict]) -> list[dict]:
+    """11. 同一 title_formula_id 在最近 5 条帖子里 ≥ 3 次出现 → warn（plan §5.4 cooldown）。
+
+    posts 字段缺失（v3.1 DB schema 没跑 migration）→ 静默跳过，不报错。
+    """
+    out: list[dict] = []
+    recent = posts[:TITLE_FORMULA_RECENT_WINDOW]
+    formulas = [
+        (p.get("title_formula_id") or "").strip()
+        for p in recent
+    ]
+    formulas = [f for f in formulas if f and f != "manual"]
+    if not formulas:
+        return out
+    counter = Counter(formulas)
+    most_common = counter.most_common(1)
+    if not most_common:
+        return out
+    fid, n = most_common[0]
+    if n >= TITLE_FORMULA_REPEAT_LIMIT:
+        out.append(
+            {
+                "check": "title_formula_repeat",
+                "severity": "warn",
+                "message": (
+                    f"标题公式「{fid}」在最近 {len(recent)} 篇里出现 {n} 次"
+                    f"（阈值 {TITLE_FORMULA_REPEAT_LIMIT}），可能进入 cooldown"
+                ),
+                "samples": [{"formula_id": fid, "count": n, "window": len(recent)}],
+                "deduction": 10,
+            }
+        )
+    return out
+
+
+def check_title_trigger_repeat(posts: list[dict]) -> list[dict]:
+    """12. 同一 title_trigger 在最近 5 条帖子里 ≥ 4 次出现 → warn（plan §5.4 模板化提示）。"""
+    out: list[dict] = []
+    recent = posts[:TITLE_TRIGGER_RECENT_WINDOW]
+    triggers = [
+        (p.get("title_trigger") or "").strip()
+        for p in recent
+    ]
+    triggers = [t for t in triggers if t]
+    if not triggers:
+        return out
+    counter = Counter(triggers)
+    most_common = counter.most_common(1)
+    if not most_common:
+        return out
+    trig, n = most_common[0]
+    if n >= TITLE_TRIGGER_REPEAT_LIMIT:
+        out.append(
+            {
+                "check": "title_trigger_repeat",
+                "severity": "warn",
+                "message": (
+                    f"标题触发器「{trig}」在最近 {len(recent)} 篇里出现 {n} 次"
+                    f"（阈值 {TITLE_TRIGGER_REPEAT_LIMIT}），账号可能正在模板化"
+                ),
+                "samples": [{"trigger": trig, "count": n, "window": len(recent)}],
+                "deduction": 10,
+            }
+        )
+    return out
+
+
 # ─── 主聚合 ───────────────────────────────────────────────────────
 def run_all_checks(
     posts: list[dict], strategies: list[str], draft: dict | None
@@ -514,6 +625,9 @@ def run_all_checks(
     warnings.extend(check_ai_flavored_words(posts, draft))
     warnings.extend(check_image_strategy_run(strategies))
     warnings.extend(check_list_style_run(posts))
+    # v3.2+ 标题公式 cooldown / 触发器模板化检测
+    warnings.extend(check_title_formula_repeat(posts))
+    warnings.extend(check_title_trigger_repeat(posts))
     # 草稿独立标题/开头检查 — 与历史比较
     if draft and posts:
         d_title = str(draft.get("title") or "").strip()

@@ -17,8 +17,8 @@ writes:
   files: []
 preconditions: []
 on_failure: []
-version: 3.0.0
-last_updated: 2026-04-27
+version: 3.2.0
+last_updated: 2026-04-28
 ---
 
 # 09 Troubleshooting and Failure Handling
@@ -145,6 +145,27 @@ bash agent/scripts/approval.sh list
 # 重新 request 一份
 bash agent/scripts/approval.sh request publish /tmp/xhs-post/meta.json
 ```
+
+### v3.2 Business Intelligence Failure Matrix
+
+> 业务画像 / 概念澄清 / 行为信号 / 商业模式 7 测试相关的故障行。详见 `docs/plans/v3.2-creator-business-intelligence-plan.md` §7.11。
+
+| 状态 / 错误码 | 现象 | 处理 |
+|---|---|---|
+| `business_profile_missing` | 03/04/05 读取 `business-profile.json` 不存在 | 回 `01-onboarding-new.md` Business Profile Building 段 / `02-onboarding-existing.md` Business Profile Inference 段补齐；允许大量 `unknown`，**不阻塞**草稿生成；下游按 `business_alignment=unknown` 兜底 |
+| `business_profile_schema_failed` | 写 `business-profile.json` 时 schema 校验失败 | **不写盘**；展示具体字段错误（如 `creator_track 越界`、`monetization_stage 缺失`、`offer 对象缺失`），引导用户改后重写；详见 `08-compliance.md` Business Profile Validation |
+| `concept_precheck_unresolved` | 触发词清单命中且两轮追问后用户仍说不清 | 允许 `unknown` 落盘；`current_bottleneck` 置 `unclear_concept`；本次 onboarding 不再继续追问；不写 `concept-clarifications.md` |
+| `concept_trigger_word_in_profile` | onboarding 试图把触发词原话写入 `profile.json.niche` / `business-profile.json.primary_goal` | 由 `08-compliance.md` Concept Precheck Rule Validation 拒写；提示用户重述；触发词清单见 `01-onboarding-new.md` Concept Precheck 段 |
+| `audit_report_inference_failed` | `audit-report.sh` 业务画像反推因数据不足或 LLM 异常失败 | **不阻塞 onboarding**；记录 `degraded`；audit report 该段写「证据不足，待 7 天后重跑」；继续往后走（patterns/anti-patterns 抽取仍可执行） |
+| `replacement_risk_evidence_insufficient` | 证据不足以判断 `replacement_risk` 为 high/low | 标 `unknown`；**不强制下结论**；audit report 段写「数据不足以判断替代风险，建议接下来 7 天注意评论中的具体反对意见与购买信号」 |
+| `behavior_signal_misfire` | 用户主动表示行为信号判断不准确 | 不写表；本次会话内不再提示同类信号；不持续骚扰用户 |
+| `behavior_signal_db_failed` | `add-creator-behavior-signal` 写表失败 / `creator_behavior_signals` 表缺失 | 仅追加 `creator-behavior-signals.md`，不阻塞 onboarding；记录 `degraded`；提示用户跑 `bash agent/scripts/db.sh init` 或 `install.sh --check` |
+| `behavior_signal_human_judgement` | `interpretation` / `next_small_action` 出现「逃避/自卑/不想赚钱/拖延症」等禁词 | 由 `08-compliance.md` Behavior Signal Output Validation 拒写；返回结构化错误给调用方重写 |
+| `business_profile_replacement_risk_high_with_evidence` | `profit_evidence_level ∈ {hard, medium}` 且 `replacement_risk == high` | **不是错误**，是合法状态；audit report 必须追加「替代风险提示」段（见 `02-onboarding-existing.md` Replacement Risk Hint）；`risk_notes[]` 加一条独占资产建议 |
+| `business review 写入失败` | `db.sh add-business-review` 返回非 0 / `business_reviews` 表缺失 / schema 校验失败 | **不阻塞日报**；在 `evolution-log.md` 标记 `degraded: business review write failed`；提示用户跑 `bash agent/scripts/db.sh init` 或 `install.sh --check`；详见 → `05-review.md` Business Attribution Review |
+| `asset-ledger 写入失败` | `db.sh add-content-asset` 返回非 0 / `content_assets` 表缺失 / schema 校验失败 | **不阻塞发布**、**不阻塞日报**；在 `evolution-log.md` 标记 `degraded: asset-ledger write failed`；保留人类可读 `asset-ledger.md` 追加（如可写盘）；详见 → `05-review.md` Asset Ledger Update |
+| `creator behavior signal 误触发` | 用户主动表示行为信号判断不准（"我没逃避""我没拖延"等） | 用户可忽略，本次会话内不再提示同类信号；不写表；不重复骚扰；详见 → `03-daily-flow.md` `## 2.0 Execution Friction Fallback` 末段 + `04-publish-flow.md` `draft_no_publish` 末段 |
+| `behavior_signal_evidence_insufficient` | 03/04/05 试图写 `creator_behavior_signal` 但 `observed_events` 为空 / 不引用可统计事件 | schema 拒写（`observed_events` minItems=1 + enum 限定事件类型）；引导调用方先收集事件再写；不阻塞兜底剧本输出 |
 
 ### General Exception Matrix（迁入 §8 完整异常场景）
 
