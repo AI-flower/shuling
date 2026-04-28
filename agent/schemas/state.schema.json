@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/state.schema.json",
+  "title": "agent/config/state.json",
+  "description": "薯灵业务里程碑状态。由 agent/scripts/preflight.py 和 agent/playbook/00-routing.md 业务路由维护，不要手改。00-routing.md 会读这个文件决定下一步。",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "setup_completed": {
+      "type": "boolean",
+      "description": "全部前置环境就绪（依赖/MCP/DB/画像）。true 时 §0a 直接进入每日流程。"
+    },
+    "profile_created": {
+      "type": "boolean",
+      "description": "博主画像已建立（profile.json 存在且有效）。true 时 §0a 不再问方向/受众/风格。"
+    },
+    "mcp_configured": {
+      "type": "boolean",
+      "description": "xiaohongshu-mcp 曾检测 ok。true 时 preflight 超时会放宽（按已就绪处理）。"
+    },
+    "cold_start_done": {
+      "type": "boolean",
+      "description": "冷启动播种（竞品分析 + patterns.md 初始化）已完成。true 时不再走冷启动流程。"
+    },
+    "setup_date": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "setup_completed 首次置 true 的日期。"
+    },
+    "creator_mode": {
+      "type": "string",
+      "enum": ["new", "existing", "unset"],
+      "description": "v2.2.0+: 博主类型。'new' = 从零起步；'existing' = 有存量账号，走 §0c 流程；'unset' = 未询问。老博主接入时必须显式设为 'existing'。"
+    },
+    "existing_import_done": {
+      "type": "boolean",
+      "description": "v2.2.0+: §0c 五步流程全部完成（批量导入 + 分类 + 画像反推 + patterns 挖掘 + 体检报告）。false 时 §0a 路由到 §0c 继续。"
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Post Meta",
+  "description": "Used by 03-daily-flow.md (after image generation) and 04-publish-flow.md (publish input).",
+  "type": "object",
+  "required": ["topic", "outline", "draft", "images"],
+  "properties": {
+    "topic": {
+      "type": "string",
+      "description": "用户原始主题原文"
+    },
+    "outline": {
+      "type": "string",
+      "description": "完整大纲原文（含 <page> 分隔与 配图建议 行）"
+    },
+    "draft": {
+      "type": "object",
+      "required": ["titles", "copywriting", "tags"],
+      "properties": {
+        "titles": {
+          "type": "array",
+          "items": {"type": "string"},
+          "minItems": 1,
+          "maxItems": 3,
+          "description": "主推 + 备选标题，15-25 字，不超 30"
+        },
+        "copywriting": {
+          "type": "string",
+          "description": "正文 200-300 字，禁用 markdown"
+        },
+        "tags": {
+          "type": "array",
+          "items": {"type": "string"},
+          "minItems": 5,
+          "maxItems": 8,
+          "description": "5-8 个标签，不带 # 号"
+        }
+      }
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["page", "path"],
+        "properties": {
+          "page": {"type": "integer", "minimum": 1},
+          "path": {"type": "string", "description": "图片绝对路径"},
+          "page_type": {"enum": ["封面", "内容", "总结"]}
+        }
+      }
+    },
+    "is_original": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

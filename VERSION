@@ -1,6 +1,6 @@
-version: "2.4.2"
-codename: "Source-Target Isolation Patch"
-released: "2026-04-23"
+version: "3.0.0"
+codename: "Stateful Creator Agent"
+released: "2026-04-27"
 
 # ─── 版本号语义: BRAIN.HANDS.CALIB ──────────────────────────────────
 #
@@ -12,18 +12,12 @@ released: "2026-04-23"
 # HANDS: scripts/ 新增或重写 / DB schema 迁移 / MCP 接口替换
 # CALIB: 阈值/关键词/节流参数调整 / bugfix / prompt 微调
 #
-# 版本位决策（本版 v2.4.2）:
-#   - SKILL.md 完全不动；业务能力 / 算法 / MCP 接口零变化；纯 bugfix
-#   - 社区二次验证复盘 5 处 source-target 路径混淆修复：
-#     1. install.sh _runtime_env_set 改 force override (MCP_URL 不再被模板默认值顶掉)
-#     2. install.sh §7.5 每 target 循环追加 db.sh init (target DB 真实初始化 + __migrations)
-#     3. install.sh ua_step_migrations 传 SHULING_DB=$target/data/xhs.db
-#        (migrations 写入 target DB, 不再误写源仓库 DB)
-#     4. db.sh 支持 SHULING_DB env var override (允许调用方显式指定 DB 路径)
-#     5. _guard.sh 调 db.sh init 时透传 SHULING_DB (target DB 不存在时, init 目标正确)
-#   - 附赠: ua_step_preflight 判定放宽 (exit 1/2 为运行时配置未就绪, 不是 upgrade 失败)
-#   - 新增: scripts/pre-submit-verify.sh 21 项本地回归套件 (预演社区 verifier 行为)
-#   - 遂定 CALIB +1 → v2.4.2
+# 版本位决策（本版 v2.4.3）:
+#   - SKILL.md 业务正文、脚本、数据库、MCP 接口完全不动；仅协议与对外文案校准
+#   - LICENSE 切换到 BSL 1.1，附带 2030-04-23 自动转 Apache-2.0
+#   - README / SECURITY / landing / docs/promotion 统一新许可表述
+#   - awesome / marketplace 投递材料新增 BSL 非 OSI 的风险披露
+#   - 遂定 CALIB +1 → v2.4.3
 
 breaking_change_policy:
   brain:

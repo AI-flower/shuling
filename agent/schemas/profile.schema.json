@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/profile.schema.json",
+  "title": "agent/knowledge-base/profile.json",
+  "description": "博主画像。agent/playbook/01-onboarding-new.md 对话建立，后续所有决策基础。存在即视为画像已建立，不要重复询问。",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["niche", "audience", "tone", "created_at"],
+  "properties": {
+    "niche": {
+      "type": "string",
+      "minLength": 1,
+      "description": "领域方向。例：\"美食探店\" / \"职场干货\" / \"家居收纳\"。"
+    },
+    "audience": {
+      "type": "string",
+      "minLength": 1,
+      "description": "目标受众描述。例：\"程序员 / 产品经理\" / \"职场新人\" / \"宝妈\"。"
+    },
+    "tone": {
+      "type": "string",
+      "minLength": 1,
+      "description": "风格偏好。例：\"轻松口语\" / \"专业干货\" / \"幽默吐槽\"。"
+    },
+    "goals": {
+      "type": "string",
+      "description": "用户的目标（可选，如有提及）。"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "画像创建日期 YYYY-MM-DD。"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "最近一次更新日期 YYYY-MM-DD。"
+    }
+  }
+}

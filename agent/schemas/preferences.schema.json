@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AI-flower/shuling/schemas/preferences.schema.json",
+  "title": "agent/knowledge-base/preferences.json",
+  "description": "用户偏好，由 agent/playbook/06-learning-loop.md 自进化引擎维护。Laplace 贝叶斯平滑 + 集中度 × 样本因子 confidence + ε-greedy 探索保底。",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["dimensions", "total_choices", "confidence_level", "updated_at"],
+  "properties": {
+    "dimensions": {
+      "type": "object",
+      "description": "三个偏好维度的类型权重分布。key 为 dimension 名，value 为该维度下的类型分布。",
+      "additionalProperties": false,
+      "properties": {
+        "topic":         { "$ref": "#/$defs/DimensionWeights" },
+        "style":         { "$ref": "#/$defs/DimensionWeights" },
+        "title_pattern": { "$ref": "#/$defs/DimensionWeights" }
+      }
+    },
+    "total_choices": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "累计用户选择次数（跨所有维度），用于 sample_factor = min(total_choices/10, 1.0)。"
+    },
+    "confidence_level": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "整体信心度 = concentration × sample_factor。≥0.75 进入 1 选档，≥0.5 进入 2 选档，其余 3 选档。警告：不要用 chosen/(chosen+skipped) 算 confidence，那是 weight 公式。"
+    },
+    "consecutive_rejects": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "用户连续\"换\"的次数，每次发布后清 0。≥2 时 confidence 强制回到 0.45。"
+    },
+    "last_exploration_at": {
+      "type": ["string", "null"],
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "上次 ε-greedy 探索项推送日期。高 confidence 档距此 ≥7 天或为 null 时追加探索项。"
+    },
+    "choice_log": {
+      "type": "array",
+      "description": "用户选择历史（最近 90 天），供时间衰减使用。",
+      "items": {
+        "type": "object",
+        "required": ["date", "dimension", "chosen"],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "dimension": {
+            "type": "string",
+            "enum": ["topic", "style", "title_pattern"]
+          },
+          "chosen":  { "type": "string" },
+          "skipped": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "最近一次写入时间（ISO 8601）。"
+    }
+  },
+  "$defs": {
+    "DimensionWeights": {
+      "type": "object",
+      "description": "某维度下各类型的选择统计。key 为类型名（如 topic 下的 ai_tools/coding/news），value 为统计结构。",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["chosen", "skipped", "weight"],
+        "properties": {
+          "chosen":  { "type": "integer", "minimum": 0 },
+          "skipped": { "type": "integer", "minimum": 0 },
+          "weight": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": "(chosen + 1) / (chosen + skipped + 2) — Laplace 平滑后的偏好权重。"
+          }
+        }
+      }
+    }
+  }
+}

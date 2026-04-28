@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  薯灵 v3.0 launchd 配置示例 (macOS)
+
+  使用：
+    1. cp ops/cron/launchd.plist.example ~/Library/LaunchAgents/com.shuling.noon.plist
+    2. 修改 ProgramArguments 路径为你的真实 AI CLI（hermes/claude-code/codex）
+    3. launchctl load ~/Library/LaunchAgents/com.shuling.noon.plist
+
+  注意：launchd 不能直接调 SKILL.md，必须通过支持薯灵的 AI 助手 CLI 触发。
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.shuling.noon</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/hermes</string>
+        <string>--skill</string>
+        <string>shuling</string>
+        <string>--prompt</string>
+        <string>使用 shuling skill：执行午间发布流程</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>12</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/tmp/shuling-noon.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/shuling-noon.err</string>
+</dict>
+</plist>

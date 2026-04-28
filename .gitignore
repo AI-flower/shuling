@@ -20,6 +20,26 @@ knowledge-base/evolution-log.md
 knowledge-base/reviews/
 knowledge-base/README.md
 
+# v3.0+ 用户态（agent/ 内核）
+agent/config/runtime.env
+agent/config/state.json
+agent/config/.layout-v3.done
+agent/data/*.db
+agent/data/*.db-shm
+agent/data/*.db-wal
+agent/data/*.db-journal
+agent/data/.schema-degraded.lock
+agent/knowledge-base/profile.json
+agent/knowledge-base/preferences.json
+agent/knowledge-base/patterns.md
+agent/knowledge-base/anti-patterns.md
+agent/knowledge-base/image-patterns.md
+agent/knowledge-base/image-anti-patterns.md
+agent/knowledge-base/evolution-log.md
+agent/knowledge-base/reviews/
+agent/knowledge-base/audit-*.md
+agent/knowledge-base/audit-*.json
+
 # =================================================================
 # 临时输出
 # =================================================================

@@ -1,0 +1,27 @@
+# ─── shuling-noon.timer ──────────────────────────────────────
+# 薯灵 v3.0 systemd timer 配置示例 (Linux)
+#
+# 使用：
+#   1. 把下面 [Timer] 部分保存到 ~/.config/systemd/user/shuling-noon.timer
+#   2. 把下面 [Service] 部分（注释里的）保存到 ~/.config/systemd/user/shuling-noon.service
+#   3. systemctl --user enable --now shuling-noon.timer
+
+[Unit]
+Description=Shuling noon publish flow
+
+[Timer]
+OnCalendar=*-*-* 12:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+
+# ─── shuling-noon.service（保存到独立文件）─────────────────
+# [Unit]
+# Description=Shuling noon publish flow
+#
+# [Service]
+# Type=oneshot
+# ExecStart=/usr/local/bin/hermes --skill shuling --prompt "使用 shuling skill：执行午间发布流程"
+# StandardOutput=journal
+# StandardError=journal

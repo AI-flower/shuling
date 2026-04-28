@@ -1,0 +1,24 @@
+# Hermes cron 配置示例 — 薯灵 v3.0
+#
+# 复制到 hermes 配置目录后改名为 .yaml 启用。Hermes 会按 schedule 唤起助手，
+# 助手读 SKILL.md → 启动协议 4 步 → 进入 agent/playbook/00-routing.md。
+#
+# 使用：cp ops/cron/hermes.yaml.example ~/.hermes/cron/shuling.yaml
+
+jobs:
+  - name: shuling-noon
+    schedule: "0 12 * * *"
+    skill: shuling
+    prompt: "使用 shuling skill：执行午间发布流程"
+  - name: shuling-evening
+    schedule: "0 19 * * *"
+    skill: shuling
+    prompt: "使用 shuling skill：执行晚间发布流程"
+  - name: shuling-review
+    schedule: "0 23 * * *"
+    skill: shuling
+    prompt: "使用 shuling skill：执行夜间复盘"
+  - name: shuling-weekly
+    schedule: "0 22 * * 0"
+    skill: shuling
+    prompt: "使用 shuling skill：执行周日深度回顾"

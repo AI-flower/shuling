@@ -15,6 +15,100 @@
 
 ---
 
+## [3.0.0] - 2026-04-27 "Stateful Creator Agent"
+
+v3.0 是薯灵的**架构重塑版**：从"标准 Skill 包"演化为 **Stateful Creator Agent**，三层架构（SKILL.md 桥梁 + agent/ 内核 + ops/ 部署）。SKILL.md 从 1204 行瘦身到 77 行，全部业务剧本下沉到 agent/playbook/。
+
+**版本位决策**：BRAIN +1 / HANDS +1 / CALIB +1 → v3.0.0（major breaking）
+
+### 🧠 Brain（架构 + 业务剧本结构）
+
+- **三层架构**：SKILL.md（≤150 行协议适配）+ agent/（业务内核）+ ops/（部署运维）
+- **9 个 playbook**：00-routing / 01-onboarding-new / 02-onboarding-existing / 03-daily-flow / 04-publish-flow / 05-review / 06-learning-loop / 07-comment-insights / 08-compliance / 09-troubleshooting
+- **4 个 _shared 资源**：emoji-dictionary / confidence-mapping / outline-template / post-meta-schema
+- **算法权威唯一性**：06-learning-loop.md 是 weight / confidence / ε-greedy / consecutive_rejects 的唯一定义；其他 playbook cross-ref 引用
+- **playbook frontmatter 规范**：id / title / when / needs / calls / writes / preconditions / on_failure / version
+
+### ✋ Hands（脚本 + 工具 + DB）
+
+- **agent/scripts/_paths.sh + _common.sh**：路径单一来源 + 退出码常量 + 日志 + JSON 输出 + 用户态守卫
+- **db.sh ensure-runtime-layout**：copy-first v2→v3 数据迁移，幂等 marker
+- **db.sh ensure-schema**：自动应用 pending migration，up_to_date 短路，失败进入 read-only 降级模式
+- **ops/install.sh**：从 1061 行升级到 1683 行，新增 7 个子命令（doctor / migrate-layout / rollback-to-v2 等）
+- **ops/layout-migrations/v2-to-v3.sh**：219 行，target 内布局迁移
+- **ops/cron/ 4 平台模板**：hermes / claude-code / launchd / systemd
+- **ops/verify/ 34 条门禁**：pre-submit-verify.sh 主调度 + 34 个独立 check
+- **build/ 5 件套**：package-skill + check-package + check-version-sync + check-playbook-frontmatter + check-active-region-refs
+
+### 🎛 Calib（文档 + 归档）
+
+- **legacy/ 归档**：skills/shuling → legacy/old-xhs-mcp-skill / docs/archive → legacy/archive / shuling-full-spec.md → legacy/
+- **docs/ 重组**：landing → site/ / docs/promotion → marketing/ / platform → docs/runbooks/platform/
+- **docs/adr/0001-stateful-creator-agent.md**：三层架构 + 12 条总原则
+- **docs/adr/0002-playbook-split-decisions.md**：5 条 P0/P1 决议 + verify 31-34 条款
+- **docs/plans/v3-playbook-split-feasibility.md**：Stage 0 假拆分演练
+- **docs/architecture.md**：三层架构详解
+- **docs/runbooks/disaster-recovery.md**：v3 → v2 回滚 SOP
+
+### 📦 用户可见改动
+
+- **如果你是 v2.x 用户**：自动迁移；v2 旧路径保留；自定义脚本路径需改
+- **如果你是新用户**：直接按 README 走 v3 安装流程
+- **如果你 fork 改过**：SKILL.md 完全重写；自定义业务流程需迁到 agent/playbook/
+
+### ⬆️ 如何升级
+
+详见 [UPGRADE.md v2.x → v3.0.0 章节](UPGRADE.md#v2x--v300-stateful-creator-agent2026-04-27)。
+
+简版：
+```bash
+git pull
+bash ops/install.sh upgrade-all
+bash ops/doctor.sh
+```
+
+---
+
+## [2.4.3] - 2026-04-23 "Business Source License Shift"
+
+仓库协议与对外文案校准版：将仓库根 LICENSE 从 MIT 切换为 **BSL 1.1**，并把 README、SECURITY、landing 页面、推广物料中的许可表述统一到新协议。**业务流程、脚本行为、数据库 schema、MCP 接口均无变化。**
+
+**版本位决策**：BRAIN +0 / HANDS +0 / CALIB +1 → v2.4.3
+
+### 🎛 Calib（license / docs / release messaging）
+
+- 根 `LICENSE` 与 `docs/promotion/LICENSE.md` 切换为 **Business Source License 1.1**
+  - `Licensor`: AI-flower
+  - `Change Date`: 2030-04-23
+  - `Change License`: Apache-2.0
+  - `Additional Use Grant`: 个人非商业可直接使用；公司/组织/商业主体需另谈商业许可
+- `README.md`：
+  - badge 从 MIT 改为 BSL 1.1
+  - 新增 BSL 1.1 许可说明，明确 source-available 而非 OSI 开源
+  - 当前版本切到 `v2.4.3`
+- `SECURITY.md` 新增 License 说明区，避免用户把安全披露与使用授权混淆
+- `landing/index.html`：
+  - 4 处 MIT 文案改为 BSL 1.1 / source-available
+  - 页面可见版本同步到 `v2.4.3`
+- `docs/promotion/README.md` / `RUNBOOK.md` / `awesome-listings.md` / `github-release-v2.4.0.md`
+  - 移除 MIT 作为卖点的表述，改为 BSL 1.1 风险披露或中性描述
+- `docs/promotion/awesome-prs-ready-to-submit.md` 与 `docs/promotion/anthropics-skills-pr.md`
+  - 顶部新增警告：BSL 非 OSI，awesome / 官方 marketplace 大概率拒收，提交策略需重评
+
+### ⬆️ 如何升级
+
+如果你只是同步仓库文档与许可：
+
+```bash
+git pull
+```
+
+如果你打算在公司或商业环境中使用本仓库，请先联系 AI-flower 获取商业授权；个人非商业使用不受影响。
+
+### 🧠 Brain / ✋ Hands
+
+_无。SKILL.md 业务流程正文、scripts/ 行为、migrations、DB 与 MCP 接口全部不变。_
+
 ## [2.4.2] - 2026-04-23 "Source-Target Isolation Patch"
 
 社区二次验证复盘 bugfix：v2.4.1 修了表层 4 处 install 断点，但社区 codex verifier 跑 Phase 2 又暴露一组更深层问题——**install / upgrade 流程对 source tree 和 target install 的路径区分不清**，导致 MCP_URL 未覆写、target DB 未初始化、migrations 误写源仓库 DB。本版 5 处定点修复 + 1 个预防性工具，**SKILL.md / 业务能力 / 算法零变化**。

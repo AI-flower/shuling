@@ -44,6 +44,100 @@ bash install.sh
 
 ## 逐版本迁移步骤
 
+## v2.x → v3.0.0 "Stateful Creator Agent"（2026-04-27）
+
+> ⚠ **v3.0 是 BRAIN +1 breaking 升级**——target 布局重组、SKILL.md 完全瘦身、scripts/ 路径变化。
+> 用户数据自动 copy-first 迁移到 agent/，v2 旧路径保留至 v3.2。
+> 详见 [`docs/adr/0001-stateful-creator-agent.md`](docs/adr/0001-stateful-creator-agent.md)。
+
+### 升级前置 checklist
+
+- [ ] 备份 `data/xhs.db`（一份独立副本）
+- [ ] 备份 `config/runtime.env`（API Key 仍然有效）
+- [ ] 记录当前 VERSION（应为 v2.4.x）
+- [ ] git 工作树 clean（`git status` 应该没有未 commit 的 in-flight 改动）
+- [ ] 确认有可用的回滚路径（`git tag v2.4.3 -- 还在`）
+
+### 自动迁移路径（推荐）
+
+```bash
+git fetch --tags origin && git checkout main && git pull
+bash ops/install.sh upgrade-all
+```
+
+`upgrade-all` 会：
+1. 探测每个 target（`~/.hermes/skills/shuling`、`~/.claude/skills/shuling`、`~/.codex/skills/shuling` 等）
+2. 跑 `ops/layout-migrations/v2-to-v3.sh`：把 target 的根级 `scripts/` `schemas/` `migrations/` `prompts/` `data/content-rules.md` `config/runtime.env.example` 迁到 `agent/`
+3. 跑 `ensure-runtime-layout`：把 `data/xhs.db` `config/runtime.env` `knowledge-base/*` copy-first 到 `agent/data/` `agent/config/` `agent/knowledge-base/`（**v2 旧路径不删，作为兼容**）
+4. 跑 `ensure-schema`：检测 `__migrations` 表，应用任何 pending migration（v3.0 不引入新 DB schema 变化，已应用 v2.x 6 条 migration 的 target 这步会 status=up_to_date）
+5. 跑 `ops/install.sh doctor`：12 项体检
+
+### 手动迁移路径（高级用户）
+
+如果你不想跑 install.sh upgrade-all：
+
+```bash
+cd ~/.hermes/skills/shuling   # 或你的 target
+bash ops/layout-migrations/v2-to-v3.sh "$PWD"        # 仅迁代码文件
+bash agent/scripts/db.sh ensure-runtime-layout       # 迁用户态
+bash agent/scripts/db.sh ensure-schema               # 应用 migration
+bash ops/doctor.sh                                    # 12 项体检
+```
+
+### 验证步骤
+
+- [ ] `bash ops/doctor.sh` 输出 fail=0
+- [ ] `agent/config/.layout-v3.done` marker 存在且 schema_version=3.0.0
+- [ ] `agent/data/xhs.db` 与原 `data/xhs.db` md5 一致
+- [ ] `python3 agent/scripts/preflight.py --json` 退出码 ≤ 1（auto-fixable）
+- [ ] `bash agent/scripts/xhs.sh status` 报告登录态（如果之前已登录）
+- [ ] AI 助手对话"看看昨天的数据"能正常返回历史
+
+### 自定义脚本路径迁移
+
+如果你的工作流脚本（cron job 配置 / 自动化脚本）调用了：
+- `bash scripts/xhs.sh ...` → 改为 `bash agent/scripts/xhs.sh ...`
+- `bash scripts/db.sh ...` → 改为 `bash agent/scripts/db.sh ...`
+- `python3 scripts/preflight.py` → 改为 `python3 agent/scripts/preflight.py`
+- `cat data/content-rules.md` → 改为 `cat agent/policies/content-rules.md`
+- `bash install.sh` → 仍然有效（v3.0 是 stub，转发到 `ops/install.sh`，v3.2 删除）
+
+### 回滚步骤
+
+如果 v3.0 升级出问题：
+
+```bash
+# 1. 切回 v2.4.3 标签
+git checkout v2.4.3
+
+# 2. v2 旧路径仍在 target，无需恢复（copy-first 没删）
+# - $target/data/xhs.db 仍是 v2 路径下的 DB
+# - $target/config/runtime.env 仍是 v2 路径下的配置
+
+# 3. 提示宿主 agent 重启
+# Hermes: hermes-cli reload
+# Claude Code: 重新 /compact + 重新对话
+# Codex: 重启 Codex session
+```
+
+详见 [`docs/runbooks/disaster-recovery.md`](docs/runbooks/disaster-recovery.md)。
+
+### 已知问题（v3.0 GA 后第一周持续更新）
+
+- 暂无报告
+
+### v3.0 重构带来的变化
+
+- **breaking**：target 布局变（`scripts/` → `agent/scripts/` 等）；自定义脚本必须改路径
+- **breaking**：SKILL.md 从 1204 行业务剧本变成 ≤150 行协议适配层；如果你 fork 改了 SKILL.md 内容，需重做到 `agent/playbook/` 下
+- **non-breaking**：用户数据 copy-first 自动迁移，v2 旧路径保留
+- **non-breaking**：所有 v2.x 子命令仍工作（install / upgrade-all / --check / --dry-run / --mode 等）
+- **新增**：ops/install.sh doctor / migrate-layout / rollback-to-v2 子命令
+- **新增**：agent/scripts/db.sh ensure-runtime-layout / ensure-schema 自愈命令
+- **新增**：34 项 verify 门禁（vs v2.x 21 项）
+
+---
+
 ### → v2.4.0 "Agent-Friendly Upgrade Infrastructure"（2026-04-23）
 
 **类型**：HANDS（纯工程基础设施，SKILL.md 完全不动）

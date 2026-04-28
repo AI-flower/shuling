@@ -1,21 +1,63 @@
-MIT License
+Business Source License 1.1
+
+Parameters
+
+Licensor:             AI-flower
+Licensed Work:        The contents of this repository, including all source code,
+                      documentation, assets, and associated files published under
+                      the `shuling` project.
+Additional Use Grant: You may use this Licensed Work for personal, non-commercial
+                      purposes at no charge. Any use by or for a company,
+                      organization, or other commercial entity requires a separate
+                      commercial license from the Licensor.
+Change Date:          2030-04-23
+Change License:       Apache License, Version 2.0
+
+Notice
+
+The Business Source License (this document, or the "License") is not an Open
+Source license. However, the Licensed Work will eventually be made available
+under an Open Source License, as stated in this License.
+
+This License is designed to strike a balance between encouraging wide access and
+allowing the Licensor to sustain commercial use through separate agreements.
+
+Terms
 
 Copyright (c) 2026 AI-flower
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+"Business Source License" is a trademark of MariaDB plc.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Permission is hereby granted, free of charge, to any person or entity obtaining
+a copy of the Licensed Work, to use, reproduce, modify, and create derivative
+works of the Licensed Work, subject to the limitations in this License.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+You may distribute copies of the Licensed Work or derivative works only if:
+
+1. you keep this License with the Licensed Work;
+2. you do not remove or alter any license, copyright, trademark, or other
+   notices of the Licensor; and
+3. your use complies with the Additional Use Grant and all other terms in this
+   License.
+
+You may not use the Licensed Work in production, for a commercial purpose, or
+for the benefit of a company or organization except as expressly allowed by the
+Additional Use Grant or by a separate written commercial agreement with the
+Licensor.
+
+Effective on the Change Date, or on any earlier date if required by the Change
+License, the Licensor hereby grants you rights under the terms of the Change
+License, and this License will no longer apply to the Licensed Work as of that
+date.
+
+If your use of the Licensed Work is not permitted under this License, then you
+have no rights to use the Licensed Work.
+
+To the extent permitted by applicable law, the Licensed Work is provided on an
+"AS IS" basis, without warranties or conditions of any kind, either express or
+implied, including without limitation any warranties of title,
+non-infringement, merchantability, or fitness for a particular purpose.
+
+In no event will the Licensor be liable to you for any damages or other
+liability arising from, out of, or in connection with the Licensed Work or this
+License, whether in contract, tort, or otherwise.

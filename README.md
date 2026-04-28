@@ -1,31 +1,33 @@
 # 薯灵 (ShuLing)
 
-> 小红书博主成长助手 — 选题、写稿、发布、复盘一体化，越用越懂你。
+> Stateful Creator Agent for 小红书博主 — 通过 SKILL.md 接入 Claude Code / Codex / Hermes，业务大脑在 `agent/playbook/`。
 
-[![Version](https://img.shields.io/badge/version-2.4.0-blue)](VERSION)
-[![Codename](https://img.shields.io/badge/codename-Agent--Friendly%20Upgrade%20Infra-green)](CHANGELOG.md)
-[![License](https://img.shields.io/badge/license-MIT-lightgrey)](#许可)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue)](VERSION)
+[![Codename](https://img.shields.io/badge/codename-Stateful%20Creator%20Agent-green)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-BSL%201.1-orange)](#许可)
 [![Website](https://img.shields.io/badge/🌐_website-shuling.pages.dev-f97316)](https://shuling.pages.dev)
 
-🌐 **官网**：[https://shuling.pages.dev](https://shuling.pages.dev)（中英文双语介绍页，源码同步在 `landing/index.html`，可直接双击本地预览）
+📦 **v3.0.0** · 2026-04-27 · [CHANGELOG](CHANGELOG.md) · [UPGRADE](UPGRADE.md) · [Architecture](docs/architecture.md)
 
-📦 **v2.4.0** · 2026-04-23 · [CHANGELOG](CHANGELOG.md) · [UPGRADE](UPGRADE.md) · [RELEASING](RELEASING.md)
+🌐 **官网**：[https://shuling.pages.dev](https://shuling.pages.dev)（双语介绍页，源码同步在 `site/landing/`）
 
 ---
 
 ## 快速导航
 
 - 🆕 **新博主从零起步** → [路径 A](#路径-a新博主从零起步)
-- 📈 **已有账号存量接入** → [路径 B（v2.2.0+）](#路径-b老博主存量接入v220)
-- 🤖 **AI 开发者 / 想借鉴架构** → [Skill-as-Brain](#核心理念skill-as-brain) ｜ [SKILL.md](SKILL.md)
+- 📈 **已有账号存量接入** → [路径 B](#路径-b老博主存量接入)
+- ⬆️ **从 v2.x 升级到 v3.0** → [升级 §v2→v3](#从-v2x-升级到-v30)
+- 🤖 **AI 开发者 / 想借鉴架构** → [三层架构速读](#三层架构速读) ｜ [docs/architecture.md](docs/architecture.md)
 
 ---
 
 ## 目录
 
 - [这是什么](#这是什么)
-- [核心理念：Skill-as-Brain](#核心理念skill-as-brain)
-- [能力全景](#能力全景)
+- [三层架构速读](#三层架构速读)
+- [v3.0 重构纪律](#v30-重构纪律)
+- [给谁用 / 不是什么](#给谁用)
 - [前置依赖](#前置依赖)
 - [快速开始](#快速开始)
 - [日常使用](#日常使用)
@@ -41,84 +43,70 @@
 
 ## 这是什么
 
-**一句话**：把你的 AI 助手变成懂小红书的博主搭档——从选题、创作、发布到复盘形成闭环，历史数据驱动自进化，越用越懂你。
+**一句话**：把你的 AI 助手变成懂小红书的博主搭档——选题、创作、发布、复盘形成闭环，历史数据驱动自进化，越用越懂你。
 
-### 给谁用
+v3.0 起，薯灵的形态明确分成 **三层**：
+
+- **协议适配层**（`SKILL.md` ≤ 150 行）：被 Claude Code / Codex / Hermes 装载时的入口，只做识别意图、初始化、路由、全局约束。
+- **业务内核**（`agent/`）：playbook + scripts + schemas + prompts + policies + migrations + 用户态。AI 真正"读"的剧本在这里。
+- **部署运维层**（`ops/`）：安装、cron 模板、verify 门禁、布局迁移。只在源仓库里，不会被打包进 target。
+
+详细决策与 12 条总原则见 [`docs/adr/0001-stateful-creator-agent.md`](docs/adr/0001-stateful-creator-agent.md)，完整架构图与三层职责见 [`docs/architecture.md`](docs/architecture.md)。
+
+---
+
+## 三层架构速读
+
+```
+Claude Code / Codex / Hermes / OpenClaw     ← 宿主平台
+            ↓ 装载
+SKILL.md  (≤ 150 行)                         ← 协议适配层：入口 / 路由 / 全局约束
+            ↓ 第 4 步：路由
+agent/playbook/00-routing.md                 ← 业务内核入口
+  ├─ 01-onboarding-new           新博主冷启动
+  ├─ 02-onboarding-existing      老博主存量接入
+  ├─ 03-daily-flow               选题 / 创作 / 起稿
+  ├─ 04-publish-flow             发布 + meta.json + 图片
+  ├─ 05-review                   夜间复盘 / 周日深度回顾
+  ├─ 06-learning-loop            自进化算法（公式权威）
+  ├─ 07-comment-insights         评论提炼
+  ├─ 08-compliance               schema + 内容合规
+  └─ 09-troubleshooting          异常总入口
+            ↓ 调用
+agent/scripts/  + agent/data/xhs.db  + agent/knowledge-base/
+            ↑
+ops/  仅在源仓库（install / cron / verify / layout-migrations）
+```
+
+每次 SKILL.md 被装载，AI 必须按"启动协议"4 步走：`ensure-runtime-layout → ensure-schema → preflight → 读 00-routing.md`。其中前两步是 v3.0 新增的 **runtime self-healing**，让"只 `git pull` 不跑安装"的用户也能升级。
+
+---
+
+## v3.0 重构纪律
+
+ADR-0001 锁定了 4 条不可让步的工程纪律，所有贡献者必须遵守：
+
+1. **路径单一来源**：`agent/scripts/_paths.sh` 是仓库内所有运行时路径的唯一权威。所有 shell 脚本必须 `source _paths.sh`，禁止 hardcode `agent/data/...`、`config/...` 等字面量。verify 第 29 条门禁。
+2. **playbook frontmatter 可机器校验**：每份 playbook 都带 YAML frontmatter（`id / title / when / needs / calls / writes / preconditions / on_failure / version / last_updated`）。verify 第 4-6、28、32、34 条覆盖。
+3. **算法权威唯一**：`weight` / `confidence_level` / `ε-greedy` / `consecutive_rejects` 公式只在 `06-learning-loop.md` 出现。其它 playbook 必须 cross-ref，不允许复述。verify 第 31 条。
+4. **34 条 verify 门禁**：发版前 `bash ops/verify/pre-submit-verify.sh` 必须全绿（v2.x 是 21 条本地回归，v3.0 升到 34 条，覆盖 active vs inactive 分区、playbook 调用图无环、package 白名单等）。
+
+---
+
+## 给谁用
 
 | 身份 | 薯灵做什么 | 入口 |
 |---|---|---|
 | 🆕 **新博主**（还没发或刚开始） | 三问对话建画像 → 竞品冷启动 → 每日选题/起稿/发布/复盘 | [路径 A](#路径-a新博主从零起步) |
-| 📈 **老博主**（已发 30~1000+ 条） | 批量导入历史 → AI 反推画像 → 挖掘你自己已验证的 patterns → 账号体检报告 → 历史加权的日常优化 | [路径 B（v2.2.0+）](#路径-b老博主存量接入v220) |
-| 🤖 **AI 智能体开发者** | 可借鉴的 Skill-as-Brain 架构、业务路由 §0a、JSON Schema 契约、反模式禁令工程化 | [SKILL.md](SKILL.md) |
+| 📈 **老博主**（已发 30~1000+ 条） | 批量导入历史 → AI 反推画像 → 挖掘已验证的 patterns → 账号体检报告 → 历史加权的日常优化 | [路径 B](#路径-b老博主存量接入) |
+| 🤖 **AI 智能体开发者** | 三层架构、playbook frontmatter 规范、JSON Schema 契约、34 条 verify 门禁、ADR / 反模式禁令 | [docs/architecture.md](docs/architecture.md) |
 
 ### 不是什么
 
 - ❌ **不是**小红书自动化工具（没有批量发布、不刷量、不绕风控）
-- ❌ **不是**内容农场（§5 合规规则兜底，不做标题党 / 同质化）
+- ❌ **不是**内容农场（08-compliance 合规规则兜底，不做标题党 / 同质化）
 - ❌ **不是**独立运行机器人（必须搭一个能读 SKILL.md 的 AI 助手）
-- ❌ **不假设通讯渠道**（Telegram / 微信等由 hermes-agent 或你自己配）
-
----
-
-## 核心理念：Skill-as-Brain
-
-> **业务逻辑全部在 `SKILL.md` 里，AI 助手读了它就是大脑；`scripts/` 只是手脚，负责调 API、读写数据库、生成图片这些 AI 做不了的物理操作。**
-
-这意味着：
-- **换 AI 平台零成本**：只要能读 SKILL.md，hermes / Claude Code / Codex / OpenClaw 都通用
-- **改流程不用改代码**：改 SKILL.md 即可，版本号 BRAIN+1
-- **越用越聪明**：每次选择、每条数据都记录到 DB，驱动偏好进化
-- **AI 自律有工程保障**：§0a 业务路由 + §0b 写入校验 + schemas/ JSON Schema + 反模式禁令
-
----
-
-## 能力全景
-
-### 🎯 核心业务流程（7 条主线）
-
-| # | 流程 | 触发 | 产出 |
-|---|---|---|---|
-| 1 | **新手引导** | 第一次对话 / preflight 未通过 | `profile.json` + 环境就绪 |
-| 2 | **老博主接入**（v2.2.0） | "已在运营" / `--mode=existing-creator` | 历史导入 + 画像反推 + patterns 种子 + 体检报告 |
-| 3 | **选题研究** | "今天发什么" / cron 午间 | 带偏好加权的候选话题 |
-| 4 | **内容创作**（RedInk 双阶段） | "帮我写一条" / cron 午/晚间 | 6-9 页大纲 + 正文（≤1000 字）+ 5-8 标签 |
-| 5 | **图片生成**（两阶段封面参考） | 起稿后 | 封面 + 内容页图（Gemini 强制、中文模板） |
-| 6 | **发布** | 起稿完成 | 小红书已发帖 + 本地 `posts` 记录 |
-| 7 | **每日复盘 + 周回顾** | 夜间 cron / 周日加餐 | 日/周报 + patterns/anti-patterns 进化 + NoteRx 五维诊断 |
-
-### 🧬 自进化引擎
-
-| 机制 | 算法 / 规则 | 效果 |
-|---|---|---|
-| **偏好学习** | `bayesian-laplace-v1` — Laplace 平滑 + 集中度×样本因子 confidence | 小样本不冒进，口味稳时快收敛 |
-| **选项递减** | confidence `≥0.75→1 选` / `≥0.5→2 选` / `<0.5→3 选` | 从"每次选几项"退化到"回一个'发'字" |
-| **ε-greedy 探索** | 距上次探索 ≥7 天追加 1 个低 weight 类型 | 防过拟合，口味可演进 |
-| **"换"信号回弹** | 连续 2 次"换" → confidence 强制回 0.45 | 防单方向钻牛角尖 |
-| **Pattern 生命周期** | experimental → medium → high / deprecated | 标题 / 结构 / 图片 prompt 通用 |
-| **收藏率驱动** | `≥5% → patterns + weight +0.1` / `<2% → anti-patterns - 0.1` | 真实数据反馈，无人为干预 |
-
-### ⚙️ 运维与工程纪律
-
-| 能力 | 细节 |
-|---|---|
-| **install.sh 六模式** | 默认 / `--check` / `--dry-run` / `--yes` / `--target <path>` / `--mode=<new\|existing>` |
-| **preflight.py 双模式** | 给 AI 的结构化 JSON + 给人的 `--human` 彩色表（退出码分级 0/1/2） |
-| **版本号** | BRAIN.HANDS.CALIB 三段语义，breaking 仅发生在 BRAIN+1 |
-| **文档四件套** | CHANGELOG（📦用户可见+⬆️如何升级 双栏）/ UPGRADE / RELEASING / docs/features/（新特性 spec） |
-| **Migrations** | `migrations/vX.Y.Z.sh` 按版本顺序幂等执行，失败可重试 |
-| **JSON Schema 契约** | `schemas/` 约束 state / profile / preferences / audit-report 四份 JSON，AI 写入前自校验 |
-| **Request Log** | v2.1.1+ MCP 调用全量落表（`tool × status × latency_ms × error_hint`） |
-| **账号风控** | 分级节流 + 日限额 profile `v1-conservative`，触顶自动拒绝 |
-
-### 🤖 AI 智能体协作（Brain 的工程纪律）
-
-| 机制 | 位置 | 作用 |
-|---|---|---|
-| **§0a 业务路由** | SKILL.md | AI 进项目第一动作：跑 preflight → 读 state → 查表选下一步 |
-| **§0b 平台识别 + 写入校验** | SKILL.md（v2.1.3+） | 按路径识别 hermes/claude/codex，写入 JSON 前按 schema 核对 |
-| **§0c 老博主接入** | SKILL.md（v2.2.0+） | 5 步流程的 additive 分支 |
-| **反模式禁令** | §0a / §0c | "不重复问画像 / 不放空 / 不绕回默认路径 / 用户主动方案优先"等明文纪律 |
-| **异常处理矩阵** | §8 | 12 种异常场景 × 标准处理（含"模型 API 报错最多 1 次重试"等） |
+- ❌ **不假设通讯渠道**（Telegram / 微信等由宿主 agent 负责）
 
 ---
 
@@ -126,13 +114,13 @@
 
 | 依赖 | 用途 | 安装 |
 |---|---|---|
-| **AI 助手** | 大脑，读 SKILL.md 驱动流程 | [hermes](https://github.com/anthropics/hermes) / [Claude Code](https://claude.com/claude-code) / [Codex](https://github.com/openai/codex) / OpenClaw 任选 |
+| **AI 助手** | 大脑，装载 SKILL.md 驱动 playbook | [Claude Code](https://claude.com/claude-code) / [Codex](https://github.com/openai/codex) / [Hermes](https://github.com/anthropics/hermes) / OpenClaw 任选 |
 | **xiaohongshu-mcp** | 小红书 MCP（搜索/详情/发布/评论/登录） | [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)；详见 [docs/runbooks/mcp-setup.md](docs/runbooks/mcp-setup.md) |
 | **Python 3 / sqlite3 / jq** | DB / 生图 / JSON | macOS: `brew install sqlite jq`；Linux: `apt install sqlite3 jq` |
-| **Gemini 图片 API**（**必需**） | AI 生图（唯一路径） | Gemini Key（https://aistudio.google.com/app/apikey） |
+| **Gemini 图片 API**（**必需**） | AI 生图（唯一路径，无 HTML 降级） | Gemini Key（https://aistudio.google.com/app/apikey） |
 | **NoteRx API**（可选） | 五维诊断 | 配 `NOTERX_API_KEY` 才启用 |
 
-> ❌ **不在本 skill 范围**：Telegram / 微信等 IM 通讯凭证——由 hermes-agent 或你的 AI 平台管理。
+> ❌ **不在本 skill 范围**：Telegram / 微信等 IM 通讯凭证——由宿主 agent 或你的 AI 平台管理。
 
 ---
 
@@ -142,27 +130,34 @@
 
 ```bash
 git clone git@github.com:AI-flower/shuling.git && cd shuling
-bash install.sh                        # 自动检测平台 + 依赖预检 + init DB + 生成配置
+
+# 推荐：直接用 ops/install.sh
+bash ops/install.sh                       # 自动检测平台 + 依赖预检 + 初始化 + 生成配置
+
+# 兼容入口：根 install.sh 是 v3.0 stub，原样转发到 ops/install.sh（v3.2 移除）
+bash install.sh                           # 等同于 bash ops/install.sh
 
 # 其他模式
-bash install.sh --check                # 只自检不动手
-bash install.sh --dry-run              # 列出将做的所有动作
-SHULING_ASSUME_YES=1 bash install.sh   # CI / 远程非交互
+bash ops/install.sh --check               # 只自检不动手
+bash ops/install.sh --dry-run             # 列出将做的所有动作
+bash ops/install.sh doctor                # 12 项 target 健康检查（v3.0+）
+SHULING_ASSUME_YES=1 bash ops/install.sh  # CI / 远程非交互
 ```
 
 ### 路径 A：新博主（从零起步）
 
 ```bash
 # 1. 安装（默认 new，直接回车）
-bash install.sh
+bash ops/install.sh
 
 # 2. 登录小红书（二选一）
-#    扫码:   AI 会调 scripts/xhs.sh login 给二维码链接
+#    扫码:   AI 调 agent/scripts/xhs.sh login 给二维码链接
 #    Cookie: 对话里说 "我给你 cookie：<浏览器 F12 复制的完整串>"
 #    详细图文 → docs/runbooks/mcp-setup.md
 
 # 3. 建立画像（在 AI 里说 "我想做小红书博主"）
 #    AI 三问: 做什么方向 / 目标受众 / 风格偏好
+#    走 agent/playbook/01-onboarding-new.md
 
 # 4. 日常
 #    "帮我发小红书"   → 完整发布流程
@@ -170,16 +165,16 @@ bash install.sh
 #    "看看昨天的数据" → 数据复盘
 ```
 
-### 路径 B：老博主（存量接入，v2.2.0+）
+### 路径 B：老博主（存量接入）
 
 ```bash
 # 1. 老博主模式安装
-bash install.sh --mode=existing-creator
+bash ops/install.sh --mode=existing-creator
 
 # 2. 登录（扫码或 Cookie，同路径 A）
 
 # 3. 对话里说 "我已经在运营小红书，帮我接入"
-#    AI 按 SKILL.md §0c 自动走 5 步:
+#    AI 按 agent/playbook/02-onboarding-existing.md 自动走 5 步:
 #      1) 确认账号登录
 #      2) 批量导入最近 200 条历史（≈30 分钟，带节流保护）
 #      3) 自动分类 (topic_type / title_pattern / content_style)
@@ -190,13 +185,15 @@ bash install.sh --mode=existing-creator
 ```
 
 手动跑：
+
 ```bash
-bash scripts/import-existing.sh --limit 200            # 批量导入（可 --resume 断点续跑）
-bash scripts/audit-report.sh --extract-patterns        # 出体检报告 + patterns 候选
+bash agent/scripts/import-existing.sh --limit 200            # 批量导入（可 --resume 断点续跑）
+bash agent/scripts/audit-report.sh --extract-patterns        # 出体检报告 + patterns 候选
 ```
+
 详细设计 → [docs/plans/existing-creator-onboarding.md](docs/plans/existing-creator-onboarding.md)
 
-> **首次安装后**：`config/runtime.env`、`config/state.json`、`knowledge-base/profile.json`、`data/xhs.db` 等是你的私人数据，已被 `.gitignore` 屏蔽。**不要 `git add -f` 这些文件**。
+> **首次安装后**：`agent/config/runtime.env`、`agent/config/state.json`、`agent/knowledge-base/profile.json`、`agent/data/xhs.db` 等是你的私人数据，已被 `.gitignore` 屏蔽。**不要 `git add -f` 这些文件**。
 
 ---
 
@@ -204,84 +201,108 @@ bash scripts/audit-report.sh --extract-patterns        # 出体检报告 + patte
 
 ### 🗣️ 对话指令（触发 AI 业务）
 
-| 说这句 | 做什么 |
-|---|---|
-| "帮我发小红书" | 完整发布流程（选题 → 创作 → 图片 → 发布） |
-| "今天发什么" | 只跑选题研究 |
-| "起个稿子" | 只跑创作 |
-| "看看昨天的数据" / "复盘" | 手动触发复盘 |
-| "最近怎么样" | 近期小结 |
-| "我想换方向" | 更新画像 |
-| "我给你 cookie：..." | Cookie 登录（绕过扫码） |
+| 说这句 | 做什么 | 进入剧本 |
+|---|---|---|
+| "帮我发小红书" | 完整发布流程（选题 → 创作 → 图片 → 发布） | 03 → 04 |
+| "今天发什么" | 只跑选题研究 | 03 |
+| "起个稿子" | 只跑创作 | 03 |
+| "看看昨天的数据" / "复盘" | 手动触发复盘 | 05 |
+| "最近怎么样" | 近期小结 | 05 |
+| "我想换方向" | 更新画像 | 01 |
+| "我给你 cookie：..." | Cookie 登录（绕过扫码） | 09 |
 
 ### 🔧 命令行（手动工具）
 
 ```bash
 # 健康检查
-bash install.sh --check                             # 依赖 + 平台 + 版本对比
-python3 scripts/preflight.py --human                # 人类可读彩色自检
+bash ops/install.sh --check                          # 依赖 + 平台 + 版本对比
+bash ops/install.sh doctor                           # 12 项 target 健康表（v3.0+）
+python3 agent/scripts/preflight.py --human           # 人类可读彩色自检
 
-# 小红书 MCP（scripts/xhs.sh 统一入口）
-bash scripts/xhs.sh status                          # 登录态
-bash scripts/xhs.sh login                           # 获取二维码
-bash scripts/xhs.sh import-cookie '<cookie 串>'     # Cookie 登录
-bash scripts/xhs.sh quota                           # 当日调用计数
-bash scripts/xhs.sh log --summary                   # 请求日志聚合（v2.1.1+）
+# 小红书 MCP（agent/scripts/xhs.sh 统一入口）
+bash agent/scripts/xhs.sh status                     # 登录态
+bash agent/scripts/xhs.sh login                      # 获取二维码
+bash agent/scripts/xhs.sh import-cookie '<cookie>'   # Cookie 登录
+bash agent/scripts/xhs.sh log --summary              # 请求日志聚合（v2.1.1+）
 
-# 数据库（scripts/db.sh 统一入口）
-bash scripts/db.sh init                             # 初始化/补建表（幂等）
-bash scripts/db.sh query-posts --today              # 今日帖
-bash scripts/db.sh query-posts --source imported    # 老博主导入的帖（v2.2.0+）
-bash scripts/db.sh query-preferences                # 偏好权重快照
-bash scripts/db.sh query-undiagnosed --days 7       # 近 7 天未诊断的帖
+# 数据库（agent/scripts/db.sh 统一入口）
+bash agent/scripts/db.sh ensure-runtime-layout       # v2→v3 用户态自愈（v3.0+ 启动协议第 1 步）
+bash agent/scripts/db.sh ensure-schema               # 自动应用 pending migration（v3.0+ 第 2 步）
+bash agent/scripts/db.sh init                        # 初始化/补建 11 表（幂等）
+bash agent/scripts/db.sh query-posts --today
+bash agent/scripts/db.sh query-posts --source imported
+bash agent/scripts/db.sh query-preferences
 
-# 老博主专用（v2.2.0+）
-bash scripts/import-existing.sh --limit 200         # 批量导入历史
-bash scripts/import-existing.sh --resume            # 断点续跑
-bash scripts/audit-report.sh                        # 账号体检报告
-bash scripts/audit-report.sh --extract-patterns     # 附带 patterns 候选
-bash scripts/audit-report.sh --include-organic      # 含薯灵自己发的帖
+# 老博主专用
+bash agent/scripts/import-existing.sh --limit 200    # 批量导入历史
+bash agent/scripts/import-existing.sh --resume       # 断点续跑
+bash agent/scripts/audit-report.sh --extract-patterns
 ```
+
+完整脚本契约见 [agent/scripts/README.md](agent/scripts/README.md)。
 
 ---
 
 ## 部署到 AI 平台
 
-| 平台 | 状态 | 触发 | 说明 |
+| 平台 | 状态 | 触发 | cron 模板 |
 |---|---|---|---|
-| [Hermes](platform/hermes.md) | ✅ | cron job + `prompt: 使用 shuling skill` | **全自动每日发布 + 复盘（推荐）** |
-| [Claude Code](platform/claude-code.md) | ✅ | 对话 + `/loop 8h ...` | VS Code 集成，支持定时 |
-| [Codex](platform/codex.md) | ✅ | 对话 | 手动触发 |
+| [Claude Code](docs/runbooks/platform/claude-code.md) | ✅ | 对话 + `/loop 8h ...` | [`ops/cron/claude-code.md`](ops/cron/claude-code.md) |
+| [Codex](docs/runbooks/platform/codex.md) | ✅ | 对话 | 手动触发 |
+| [Hermes](docs/runbooks/platform/hermes.md) | ✅ | cron job + `prompt: 使用 shuling skill` | [`ops/cron/hermes.yaml.example`](ops/cron/hermes.yaml.example) |
 | OpenClaw | ✅ | 兼容 `agents/` 目录规范 | 通用 agents 兜底 |
+| macOS launchd | ✅ | OS 级 user agent | [`ops/cron/launchd.plist.example`](ops/cron/launchd.plist.example) |
+| Linux systemd | ✅ | OS 级 user timer | [`ops/cron/systemd.timer.example`](ops/cron/systemd.timer.example) |
 
-> 一份 SKILL.md 在所有平台产生相同业务行为；§0b 识别平台用于调用各自特有能力（如 hermes cron、claude /loop）。
+> 一份 SKILL.md 在所有平台产生相同业务行为；00-routing.md 第 3 步识别平台，仅用于调用各自特有能力（如 Hermes cron、Claude `/loop`）。
+>
+> 薯灵**不会自动启用任何 cron**——`ops/cron/` 是模板库，用户必须显式选模板 + 自己装。详见 [`ops/cron/README.md`](ops/cron/README.md)。
 
 ---
 
 ## 升级
 
-### 从旧版升级（自动识别）
+### 从 v2.x 升级到 v3.0
+
+v3.0 是 **BRAIN +1 breaking** 升级，目录布局与 SKILL.md 形态都有变化。**升级前请备份**用户态数据（`data/xhs.db`、`config/runtime.env`、`knowledge-base/`）。
 
 ```bash
 cd /path/to/shuling
 git fetch --tags origin && git checkout main && git pull
-bash install.sh         # v2.1.2+ 自动识别部署版本并跑所需 migration
+
+bash ops/install.sh --check               # 看清要做哪些事
+bash ops/install.sh upgrade-all --json    # 批量升级所有 target，机器可读 JSON
 ```
 
-`install.sh` 升级模式会：
-1. 对比每个部署目录的 `VERSION` 与源版本
-2. 按需运行 `migrations/vX.Y.Z.sh`（幂等）
-3. 保留你的私人数据（`.env` / `config/runtime.env` / `data/*.db` / `knowledge-base/*`）
+`upgrade-all` 升级模式做 4 件事：
 
-### install.sh 模式速查（v2.1.3+）
+1. 调 `ops/layout-migrations/v2-to-v3.sh` 把 target 内 v2 布局迁到 v3（用户态文件不动）
+2. 跑 `ensure-runtime-layout`：copy-first 把 `data/xhs.db` 等迁到 `agent/data/xhs.db`，源文件保留至 v3.2 删除窗口
+3. 按 `__migrations` 表台账跑 pending DB migration（幂等）
+4. 跑 `ensure-schema`：自动应用 state migration，失败进入 read-only 降级模式
+
+详细步骤、回滚方案与 troubleshooting 见 [UPGRADE.md](UPGRADE.md) 的 v2→v3 章节。
+
+### v3.0 内部小版本升级
 
 ```bash
-bash install.sh --check                             # 只自检，不写文件
-bash install.sh --dry-run                           # 预演：列出将做的所有动作
-bash install.sh --yes                               # 跳过交互用默认值
-bash install.sh --target ~/.myagents/skills/shuling # 显式指定部署目标（可重复）
-bash install.sh --mode=existing-creator             # 老博主模式（v2.2.0+）
-SHULING_ASSUME_YES=1 GEMINI_API_KEY=xxx bash install.sh   # 远程/自动化一键部署
+git pull && bash ops/install.sh upgrade-all
+```
+
+正常情况下零交互、保留所有用户私人数据。
+
+### ops/install.sh 子命令速查
+
+```bash
+bash ops/install.sh                              # install
+bash ops/install.sh upgrade-all                  # 批量升级所有 target
+bash ops/install.sh --check                      # 只自检不写文件
+bash ops/install.sh --dry-run                    # 预演
+bash ops/install.sh --target ~/.myagents/skills/shuling   # 显式指定部署目标
+bash ops/install.sh --mode=existing-creator      # 老博主模式
+bash ops/install.sh doctor [TARGET]              # 12 项 target 健康检查
+bash ops/install.sh migrate-layout [TARGET]      # v2 → v3 布局迁移（单 target）
+bash ops/install.sh rollback-to-v2 <TARGET>      # 输出回滚指引（不动用户态）
 ```
 
 逐版本升级步骤 → [UPGRADE.md](UPGRADE.md)
@@ -290,116 +311,89 @@ SHULING_ASSUME_YES=1 GEMINI_API_KEY=xxx bash install.sh   # 远程/自动化一�
 
 ## 架构与目录
 
-### 数据流
+> 完整三层心智模型 + ASCII 架构图见 [`docs/architecture.md`](docs/architecture.md)。
+
+### 数据流（一条主线）
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│           AI 助手（大脑 / Skill-as-Brain）                │
-│                                                            │
-│   §0a 业务路由 → §0b 识别平台/校验 schema                  │
-│   ├─→ §0c 老博主接入（v2.2.0+ 可选）                       │
-│   └─→ §0/§1 新博主流程                                     │
-│   → §2/§3/§4 日常（选题/创作/发布/复盘/自进化）            │
-└─┬──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┘
-  │      │      │      │      │      │      │      │
-┌─▼────┐┌▼────┐┌▼───┐┌─▼───┐┌▼─────┐┌▼────┐┌▼───┐┌─▼─────┐
-│xhs.sh││db.sh││image││fetch││noterx││pre- ││imp-││audit- │
-│MCP   ││SQL  ││.py  ││-*.sh││-diag ││flight│ort-││report │
-│9 工具 ││8 表 ││生图 ││拉数据││5 维  ││自检  ││exst││8 维  │
-└──────┘└─────┘└─────┘└─────┘└─────┘└─────┘└────┘└──────┘
-                                                  ↑ v2.2.0
-
-knowledge-base/                    schemas/（AI 写入契约）
-├── profile.json                   ├── state.schema.json
-├── preferences.json               ├── profile.schema.json
-├── patterns.md / anti-*.md        ├── preferences.schema.json
-├── image-patterns.md / anti-*     └── audit-report.schema.json
-├── evolution-log.md
-├── reviews/<YYYY-W##>.md          data/
-└── audit-<YYYY-MM-DD>.md / json   ├── xhs.db          ← 8 张表
-  ↑ v2.2.0                        └── content-rules.md
+AI → SKILL.md（启动协议 4 步）
+       ↓ 第 4 步路由
+agent/playbook/00-routing.md → 选具体剧本
+       ↓
+具体 playbook → 调 agent/scripts/* → 读写 agent/data/xhs.db + agent/knowledge-base/
+       ↓
+状态落 agent/config/state.json，下次路由读 state 决定下一步
 ```
 
-**一条主线**：AI → SKILL.md（业务路由）→ scripts/（物理操作）→ DB + knowledge-base（持久化）→ 下次路由读 state。所有自动化（午/晚间发布 + 夜间复盘 + 周日深度回顾）全部走这条，由 hermes cron 定时唤起助手实现。
+所有自动化（午/晚间发布 + 夜间复盘 + 周日回顾）走同一条主线，由 cron 唤起助手 → 助手读 SKILL.md → 路由到对应 playbook。
 
-### 目录结构
+### 顶层目录
 
 ```
 shuling/
-├── SKILL.md                             # 大脑剧本（AI 读这个，核心）
-├── VERSION                               # 版本号 + BRAIN/HANDS/CALIB 清单
-├── CHANGELOG.md / UPGRADE.md / RELEASING.md    # 版本管理三件套
-├── README.md                             # 本文件
-├── install.sh                            # 六模式安装脚本（v2.1.3+）
+├── SKILL.md                # 协议适配层（≤150 行）
+├── VERSION                 # 版本号 + BRAIN/HANDS/CALIB 清单
+├── README.md / CHANGELOG.md / UPGRADE.md / RELEASING.md
+├── install.sh              # v3.0 兼容 stub，转发到 ops/install.sh（v3.2 移除）
+├── agents/                 # 多平台元数据（OpenClaw 兼容）
 │
-├── config/
-│   └── runtime.env.example               # 配置模板
+├── agent/                  # ───── 业务内核（进 target 包）─────
+│   ├── playbook/           # 9 个剧本 + _shared/（emoji 词典 / 决策档映射 / 大纲范例）
+│   ├── scripts/            # 手脚层（_paths.sh 是路径单一来源）
+│   ├── schemas/            # JSON Schema 数据契约（4 + 1 frontmatter）
+│   ├── prompts/            # 图像生成 prompt 模板
+│   ├── policies/           # 内容规则 / 节流 / 限额
+│   ├── migrations/db/      # SQLite migration（v*.sh + _guard.sh + __migrations）
+│   ├── migrations/state/   # JSON / knowledge-base 结构迁移
+│   ├── config/             # runtime.env / state.json / .layout-v3.done（用户态）
+│   ├── data/               # xhs.db（用户态，11 张表）
+│   └── knowledge-base/     # profile / preferences / patterns / evolution-log（用户态）
 │
-├── scripts/                              # ───── Hands 层 ─────
-│   ├── preflight.py                      # 环境预检（JSON + --human，v2.1.3+）
-│   ├── db.sh                             # SQLite CRUD（8 表）
-│   ├── xhs.sh                            # 小红书 MCP 统一入口（9 工具 + 节流 + 限额 + 日志）
-│   ├── image.py                          # Gemini / OpenAI 生图
-│   ├── fetch-post-data.sh                # 合并拉 metrics + comments（v2.1.0+）
-│   ├── fetch-metrics.sh / fetch-comments.sh  # 旧（v2.1.0 前）
-│   ├── noterx-diagnose.sh                # NoteRx 五维诊断
-│   ├── import-existing.sh                # 老博主批量导入（v2.2.0+）
-│   └── audit-report.sh                   # 账号体检报告（v2.2.0+）
+├── ops/                    # ───── 部署运维层（不进 target）─────
+│   ├── install.sh          # 7 子命令：install / upgrade-all / dry-run / check / doctor / migrate-layout / rollback-to-v2
+│   ├── doctor.sh           # 12 项 target 健康检查
+│   ├── layout-migrations/  # v2-to-v3.sh
+│   ├── upgrade-hooks/      # 单参数+单行 JSON 契约的副作用 hook
+│   ├── cron/               # 4 平台 cron 模板（hermes / claude-code / launchd / systemd）
+│   └── verify/             # 34 条门禁 + pre-submit-verify.sh
 │
-├── schemas/                              # ───── AI 写入契约（v2.1.3+）─────
-│   ├── state.schema.json
-│   ├── profile.schema.json
-│   ├── preferences.schema.json
-│   └── audit-report.schema.json          # v2.2.0+
+├── build/                  # ───── 工程支撑层（不进 target）─────
+│   ├── package-skill.sh    # 按白名单 rsync 到 dist/
+│   ├── check-package.sh    # 校验 dist/ 顶层只有 4 项
+│   ├── check-version-sync.sh
+│   ├── check-playbook-frontmatter.py
+│   └── check-active-region-refs.py
 │
-├── migrations/                           # DB schema 迁移（vX.Y.Z.sh 幂等）
-│   ├── v2.1.1.sh                         # 补建 request_log 表
-│   ├── v2.1.2.sh / v2.1.3.sh             # 纯文档版本留痕
-│   └── v2.2.0.sh                         # ALTER posts add source + CREATE historical_stats
-│
-├── knowledge-base/                       # ───── 运行时生成（私有）─────
-│   ├── profile.json                      # 博主画像
-│   ├── preferences.json                  # 偏好权重（自进化）
-│   ├── patterns.md / anti-patterns.md    # 文字 pattern 库
-│   ├── image-patterns.md / image-anti-*  # 图片 prompt 库
-│   ├── evolution-log.md                  # 每日进化日志
-│   ├── reviews/<YYYY-W##>.md             # 周快照
-│   └── audit-<YYYY-MM-DD>.(md|json)      # 老博主体检报告（v2.2.0+）
-│
-├── data/
-│   ├── xhs.db                            # SQLite（8 张表，运行时生成）
-│   └── content-rules.md                  # 内容规则与平台限制
-│
-├── docs/
-│   ├── mcp-setup.md                      # xiaohongshu-mcp 完整安装指南（含 cookie 图文）
-│   └── features/
-│       └── existing-creator-onboarding.md    # 老博主接入完整 spec（v2.2.0+）
-│
-└── platform/
-    ├── hermes.md                         # Hermes 定时任务配置
-    ├── claude-code.md                    # Claude Code 使用指南
-    └── codex.md                          # Codex 使用指南
+├── docs/                   # 文档（adr / plans / runbooks / reference）
+├── site/                   # landing page 源码
+├── marketing/              # v2.x 推广物料
+├── legacy/                 # 归档（old-xhs-mcp-skill / archive / promotion-archive / shuling-full-spec.md）
+└── dist/                   # package-skill.sh 输出（gitignored）
 ```
+
+`agents/`（顶层）+ `agent/`（业务内核）+ `SKILL.md` + `VERSION` 是唯一会被打包到 target 的 4 个顶级条目；其它目录全部留在源仓库。verify 第 12-14 条强制约束。
 
 ---
 
 ## 配置参考
 
-所有 `XHS_*` / `SHULING_*` 变量可在 `.env`、`config/runtime.env` 或进程环境中设置。
+所有 `XHS_*` / `SHULING_*` / `MCP_*` 变量可在 `agent/config/runtime.env` 或进程环境中设置。
 
-### 通用配置（MCP / 安装 / 图片 / 诊断）
+### 通用配置
 
 | 变量 | 默认 | 作用 |
 |---|---|---|
 | `MCP_URL` | `http://localhost:18060/mcp` | xiaohongshu-mcp 服务地址 |
 | `XHS_CACHE_DIR` | `~/.cache/shuling` | 节流戳 + quota + session + import-state 目录 |
-| `SHULING_ASSUME_YES` | `0` | 设 `1` 等同 `--yes`，所有交互用默认值（v2.1.3+） |
-| `SHULING_CREATOR_MODE` | 空 | 设 `existing` 等同 `--mode=existing-creator`（v2.2.0+） |
+| `SHULING_ASSUME_YES` | `0` | 设 `1` 等同 `--yes`，所有交互用默认值 |
+| `SHULING_CREATOR_MODE` | 空 | 设 `existing` 等同 `--mode=existing-creator` |
+| `SHULING_DB` | `agent/data/xhs.db` | DB 路径覆盖（v2.4.2+ 兼容） |
+| `SHULING_AGENT_ROOT` | 自动推导 | agent/ 根路径覆盖（v3.0+） |
 | `XHS_MCP_URL` | 空 | 预填 MCP URL（避免 prompt 卡住） |
-| `GEMINI_API_KEY` | 空 | Gemini 生图 Key（推荐） |
-| `IMAGE_GEN_MODEL` | `gemini-3-pro-image-preview` | 图像模型（Nano Banana Pro，中文渲染更稳） |
+| `IMAGE_GEN_API_KEY` | 空 | Gemini 生图 Key（必需，写入 `agent/config/runtime.env`） |
+| `IMAGE_GEN_MODEL` | `gemini-3-pro-image-preview` | 图像模型（Nano Banana Pro，中文渲染稳） |
 | `IMAGE_GEN_PROTOCOL` | `gemini-native` | 也可设 `openai-chat`（走兼容代理）；不配置无 HTML 降级 |
-| `NOTERX_API_KEY` | 空 | NoteRx 五维诊断 Key（不配则跳过 §3 诊断步骤） |
+| `NOTERX_API_KEY` | 空 | NoteRx 五维诊断 Key（不配则跳过 05 诊断步骤） |
 
 ### 节流与限额（profile `v1-conservative`，v2.1.0+）
 
@@ -418,13 +412,14 @@ shuling/
 | `XHS_DISABLE_QUOTA` | `0` | 设 `1` 跳过日限额（**账号安全自理**） |
 | `XHS_REUSE_SESSION` | `0` | 设 `1` 启用 session 复用（opt-in，上游 2-3 次后失效） |
 | `XHS_SESSION_TTL` | `120` | session 复用 TTL 秒数 |
-| `XHS_DISABLE_LOG` | `0`（开启） | 设 `1` 跳过写 `request_log` 表（v2.1.1+） |
+| `XHS_DISABLE_LOG` | `0`（开启） | 设 `1` 跳过写 `request_log` 表 |
 
 请求日志查询：
+
 ```bash
-bash scripts/xhs.sh log --limit 10            # 最近 10 条
-bash scripts/xhs.sh log --summary              # 按 tool × status 聚合
-bash scripts/xhs.sh log --tool search_feeds --days 7
+bash agent/scripts/xhs.sh log --limit 10            # 最近 10 条
+bash agent/scripts/xhs.sh log --summary             # 按 tool × status 聚合
+bash agent/scripts/xhs.sh log --tool search_feeds --days 7
 ```
 
 ---
@@ -434,15 +429,20 @@ bash scripts/xhs.sh log --tool search_feeds --days 7
 | 你想做什么 | 去读 |
 |---|---|
 | 想先看项目介绍页（中英文） | [shuling.pages.dev](https://shuling.pages.dev) |
-| 我是 AI / 想知道整个业务怎么运行 | [SKILL.md](SKILL.md)（必读） |
-| 我是用户 / 每次发版有什么变化 | [CHANGELOG.md](CHANGELOG.md) |
-| 我要从 vX.Y.Z 升级到新版 | [UPGRADE.md](UPGRADE.md) |
-| 我要自己发版 | [RELEASING.md](RELEASING.md) |
-| xiaohongshu-mcp 装不上 / cookie 怎么拿 | [docs/runbooks/mcp-setup.md](docs/runbooks/mcp-setup.md) |
-| 老博主接入流程的完整设计 | [docs/plans/existing-creator-onboarding.md](docs/plans/existing-creator-onboarding.md) |
-| AI 写入 JSON 时要遵守什么契约 | [schemas/](schemas/) + [schemas/README.md](schemas/README.md) |
-| 我的平台（hermes / claude / codex）怎么配 | [platform/](platform/) |
-| 知道有哪些表、字段是什么 | `scripts/db.sh init` 看 SQL；或 SKILL.md §7 |
+| 我是 AI / 想知道整个业务怎么运行 | [`SKILL.md`](SKILL.md) → [`agent/playbook/00-routing.md`](agent/playbook/00-routing.md) |
+| 我想理解 v3.0 三层架构 | [`docs/architecture.md`](docs/architecture.md) |
+| 我是用户 / 每次发版有什么变化 | [`CHANGELOG.md`](CHANGELOG.md) |
+| 我要从 v2.x 升级到 v3.0 | [`UPGRADE.md`](UPGRADE.md) |
+| 我要自己发版 | [`RELEASING.md`](RELEASING.md) |
+| v3.0 重构决策（为什么这样拆） | [`docs/adr/0001-stateful-creator-agent.md`](docs/adr/0001-stateful-creator-agent.md) |
+| playbook 拆分决议 | [`docs/adr/0002-playbook-split-decisions.md`](docs/adr/0002-playbook-split-decisions.md) |
+| xiaohongshu-mcp 装不上 / cookie 怎么拿 | [`docs/runbooks/mcp-setup.md`](docs/runbooks/mcp-setup.md) |
+| 老博主接入流程的完整设计 | [`docs/plans/existing-creator-onboarding.md`](docs/plans/existing-creator-onboarding.md) |
+| 脚本契约（命令清单 + 输入输出） | [`agent/scripts/README.md`](agent/scripts/README.md) |
+| 数据契约（schema + 表 + 文件） | [`agent/schemas/_meta.md`](agent/schemas/_meta.md) |
+| 我的平台（Claude / Codex / Hermes）怎么配 | [`docs/runbooks/platform/`](docs/runbooks/platform/) |
+| cron 模板（自动化） | [`ops/cron/`](ops/cron/) |
+| 灾备 / 回滚到 v2 | [`docs/runbooks/disaster-recovery.md`](docs/runbooks/disaster-recovery.md) |
 
 ---
 
@@ -450,7 +450,7 @@ bash scripts/xhs.sh log --tool search_feeds --days 7
 
 ### 版本号语义：BRAIN.HANDS.CALIB
 
-- **BRAIN** +1：SKILL.md 核心流程 / 自进化算法 / AI 行为方式变化 → **major**，breaking
+- **BRAIN** +1：SKILL.md / playbook 核心流程 / 自进化算法 / AI 行为方式变化 → **major**，breaking
 - **HANDS** +1：scripts/ 扩展 / DB schema 变化 / MCP 接口变化 → **minor**，一般非 breaking
 - **CALIB** +1：阈值 / 文档 / bugfix / prompt 微调 → **patch**，用户无感升级
 
@@ -462,18 +462,23 @@ bash scripts/xhs.sh log --tool search_feeds --days 7
 |---|---|---|
 | v1.x | OpenClaw + Python workflow 双线架构 | 已归档 |
 | v2.0.0 | Skill-as-Brain 重构 | ✅ |
-| v2.1.0 | Anti-Ban Shield（节流 + 限额 + session + 合并脚本） | ✅ |
+| v2.1.0 | Anti-Ban Shield（节流 + 限额 + session） | ✅ |
 | v2.1.1 | Request Log（MCP 调用全量落表） | ✅ |
-| v2.1.2 | Release Polish（CHANGELOG/UPGRADE/RELEASING 三件套 + migrations） | ✅ |
-| v2.1.3 | Friendly Onboarding（install.sh 六模式 + preflight --human + schemas + §0b） | ✅ |
-| v2.2.0 | Existing Creator Support（老博主接入 + 账号体检 + patterns 种子） | ✅ |
-| v2.2.1 | Migration Safety Fix（v2.1.1 迁移脚本在存量 v2.0 升级时阻断修复） | ✅ |
-| v2.3.0 | Pure Image Pipeline（去 HTML 截图降级 + Gemini 必需 + prompt 模板系统 + 封面参考图） | ✅ |
-| **v2.4.0** | **Agent-Friendly Upgrade Infrastructure（`install.sh upgrade-all` + `upgrade-hooks/` + `__migrations` 表 + schema drift 校验 + docs 五子目录 + requirements.txt）** | ✅ **当前** |
-| v2.4.1 | Observability + Test（脚本 JSON 日志 + smoke 测试 + ShellCheck） | 规划中 |
-| v2.5.0 | SKILL.md Modular（1208 行瘦身 → 主干 ≤300 行 + skill-chapters/） | 规划中 |
-| v2.x 其他 | 历史帖改写重发建议 / 评论回复助手（Layer 2） | 规划中 |
-| v3.0.0 | 视频笔记 / 多账号灰度 / 竞品对标（Layer 3）；候选议题：Phase-Aware Weights（phase 权重自适应硬化）/ Pattern Confidence State Machine（low→medium→high 升级规则）——待真实数据量（20+ 帖、10+ 诊断）到位后再决定 | 远期 |
+| v2.1.2 | Release Polish（CHANGELOG/UPGRADE/RELEASING + migrations） | ✅ |
+| v2.1.3 | Friendly Onboarding（install 六模式 + preflight --human + schemas） | ✅ |
+| v2.2.0 | Existing Creator Support（老博主接入 + 体检 + patterns 种子） | ✅ |
+| v2.2.1 | Migration Safety Fix | ✅ |
+| v2.3.0 | Pure Image Pipeline（去 HTML 截图降级 + Gemini 必需） | ✅ |
+| v2.4.0 | Agent-Friendly Upgrade Infrastructure（upgrade-all + upgrade-hooks + `__migrations` + schema drift） | ✅ |
+| v2.4.1 | Install reliability patch（4 处 verify 修复） | ✅ |
+| v2.4.2 | Source-Target Isolation Patch（5 处 + pre-submit-verify 21 项） | ✅ |
+| v2.4.3 | Business Source License Shift（BSL 1.1） | ✅ |
+| **v3.0.0** | **Stateful Creator Agent（三层架构 + playbook 拆分 + ensure-* 自愈 + 34 条 verify）** | ✅ **当前** |
+| v3.1 | Policies YAML 拆分（throttle / quota 从硬编码移到 `agent/policies/*.yaml`） | 规划中 |
+| v3.2 | v2 兼容 stub 移除（根 `install.sh` 移除 / target 内 v2 旧路径删除窗口） | 规划中 |
+| v4.0 | 触发条件之一满足时考虑（playbook >20 / 多账户 >100k posts / agent daemon 化） | 远期 |
+
+ADR-0001 末尾的 v4.0 退出条件见 [`docs/adr/0001-stateful-creator-agent.md` §退出条件](docs/adr/0001-stateful-creator-agent.md#退出条件何时考虑-v40)。
 
 ---
 
@@ -481,18 +486,26 @@ bash scripts/xhs.sh log --tool search_feeds --days 7
 
 这是个人项目，但代码开源借鉴欢迎：
 
-- **Fork + 本地改 + 测试**（至少跑通一次 `install.sh --check` + 一次 `xhs.sh search`）
-- **遵守 [RELEASING.md](RELEASING.md) 的版本号决策树**
-- **CHANGELOG 写给用户看**，不是给开发者看（参考已有条目格式）
-- 发 PR 时附上 smoke test 结果（截图或命令输出）
+- **Fork + 本地改 + 测试**（至少跑通 `bash ops/install.sh --check` + `bash ops/verify/pre-submit-verify.sh` 全绿）
+- **遵守 [RELEASING.md](RELEASING.md) 的版本号决策树** + ADR-0001 的 12 条总原则
+- **CHANGELOG 写给用户看**（参考已有条目格式）
+- 发 PR 时附上 verify 结果（截图或 JSON 输出）
 
-如果你在做类似"AI Skill + MCP + 自进化知识库"的项目，可以直接借鉴以下设计：
+如果你在做类似"AI Skill + MCP + 自进化知识库"的项目，可以直接借鉴：
 
-- `SKILL.md §0a` 业务路由 + 反模式禁令
-- `schemas/` + AI 写入前自校验协议
+- 三层架构（协议适配 / 业务内核 / 部署运维）
+- playbook frontmatter + 算法权威唯一性 + 路径单一来源
+- `agent/schemas/` + 写入前自校验协议
 - BRAIN.HANDS.CALIB 版本号语义
-- CHANGELOG 📦/⬆️ 双栏 + UPGRADE 逐版本步骤 + RELEASING SOP
+- 34 条 verify 门禁的工程化纪律
 
 ### 许可
 
-MIT
+本仓库当前采用 **Business Source License 1.1**。
+
+- `Licensor`: AI-flower
+- `Change Date`: 2030-04-23
+- `Change License`: Apache-2.0
+- `Additional Use Grant`: 个人非商业使用可直接使用；任何公司、组织或其他商业主体需要另行与作者洽谈商业许可
+
+这意味着它是 **source-available**，不是 OSI 批准的开源许可。完整条款见 [LICENSE](LICENSE)。
